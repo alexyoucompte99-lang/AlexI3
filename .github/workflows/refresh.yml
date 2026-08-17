@@ -5,7 +5,7 @@ on:
     types: [refresh]
   workflow_dispatch:
   schedule:
-    - cron: "*/30 5-21 * * *"   # toutes les 30 min, 7h-23h heure de Paris (été)
+    - cron: "*/15 5-21 * * *"   # toutes les 15 min, 7h-23h heure de Paris (été)
 
 concurrency:
   group: refresh
@@ -42,6 +42,8 @@ jobs:
         env:
           META_TOKEN: ${{ secrets.META_TOKEN }}
           META_ACCOUNT: ${{ secrets.META_ACCOUNT }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
           ALEX_CODE: ${{ secrets.ALEX_CODE }}
           PILOTAGE_CODE: ${{ secrets.PILOTAGE_CODE }}
           WA_THOMAS: ${{ secrets.WA_THOMAS }}
@@ -54,11 +56,18 @@ jobs:
           python parse_xlsx.py investisseurs30.xlsx data.json
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
+          python eow_notify.py investisseurs30.xlsx ../.eow-count || true
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
           HASH=$(cat data.json ads.json | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
           if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "donnees inchangees, pas de rebuild"; exit 0
+            echo "donnees inchangees, pas de rebuild"
+            cd ..
+            git config user.name "console-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git add .eow-count 2>/dev/null || true
+            git diff --cached --quiet || (git commit -m "EOW notifies" && git push)
+            exit 0
           fi
           echo "$HASH" > ../.data-hash
           python aggregate.py data.json ads.json dashboard-data.json "$NOW"
@@ -72,5 +81,5 @@ jobs:
         run: |
           git config user.name "console-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add index.html closing/index.html .data-hash
+          git add index.html closing/index.html .data-hash .eow-count
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)
