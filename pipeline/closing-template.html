@@ -930,6 +930,7 @@ function waDraft(c) {
   const cl = (c.c || "").trim().split(/\s+/)[0];
   const quand = c.d ? " du " + frDate(c.d) : "";
   const obj = (c.obj || "").trim();
+  if (c.d && c.d > TODAY_ISO && !c.s) return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! On a notre call prévu ensemble le ${frDate(c.d)}. Si tu as la moindre question d'ici là n'hésite pas, à très vite !`;
   if (c.v === "FOLLOW_UP") {
     let m = `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Je reviens vers toi comme convenu suite à notre échange${quand}.`;
     if (obj && obj.length <= 45) m += ` La dernière fois tu hésitais encore (${obj.toLowerCase()}).`;
