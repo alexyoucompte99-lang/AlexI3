@@ -1447,7 +1447,11 @@ function setupRefresh(btn, note) {
       btn.textContent = "MAJ lancée...";
       try {
         const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh");
-        await r.text();
+        const body = await r.text();
+        if (body.indexOf('"ok":true') === -1) {
+          btn.textContent = "MAJ auto toutes les 30 min (bouton instantané à configurer)";
+          return;
+        }
         let left = 170;
         const t = setInterval(() => {
           left -= 1;
