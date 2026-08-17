@@ -1275,7 +1275,7 @@ const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
         const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh");
         const body = await r.text();
         if (body.indexOf('"ok":true') === -1) {
-          btn.textContent = "MAJ auto toutes les 30 min (bouton instantané à configurer)";
+          btn.textContent = "MAJ auto toutes les 15 min (bouton instantané à configurer)";
           return;
         }
         let left = 170;
