@@ -53,7 +53,11 @@ async function tryOpen(pass) {
   try {
     const html = await decrypt(pass);
     sessionStorage.setItem("i3-code", pass);
-    document.open(); document.write(html); document.close();
+    /* doctype indispensable : sans lui la page rendue par document.write passe
+       en mode quirks et les sliders (input range) ne se laissent plus glisser */
+    document.open();
+    document.write('<!doctype html>\\n<meta name="viewport" content="width=device-width,initial-scale=1">\\n' + html);
+    document.close();
   } catch (e) {
     sessionStorage.removeItem("i3-code");
     document.getElementById("err").style.display = "block";

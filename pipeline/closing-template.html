@@ -894,7 +894,55 @@ function followups() {
     .sort((a, b) => (b.d || "") < (a.d || "") ? -1 : 1);
 }
 const fuKey = (c) => "fu-done:" + c.n + "|" + (c.d || "");
-const fuDone = (c) => localStorage.getItem(fuKey(c)) != null;
+/* relance considérée faite si cochée sur ce navigateur OU notée dans le Sheet
+   (colonne « RELANCE FAITE (console) », partagée entre tous) */
+const fuDone = (c) => localStorage.getItem(fuKey(c)) != null || !!c.rf;
+
+/* ---- écriture retour vers le Google Sheet via le pont Apps Script ---- */
+const bridgeReady = () => typeof BRIDGE !== "undefined" && BRIDGE.url.indexOf("http") === 0;
+async function bridgePost(payload) {
+  if (!bridgeReady()) return false;
+  try {
+    const r = await fetch(BRIDGE.url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(Object.assign({ key: BRIDGE.key }, payload)),
+    });
+    return (await r.text()).indexOf('"ok":true') !== -1;
+  } catch (e) { return false; }
+}
+let toastEl = null;
+function toast(msg) {
+  if (!toastEl) {
+    toastEl = document.createElement("div");
+    toastEl.style.cssText = "position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#241d15;color:#f7efe4;padding:9px 18px;border-radius:999px;font-size:13px;z-index:99;transition:opacity .3s";
+    document.body.appendChild(toastEl);
+  }
+  toastEl.textContent = msg;
+  toastEl.style.opacity = "1";
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(() => toastEl.style.opacity = "0", 3500);
+}
+
+/* ---- brouillon WhatsApp selon le contexte du call ---- */
+function waDraft(c) {
+  const p = (c.n || "").trim().split(/\s+/)[0];
+  const cl = (c.c || "").trim().split(/\s+/)[0];
+  const quand = c.d ? " du " + frDate(c.d) : "";
+  const obj = (c.obj || "").trim();
+  if (c.v === "FOLLOW_UP") {
+    let m = `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Je reviens vers toi comme convenu suite à notre échange${quand}.`;
+    if (obj && obj.length <= 45) m += ` La dernière fois tu hésitais encore (${obj.toLowerCase()}).`;
+    m += ` Tu en es où de ta réflexion ? Si tu veux on se cale 10 minutes cette semaine pour en reparler.`;
+    return m;
+  }
+  if (c.s === "NON") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. On avait un call prévu${quand} et on s'est manqués. Quel créneau t'arrangerait pour le reprogrammer ?`;
+  if (c.s === "REPROGRAMMER" || c.s === "ANNULE") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Notre call${quand} avait été décalé, je te propose qu'on le remette au planning. Quelles sont tes dispos cette semaine ?`;
+  return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Je me permets de revenir vers toi suite à notre échange${quand}. Dis-moi si tu veux qu'on en reparle !`;
+}
+const waLink = (c) => c.tel
+  ? `<a class="tel" href="https://wa.me/${esc(String(c.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(waDraft(c)).replace(/'/g, "%27")}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec un message pré-écrit">${esc(c.tel)}</a>`
+  : "·";
 function bestRelance(c) {
   if (c.r2) return { d: c.r2, src: "R2" };
   if (c.rel) return { d: c.rel, src: "prévue" };
@@ -970,7 +1018,7 @@ function renderFollowups() {
         <td><input type="checkbox" data-fui="${i}" ${done ? "checked" : ""} aria-label="Relance faite pour ${esc(c.n)}" style="width:17px;height:17px;accent-color:var(--accent);cursor:pointer"></td>
         <td>${esc(c.c) || "·"}</td>
         <td><b${done ? ' style="text-decoration:line-through"' : ""}>${esc(c.n)}</b></td>
-        <td>${c.tel ? `<a class="tel" href="tel:${esc(c.tel)}">${esc(c.tel)}</a>` : "·"}</td>
+        <td>${waLink(c)}</td>
         <td style="max-width:20ch;overflow-wrap:anywhere">${esc(c.mail) || "·"}</td>
         <td>${frDate(c.d)}</td>
         <td class="${age != null && age > 14 && !done ? "late" : ""}">${ageTxt}</td>
@@ -983,8 +1031,14 @@ function renderFollowups() {
   $("fuTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
     cb.addEventListener("change", () => {
       const c = list[+cb.dataset.fui];
-      if (cb.checked) localStorage.setItem(fuKey(c), TODAY_ISO);
-      else localStorage.removeItem(fuKey(c));
+      if (cb.checked) { localStorage.setItem(fuKey(c), TODAY_ISO); c.rf = "OUI " + frDate(TODAY_ISO); }
+      else { localStorage.removeItem(fuKey(c)); c.rf = ""; }
+      /* écrit aussi dans le Sheet (colonne RELANCE FAITE) pour partager l'état */
+      if (c.st && c.sr) {
+        bridgePost({ what: "relance", tab: c.st, row: c.sr, headerRow: (DATA.hrows || {})[c.st] || 1,
+                     value: cb.checked ? "OUI " + frDate(TODAY_ISO) : "" })
+          .then(ok => toast(ok ? "Noté dans le Sheet ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
+      }
       renderFollowups();
     });
   });
@@ -1035,8 +1089,18 @@ function initEow() {
   const eowHref = () => { $("eowSend").href = "https://wa.me/__WA_ALEX__?text=" + encodeURIComponent(eowText()); };
   eowHref();
   EOW_FIELDS.forEach(id => $(id).addEventListener("input", eowHref));
+  const eowToSheet = () => bridgePost({
+    what: "eow", closer: $("eowCloser").value,
+    energie: $("eowEnergy").value, leads: $("eowLeads").value,
+    good: $("eowGood").value, hard: $("eowHard").value,
+    obj: $("eowObj").value, need: $("eowNeed").value, free: $("eowFree").value,
+  });
   $("eowSend").addEventListener("click", () => {
-    eowMsg("WhatsApp s'ouvre avec ton récap prêt pour Alex : appuie juste sur envoyer ✓");
+    /* enregistre aussi la réponse dans le Sheet (onglet « EOW Console ») */
+    eowToSheet().then(ok => {
+      eowMsg(ok ? "Enregistré dans le Sheet + WhatsApp s'ouvre : appuie sur envoyer ✓"
+                : "WhatsApp s'ouvre avec ton récap prêt pour Alex : appuie juste sur envoyer ✓");
+    });
   });
   $("eowCopy").addEventListener("click", async () => {
     await copyText(eowText());
@@ -1164,7 +1228,7 @@ function renderLeads() {
     shown.map(c => `<tr>
       <td>${frDate(c.d)}</td><td>${esc(c.c) || "·"}</td>
       <td><b>${esc(c.n)}</b></td>
-      <td>${c.tel ? `<a class="tel" href="tel:${esc(c.tel)}">${esc(c.tel)}</a>` : "·"}</td>
+      <td>${waLink(c)}</td>
       <td>${chip(CHIP_S, c.s)}</td><td>${venteChip(c)}</td>
       <td class="num">${c.q == null ? "·" : String(c.q).replace(".", ",")}</td>
       <td class="num">${c.pp ? fmtE(c.pp) : "·"}</td>

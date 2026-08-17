@@ -146,6 +146,9 @@ def main(data_path, out_path, updated_at):
             "relEst": relance_estimee(c.get("commentaire"), c.get("date")),
             "hasS": bool(c.get("has_show_up_raw")),
             "hasV": bool(c.get("has_vente_raw")),
+            "st": c.get("tab"),          # onglet + ligne Sheet : écriture retour
+            "sr": c.get("row"),
+            "rf": (c.get("relance_faite") or "").strip(),
         })
 
     eod_appel = [r for r in d.get("setter_reports", []) if r.get("year") == 2026]
@@ -160,7 +163,8 @@ def main(data_path, out_path, updated_at):
                  for w in ads.get("weeks", [])]
     except (FileNotFoundError, json.JSONDecodeError):
         pass
-    out = {"updated_at": updated_at, "calls": calls,
+    hrows = {c["tab"]: c["hrow"] for c in d["calls"] if c.get("tab") and c.get("hrow")}
+    out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)

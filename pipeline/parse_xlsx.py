@@ -97,6 +97,7 @@ COL_MAP = {
     "objection/peur principale": "objection",
     "date de relance a faire": "relance",
     "date r2": "r2",
+    "relance faite": "relance_faite",  # colonne ajoutée par la console (coche Relancé)
 }
 
 
@@ -174,7 +175,8 @@ def main(xlsx_path, out_path):
             if header is None:
                 continue
             mapping = map_header(header)
-            for r in all_rows[hidx + 1:]:
+            # ridx = numéro de ligne réel dans le Sheet (1-based), pour l'écriture retour
+            for ridx, r in enumerate(all_rows[hidx + 1:], start=hidx + 2):
                 def g(f):
                     i = mapping.get(f)
                     return r[i] if i is not None and i < len(r) else None
@@ -192,7 +194,7 @@ def main(xlsx_path, out_path):
                 relance = parse_date(g("relance"))
                 r2 = parse_date(g("r2"))
                 calls.append({
-                    "tab": title, "webi": webi,
+                    "tab": title, "webi": webi, "row": ridx, "hrow": hidx + 1,
                     "closer": re.sub(r"\s+", " ", closer),
                     "prospect": prospect,
                     "date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None,
@@ -211,6 +213,7 @@ def main(xlsx_path, out_path):
                     "objection": cell_str(g("objection"))[:300],
                     "relance": f"{relance[0]:04d}-{relance[1]:02d}-{relance[2]:02d}" if relance else None,
                     "r2": f"{r2[0]:04d}-{r2[1]:02d}-{r2[2]:02d}" if r2 else None,
+                    "relance_faite": cell_str(g("relance_faite"))[:30],
                     "has_show_up_raw": bool(cell_str(g("show_up"))),
                     "has_vente_raw": bool(cell_str(g("vente"))),
                     "has_qualif_raw": bool(cell_str(g("qualif"))),
