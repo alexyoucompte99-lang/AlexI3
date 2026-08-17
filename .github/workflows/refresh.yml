@@ -1,0 +1,76 @@
+name: Refresh consoles
+
+on:
+  repository_dispatch:
+    types: [refresh]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 5-21 * * *"   # toutes les 30 min, 7h-23h heure de Paris (été)
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependances
+        run: pip install --quiet openpyxl
+
+      - name: Recuperer les donnees (pont Apps Script)
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+        working-directory: pipeline
+        run: |
+          curl -sfL "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
+          base64 -d closing.b64 > investisseurs30.xlsx
+          python -c "import openpyxl; wb=openpyxl.load_workbook('investisseurs30.xlsx', read_only=True); print('onglets:', len(wb.sheetnames))"
+          curl -sfL "$BRIDGE_URL?key=$BRIDGE_KEY&what=ads" -o ads_values.json
+
+      - name: Pipeline
+        env:
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+          META_ACCOUNT: ${{ secrets.META_ACCOUNT }}
+          ALEX_CODE: ${{ secrets.ALEX_CODE }}
+          PILOTAGE_CODE: ${{ secrets.PILOTAGE_CODE }}
+          WA_THOMAS: ${{ secrets.WA_THOMAS }}
+          WA_ALEX: ${{ secrets.WA_ALEX }}
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+          PAGE_CODE: ${{ secrets.PAGE_CODE }}
+        working-directory: pipeline
+        run: |
+          python parse_xlsx.py investisseurs30.xlsx data.json
+          python parse_ads_values.py ads_values.json ads.json
+          python meta_fetch.py
+          NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
+          HASH=$(cat data.json ads.json | sha256sum | cut -d" " -f1)
+          OLD=$(cat ../.data-hash 2>/dev/null || echo none)
+          if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "donnees inchangees, pas de rebuild"; exit 0
+          fi
+          echo "$HASH" > ../.data-hash
+          python aggregate.py data.json ads.json dashboard-data.json "$NOW"
+          python build.py
+          python aggregate_closing.py data.json closing-data.json "$NOW"
+          python build.py closing-data.json closing-template.html closing.html
+          python encrypt_page.py dashboard.html ../index.html "$PAGE_CODE" "Console business · Investisseurs 3.0"
+          python encrypt_page.py closing.html ../closing/index.html "$PAGE_CODE" "Console closing · Investisseurs 3.0"
+
+      - name: Publier
+        run: |
+          git config user.name "console-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html closing/index.html .data-hash
+          git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)

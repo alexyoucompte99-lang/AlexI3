@@ -1,0 +1,1300 @@
+<meta charset="utf-8">
+<title>Console Investisseurs 3.0</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f7efe4;
+    --card: #fdfbf6;
+    --border: #e9ddc9;
+    --ink: #262019;
+    --ink-2: #5d5344;
+    --muted: #8f8471;
+    --grid: #ece2d2;
+    --baseline: #d4c7b2;
+    --accent: #a34524;
+    --accent-soft: #fdeae1;
+    --pill-bg: #241d15;
+    --pill-ink: #f7efe4;
+    --wash: rgba(163, 69, 36, 0.09);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --seq-250: #86b6ef; --seq-350: #5598e7; --seq-450: #2a78d6; --seq-550: #1c5cab;
+    --good: #0ca30c; --good-text: #1d6b1d; --warning: #b07a00; --critical: #c03a30;
+    --callout-bg: #fbe7de;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --plane: #171209; --card: #211a11; --border: #3a3226;
+      --ink: #f5eee1; --ink-2: #cbbfa8; --muted: #94897a;
+      --grid: #2e281e; --baseline: #4a4233;
+      --accent: #de8253; --accent-soft: #3a251c;
+      --pill-bg: #f5eee1; --pill-ink: #241d15;
+      --wash: rgba(222, 130, 83, 0.14);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --seq-250: #86b6ef; --seq-350: #5598e7; --seq-450: #3987e5; --seq-550: #1c5cab;
+      --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
+      --callout-bg: #362119;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #171209; --card: #211a11; --border: #3a3226;
+    --ink: #f5eee1; --ink-2: #cbbfa8; --muted: #94897a;
+    --grid: #2e281e; --baseline: #4a4233;
+    --accent: #de8253; --accent-soft: #3a251c;
+    --pill-bg: #f5eee1; --pill-ink: #241d15;
+    --wash: rgba(222, 130, 83, 0.14);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --seq-250: #86b6ef; --seq-350: #5598e7; --seq-450: #3987e5; --seq-550: #1c5cab;
+    --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
+    --callout-bg: #362119;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --plane: #f7efe4; --card: #fdfbf6; --border: #e9ddc9;
+    --ink: #262019; --ink-2: #5d5344; --muted: #8f8471;
+    --grid: #ece2d2; --baseline: #d4c7b2;
+    --accent: #a34524; --accent-soft: #fdeae1;
+    --pill-bg: #241d15; --pill-ink: #f7efe4;
+    --wash: rgba(163, 69, 36, 0.09);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --seq-250: #86b6ef; --seq-350: #5598e7; --seq-450: #2a78d6; --seq-550: #1c5cab;
+    --good-text: #1d6b1d; --warning: #b07a00; --critical: #c03a30;
+    --callout-bg: #fbe7de;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--plane); color: var(--ink);
+    font-family: "Avenir Next", -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.45;
+  }
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 24px 22px 90px; }
+
+  header.top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 18px; margin-bottom: 14px; }
+  .brand .eyebrow { margin-bottom: 2px; }
+  h1 { font-family: var(--serif); font-size: 30px; font-weight: 700; letter-spacing: 0; margin: 0; text-wrap: balance; }
+  h1 em { font-style: italic; font-weight: 400; }
+  .lede-top { color: var(--ink-2); font-size: 13.5px; margin-top: 4px; max-width: 62ch; }
+  .top-right { margin-left: auto; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .updated { font-size: 12.5px; color: var(--ink-2); }
+  .updated b { color: var(--ink); font-weight: 600; }
+  .btn-refresh {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--pill-bg); color: var(--pill-ink); text-decoration: none;
+    font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid var(--pill-bg);
+  }
+  .btn-refresh:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .btn-refresh:hover { color: #241d15; }
+
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+  /* -------- barre de filtres -------- */
+  .filterbar {
+    position: sticky; top: 0; z-index: 30;
+    background: var(--plane);
+    border-bottom: 1px solid var(--border);
+    margin: 0 -22px 8px; padding: 9px 22px 10px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .frow { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+  .flabel {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); min-width: 62px;
+  }
+  .fpill {
+    font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer;
+    padding: 6px 13px; border-radius: 999px; border: 1px solid transparent; background: none;
+    font-family: inherit;
+  }
+  .fpill:hover { border-color: var(--baseline); color: var(--ink); }
+  .fpill[aria-pressed="true"] { background: var(--pill-bg); color: var(--pill-ink); border-color: var(--pill-bg); }
+  .fpill:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .fsep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
+  .fcustom { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  .fcustom input {
+    font: inherit; font-size: 12.5px; color: var(--ink); background: var(--card);
+    border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; max-width: 128px;
+  }
+  .fpill.toggle[aria-pressed="true"]::before { content: "✓ "; }
+
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 24px; }
+  nav.toc a {
+    font-size: 12px; font-weight: 600; color: var(--ink-2); text-decoration: none;
+    padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+  }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+
+  section { margin-top: 44px; }
+  section > .eyebrow { display: block; margin-bottom: 4px; }
+  h2 { font-family: var(--serif); font-size: 22px; font-weight: 700; margin: 0 0 4px; text-wrap: balance; }
+  .lede { color: var(--ink-2); font-size: 13.5px; margin: 0 0 16px; max-width: 76ch; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(252px, 100%), 1fr)); gap: 12px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 15px 17px 13px; }
+  .kpi .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  .kpi .val { font-family: var(--serif); font-size: 31px; font-weight: 700; margin-top: 5px; line-height: 1.1; }
+  .kpi .sub { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+  .kpi .exp { font-size: 12px; color: var(--muted); margin-top: 7px; line-height: 1.45; }
+  .kpi .delta { font-size: 12.5px; font-weight: 700; margin-left: 7px; }
+  .delta.up { color: var(--good-text); } .delta.down { color: var(--critical); } .delta.na { color: var(--muted); font-weight: 400; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: 15px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 17px 19px; }
+  .card h3 { margin: 0 0 2px; font-size: 15px; font-weight: 700; }
+  .card .sub { font-size: 12.5px; color: var(--ink-2); margin-bottom: 12px; }
+  .card.full { grid-column: 1 / -1; }
+
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--callout-bg);
+    border-radius: 0 14px 14px 0; padding: 14px 18px; margin: 14px 0 0; font-size: 13.5px;
+  }
+  .callout .eyebrow { color: var(--accent); margin-bottom: 3px; display: block; }
+  .callout b { font-weight: 700; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-2); margin: 2px 0 8px; }
+  .legend .it { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  svg text { font-family: "Avenir Next", -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .axis { font-size: 10.5px; fill: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+       color: var(--muted); padding: 7px 10px; border-bottom: 1px solid var(--baseline); white-space: nowrap; }
+  th.num, td.num { text-align: right; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--ink); }
+  th .arr { font-size: 9px; }
+  .tscroll { overflow-x: auto; }
+  .rowbar { position: relative; }
+  .rowbar .fill { position: absolute; left: 0; top: 15%; bottom: 15%; background: var(--wash); border-radius: 3px; z-index: 0; }
+  .rowbar span { position: relative; z-index: 1; }
+
+  .pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+          border: 1px solid var(--border); white-space: nowrap; }
+  .pill.crit { color: var(--critical); border-color: var(--critical); }
+  .pill.warn { color: var(--warning); border-color: var(--warning); }
+  .pill.info { color: var(--ink-2); }
+
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .dot.g { background: var(--good); } .dot.o { background: var(--warning); } .dot.r { background: var(--critical); }
+
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 50; display: none;
+    background: var(--ink); color: var(--plane); font-size: 12px; line-height: 1.4;
+    padding: 7px 10px; border-radius: 8px; max-width: 280px;
+  }
+
+  .funnel-row { display: grid; grid-template-columns: 172px 1fr 90px; align-items: center; gap: 10px; padding: 5px 0; }
+  .funnel-row .lbl { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+  .funnel-row .val { font-family: var(--serif); font-size: 15px; font-weight: 700; text-align: right; }
+  .funnel-bar { height: 22px; border-radius: 5px; min-width: 3px; }
+  .funnel-conv { display: grid; grid-template-columns: 172px 1fr; gap: 10px; }
+  .funnel-conv .c { font-size: 11.5px; color: var(--muted); padding: 1px 0 1px 2px; }
+  .funnel-conv .c b { color: var(--ink-2); }
+  .funnel-conv .c .loss { color: var(--critical); font-weight: 600; }
+
+  dl.defs { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 13px; margin: 0; }
+  dl.defs dt { font-weight: 700; white-space: nowrap; }
+  dl.defs dd { margin: 0; color: var(--ink-2); max-width: 78ch; }
+
+  .miss { color: var(--muted); font-style: italic; }
+  footer { margin-top: 60px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 14px; }
+
+  #backtop {
+    position: fixed; right: 22px; bottom: 22px; z-index: 40;
+    width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--pill-bg); color: var(--pill-ink); font-size: 19px; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(38, 32, 25, 0.18);
+  }
+  #backtop.show { display: flex; }
+  #backtop:hover { background: var(--accent); color: #fff; }
+  :root[data-theme="dark"] #backtop:hover { color: #241d15; }
+  #backtop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  @media (max-width: 640px) {
+    .funnel-row { grid-template-columns: 112px 1fr 74px; }
+    .funnel-conv { grid-template-columns: 112px 1fr; }
+    dl.defs { grid-template-columns: 1fr; gap: 2px; }
+    dl.defs dd { margin-bottom: 8px; }
+    .top-right { margin-left: 0; align-items: flex-start; text-align: left; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Thomas · Investisseurs 3.0</span>
+      <h1>Console <em>de pilotage</em></h1>
+      <div class="lede-top">Du budget ads à la vente signée : chaque étape du funnel, les closers, et ce qui reste à corriger dans les tableaux.</div>
+    </div>
+    <div class="top-right">
+      <a class="btn-refresh" id="btnRefresh" href="#" target="_blank" rel="noopener"
+         title="Ouvre Claude avec la demande de mise à jour prête à envoyer. La console se met aussi à jour toute seule chaque matin.">
+        ↻ Actualiser les données
+      </a>
+      <div class="updated">Dernière mise à jour : <b id="updatedAt"></b><br>MAJ auto chaque matin à 7 h 30<br>
+        <span style="color:var(--muted)">Le bouton ouvre Claude : envoie le message pré-rempli,<br>patiente 2-3 min puis recharge cette page.</span></div>
+    </div>
+  </header>
+
+  <div class="filterbar" id="filterbar" role="toolbar" aria-label="Période">
+    <!-- pills injectées en JS -->
+  </div>
+
+  <nav class="toc" aria-label="Sections">
+    <a href="#funnel">Funnel</a>
+    <a href="#mois">Par mois</a>
+    <a href="#semaines">Ads hebdo</a>
+    <a href="#closers">Closers</a>
+    <a href="#sources">Sources</a>
+    <a href="#qualite">Qualité leads</a>
+    <a href="#brancher">À brancher</a>
+    <a href="#methodo">Méthodo</a>
+    <a href="#hygiene">Champs manquants</a>
+    <a href="#showup">Show-up à remplir</a>
+  </nav>
+
+  <div id="bottleneck"></div>
+
+  <section id="kpis" aria-label="Chiffres clés">
+    <span class="eyebrow" id="kpiTitle">Vue globale</span>
+    <div class="kpis" id="kpiGrid" style="margin-top:8px"></div>
+  </section>
+
+  <section id="objectif" aria-label="Objectif et projection du mois">
+    <div class="card full" id="projCard"></div>
+  </section>
+
+  <section id="funnel">
+    <span class="eyebrow">Funnel complet</span>
+    <h2>De la pub à la vente : où on perd les leads</h2>
+    <p class="lede" id="funnelPeriod"></p>
+    <div class="cards">
+      <div class="card">
+        <h3>Acquisition (Facebook Ads)</h3>
+        <div class="sub">Tableau ads, semaines de la période. Le tracking ads démarre au 04/05/2026.</div>
+        <div id="funnelAds"></div>
+      </div>
+      <div class="card">
+        <h3>Vente (calls, tous canaux)</h3>
+        <div class="sub">Onglets closing : webinaires, ads, organique confondus.</div>
+        <div id="funnelSales"></div>
+      </div>
+      <div class="card full">
+        <h3>Ce que coûte un lead à chaque étape</h3>
+        <div class="sub">Budget ads de la période divisé par les leads arrivés à chaque marche (tous canaux : à lire comme un ordre de grandeur). C'est le vrai prix d'un lead qui va jusque-là.</div>
+        <div class="tscroll"><table id="costTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mois">
+    <span class="eyebrow">Vue mensuelle</span>
+    <h2>Volume, conversion et chiffre d'affaires par mois</h2>
+    <p class="lede">Chaque call est rattaché à l'onglet mensuel où l'équipe l'a loggé, comme dans les récaps du Sheet. Janvier et avril incluent les webinaires.</p>
+    <div class="cards">
+      <div class="card"><h3>Calls bookés et ventes</h3><div class="sub">Lignes closing / ventes signées</div><div id="chMonthlyCalls"></div></div>
+      <div class="card"><h3>CA signé</h3><div class="sub">Prix confirmé (sinon proposé) des ventes OUI, en euros</div><div id="chMonthlyCA"></div></div>
+      <div class="card"><h3>Taux de show-up et de closing</h3><div class="sub">Show-up : présents / (présents + no-show) · closing : ventes / pitchés</div><div id="chMonthlyRates"></div></div>
+      <div class="card"><h3>ROAS mensuel</h3><div class="sub">CA signé du mois divisé par le budget ads du mois · pointillé : seuil de rentabilité ×1 · dispo depuis mai</div><div id="chRoas"></div></div>
+    </div>
+  </section>
+
+  <section id="semaines">
+    <span class="eyebrow">Ads, semaine par semaine</span>
+    <h2>Budget, coût par call et performance du funnel ads</h2>
+    <p class="lede" id="weeksLede"></p>
+    <div class="cards">
+      <div class="card"><h3>Budget dépensé par semaine</h3><div class="sub">En euros</div><div id="chWeekSpend"></div></div>
+      <div class="card"><h3>Calls bookés par semaine</h3><div class="sub">Réservations attribuées aux ads</div><div id="chWeekBooked"></div></div>
+      <div class="card"><h3>Coût par call booké</h3><div class="sub">Euros par réservation</div><div id="chWeekCPC"></div></div>
+      <div class="card"><h3>Taux de résa LP vers call</h3><div class="sub">Calls bookés / arrivées LP</div><div id="chWeekResa"></div></div>
+    </div>
+  </section>
+
+  <section id="closers">
+    <span class="eyebrow">Équipe</span>
+    <h2>Stats individuelles des closers</h2>
+    <p class="lede" id="closerNote"></p>
+    <div class="card full">
+      <div class="tscroll"><table id="closerTable"></table></div>
+      <div class="sub" id="closerHidden" style="margin:10px 0 0"></div>
+    </div>
+  </section>
+
+  <section id="sources">
+    <span class="eyebrow">Canaux</span>
+    <h2>D'où viennent les calls, et les ventes</h2>
+    <p class="lede">Canal reconstitué depuis l'UTM et la provenance du lead. « Non renseigné » : la ligne du Sheet ne permet pas de savoir (voir Champs manquants, en bas de page).</p>
+    <div class="card full">
+      <div class="tscroll"><table id="sourceTable"></table></div>
+    </div>
+  </section>
+
+  <section id="qualite">
+    <span class="eyebrow">Qualité des leads</span>
+    <h2>Notes de qualification données par les closers</h2>
+    <p class="lede" id="qualifLede"></p>
+    <div class="cards">
+      <div class="card"><h3>Distribution des notes sur 10</h3><div class="sub">Leads présents notés par les closers</div><div id="chQualif"></div></div>
+      <div class="card"><h3>Qualité moyenne par mois</h3><div class="sub">Note moyenne des leads présents</div><div id="chQualifMonth"></div></div>
+    </div>
+  </section>
+
+  <section id="brancher">
+    <span class="eyebrow">Données à brancher</span>
+    <h2>Ce qui manque encore pour tout tracker</h2>
+    <div class="cards" id="missingCards"></div>
+  </section>
+
+  <section id="methodo">
+    <span class="eyebrow">Méthodologie</span>
+    <h2>Définitions exactes des métriques</h2>
+    <div class="card full">
+      <dl class="defs">
+        <dt>Call booké</dt><dd>Une ligne dans un onglet « Suivi Closing » : le call a été réservé et loggé par l'équipe. Rattaché au mois de son onglet.</dd>
+        <dt>Show-up</dt><dd>Présents divisés par (présents + no-show). Les « reprogrammer » et « annulé » sont exclus du calcul.</dd>
+        <dt>Pitché</dt><dd>Lead présent dont la colonne VENTE est remplie (OUI, NON, FOLLOW UP), hors « non pitché ».</dd>
+        <dt>Taux de closing</dt><dd>Ventes OUI divisées par les pitchés.</dd>
+        <dt>CA signé</dt><dd>Somme des prix (confirmé par Justine si dispo, sinon prix proposé) des lignes VENTE = OUI, TTC.</dd>
+        <dt>ROAS</dt><dd>CA signé divisé par le budget ads de la même période. Il compare le CA tous canaux au budget Facebook : un ordre de grandeur tant que l'attribution par canal n'est pas fiabilisée.</dd>
+        <dt>Coût par call</dt><dd>Budget ads divisé par les calls bookés attribués aux ads (tableau ads hebdo).</dd>
+        <dt>Qualité lead</dt><dd>Note « Qualifié /10 » donnée par le closer sur les leads présents.</dd>
+        <dt>Filtres de dates</dt><dd>Les calls sont filtrés sur leur date réelle (à défaut, le 1ᵉʳ du mois de leur onglet). Les semaines ads sont prises quand leur début tombe dans la période. « Comparatif » compare à la période précédente de même durée.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="hygiene">
+    <span class="eyebrow">Hygiène des données</span>
+    <h2>Champs manquants dans les tableaux</h2>
+    <p class="lede" id="hygLede"></p>
+    <div class="cards">
+      <div class="card"><h3>Par type de champ</h3><div class="sub">Nombre de lignes concernées</div><div id="chIssuesField"></div></div>
+      <div class="card"><h3>Par closer</h3><div class="sub">Lignes incomplètes à corriger, par responsable</div><div id="chIssuesCloser"></div></div>
+      <div class="card full">
+        <h3>Lignes à corriger en priorité</h3>
+        <div class="sub">Triées par gravité : show-up manquant, puis vente, prix, qualif, source. <span id="issuesCount"></span></div>
+        <div class="tscroll"><table id="issueTable"></table></div>
+      </div>
+      <div class="card full" id="structuralIssues"></div>
+    </div>
+  </section>
+
+  <section id="showup">
+    <span class="eyebrow">À remplir en premier</span>
+    <h2>Leads sans show-up renseigné</h2>
+    <p class="lede" id="suLede"></p>
+    <div class="card full">
+      <div class="tscroll"><table id="suTable"></table></div>
+    </div>
+  </section>
+
+  <footer>
+    Console générée automatiquement depuis les Google Sheets « Suivi Closing » et « Tableau Data VSL ».
+    Les chiffres reflètent ce qui est rempli dans les Sheets : corriger les lignes signalées en bas de page les fiabilise directement.
+  </footer>
+</div>
+
+<div id="tooltip" role="status"></div>
+<button id="backtop" aria-label="Remonter en haut de la page" title="Remonter en haut">↑</button>
+
+<script>
+const DATA = __DATA_JSON__;
+
+/* ================= helpers ================= */
+const $ = (id) => document.getElementById(id);
+const NF = new Intl.NumberFormat("fr-FR");
+const fmtN = (n) => n == null ? "·" : NF.format(Math.round(n));
+const fmtE = (n) => n == null ? "·" : NF.format(Math.round(n)) + " €";
+const fmtE2 = (n) => n == null ? "·" : NF.format(Math.round(n * 100) / 100) + " €";
+const fmtP = (n, d = 0) => (n == null || !isFinite(n)) ? "·" : n.toFixed(d).replace(".", ",") + " %";
+const MONTH_SHORT = ["", "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+const MONTH_FULL = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const TOP3 = ["Louis Granier", "Romain Gourand", "Adrien Soret"];
+const DAY = 864e5;
+
+const tooltip = $("tooltip");
+function showTip(html, ev) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = "block";
+  const pad = 14;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  const r = tooltip.getBoundingClientRect();
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - pad;
+  tooltip.style.left = x + "px"; tooltip.style.top = y + "px";
+}
+function hideTip() { tooltip.style.display = "none"; }
+
+function svgEl(tag, attrs = {}, text) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* date de référence = date de la dernière MAJ (jj/mm/aaaa hh:mm) */
+const NOW = (() => {
+  const m = DATA.updated_at.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], 23, 59) : new Date();
+})();
+const iso = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const TODAY_ISO = iso(NOW);
+
+/* date effective d'un call : date réelle, sinon le 1er du mois de l'onglet */
+DATA.calls.forEach(c => { c.ed = c.d || (c.tm + "-01"); });
+
+/* ================= état des filtres ================= */
+const PERIODS = [
+  { k: "24h", label: "24 h", from: () => new Date(NOW - 1 * DAY) },
+  { k: "3j", label: "3 j", from: () => new Date(NOW - 3 * DAY) },
+  { k: "7j", label: "7 j", from: () => new Date(NOW - 7 * DAY) },
+  { k: "10j", label: "10 j", from: () => new Date(NOW - 10 * DAY) },
+  { k: "mtd", label: "Mois en cours", from: () => new Date(NOW.getFullYear(), NOW.getMonth(), 1) },
+  { k: "30j", label: "30 j", from: () => new Date(NOW - 30 * DAY) },
+  { k: "lastm", label: "Mois dernier", from: () => new Date(NOW.getFullYear(), NOW.getMonth() - 1, 1),
+    to: () => new Date(NOW.getFullYear(), NOW.getMonth(), 0) },
+  { k: "3m", label: "3 mois", from: () => new Date(NOW - 90 * DAY) },
+  { k: "ytd", label: "Année", from: () => new Date(NOW.getFullYear(), 0, 1) },
+  { k: "1an", label: "1 an", from: () => new Date(NOW - 365 * DAY) },
+  { k: "tout", label: "Tout", from: () => new Date(2020, 0, 1) },
+  { k: "demain", label: "Demain", from: () => new Date(+NOW + DAY), to: () => new Date(+NOW + DAY) },
+  { k: "3proch", label: "3 prochains j", from: () => new Date(+NOW + DAY), to: () => new Date(+NOW + 3 * DAY) },
+  { k: "7proch", label: "7 prochains j", from: () => new Date(+NOW + DAY), to: () => new Date(+NOW + 7 * DAY) },
+];
+const state = { period: "mtd", compare: false, closerSel: "top3", custom: null };
+
+function currentRange() {
+  if (state.custom) return state.custom;
+  const p = PERIODS.find(p => p.k === state.period);
+  return { from: iso(p.from()), to: p.to ? iso(p.to()) : TODAY_ISO };
+}
+function prevRange(r) {
+  const f = new Date(r.from), t = new Date(r.to);
+  const len = Math.max(DAY, t - f + DAY);
+  return { from: iso(new Date(f - len)), to: iso(new Date(f - DAY)) };
+}
+function rangeLabel(r) {
+  const f = r.from.split("-"), t = r.to.split("-");
+  return f[2] + "/" + f[1] + "/" + f[0] + " → " + t[2] + "/" + t[1] + "/" + t[0];
+}
+
+/* « Mois en cours » = règle des récaps du Sheet : toutes les lignes de l'onglet
+   du mois déjà passées ou sans date (relances comprises), pas un filtre date. */
+const isMtdRange = (r) => r.to === TODAY_ISO && r.from === TODAY_ISO.slice(0, 8) + "01" && r.from !== r.to;
+function inRange(c, r) {
+  if (isMtdRange(r)) return c.tm === TODAY_ISO.slice(0, 7) && c.ed <= TODAY_ISO;
+  return c.ed >= r.from && c.ed <= r.to;
+}
+function closerOk(c) {
+  if (state.closerSel === "tous") return true;
+  if (state.closerSel === "top3") return TOP3.includes(c.c);
+  return c.c === state.closerSel;
+}
+function closerLabel() {
+  if (state.closerSel === "tous") return "tous les closers";
+  if (state.closerSel === "top3") return "3 closers principaux";
+  return state.closerSel;
+}
+function callsIn(r) { return DATA.calls.filter(c => inRange(c, r) && closerOk(c)); }
+function weeksIn(r) { return DATA.weeks.filter(w => w.start >= r.from.slice(0, 10) && w.start <= r.to); }
+
+/* ================= stats ================= */
+/* vente comptée si validée par le closer (OUI) ou par Justine (virement coché) */
+const isSale = (c) => c.v === "OUI" || (c.vir && c.v !== "REMBOURSEMENT");
+function st(rows) {
+  const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
+              pitched: 0, nonPitche: 0, ventes: 0, remb: 0, follow: 0, ca: 0,
+              qSum: 0, qN: 0, ventesAvecPrix: 0 };
+  for (const c of rows) {
+    if (c.s === "OUI") o.shows++;
+    else if (c.s === "NON") o.noshow++;
+    else if (c.s === "REPROGRAMMER") o.reprog++;
+    else if (c.s === "ANNULE") o.annule++;
+    else o.suVide++;
+    if (c.s === "OUI") {
+      if (c.v === "NON_PITCHE") o.nonPitche++;
+      else if (["OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
+      if (c.q != null) { o.qSum += c.q; o.qN++; }
+    }
+    if (isSale(c)) { o.ventes++; o.ca += c.p; if (c.p > 0) o.ventesAvecPrix++; }
+    if (c.v === "REMBOURSEMENT") o.remb++;
+    if (c.v === "FOLLOW_UP" && !c.vir) o.follow++;
+  }
+  const dsh = o.shows + o.noshow;
+  o.tShow = dsh ? 100 * o.shows / dsh : null;
+  o.tClosPitche = o.pitched ? 100 * o.ventes / o.pitched : null;
+  o.tClosBooke = o.calls ? 100 * o.ventes / o.calls : null;
+  o.tClosShow = o.shows ? 100 * o.ventes / o.shows : null;
+  o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
+  o.panier = o.ventesAvecPrix ? o.ca / o.ventesAvecPrix : null;
+  o.qMoy = o.qN ? o.qSum / o.qN : null;
+  return o;
+}
+function issuesOf(rows) {
+  const list = [];
+  for (const c of rows) {
+    const miss = [];
+    const past = c.d != null && c.d < TODAY_ISO;
+    if (!c.c) miss.push("closer");
+    if (past && c.s === "" && !(c.f & 1)) miss.push("show-up");
+    if (c.s === "OUI") {
+      if (!(c.f & 2)) miss.push("vente ?");
+      if (!(c.f & 4)) miss.push("qualif /10");
+    }
+    if (c.v === "OUI" && c.p === 0) miss.push("prix");
+    if (c.g === "Non renseigné") miss.push("source/UTM");
+    if (miss.length) list.push({ c, miss });
+  }
+  return list;
+}
+
+/* ================= charts ================= */
+function barChart(mount, labels, series, opts = {}) {
+  const W = opts.width || 520, H = opts.height || 230;
+  const m = { t: 14, r: 8, b: 26, l: opts.left || 46 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxV = opts.max || Math.max(1, ...series.flatMap(s => s.values.filter(v => v != null)));
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": opts.aria || "" });
+  const ticks = opts.ticks || 4;
+  for (let i = 0; i <= ticks; i++) {
+    const v = maxV * i / ticks, y = m.t + ih - ih * i / ticks;
+    svg.appendChild(svgEl("line", { x1: m.l, x2: m.l + iw, y1: y, y2: y,
+      stroke: i === 0 ? "var(--baseline)" : "var(--grid)", "stroke-width": 1 }));
+    svg.appendChild(svgEl("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end", class: "axis" },
+      opts.fmtAxis ? opts.fmtAxis(v) : fmtN(v)));
+  }
+  const n = labels.length, groupW = iw / Math.max(1, n);
+  const barW = Math.min(opts.barMax || 28, Math.max(4, (groupW - 8) / series.length - 2));
+  labels.forEach((lb, i) => {
+    const cx = m.l + groupW * i + groupW / 2;
+    const total = series.length * barW + (series.length - 1) * 2;
+    series.forEach((s, si) => {
+      const v = s.values[i];
+      if (v == null) return;
+      const h = Math.max(v > 0 ? 2 : 0, ih * v / maxV);
+      const x = cx - total / 2 + si * (barW + 2);
+      const y = m.t + ih - h;
+      const r = Math.min(4, h, barW / 2);
+      const bar = svgEl("path", {
+        d: `M${x},${m.t + ih} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + barW - r},${y} Q${x + barW},${y} ${x + barW},${y + r} L${x + barW},${m.t + ih} Z`,
+        fill: s.color });
+      bar.addEventListener("mousemove", ev => showTip(`<b>${lb}</b><br>${s.name} : <b>${(opts.fmtVal || fmtN)(v)}</b>`, ev));
+      bar.addEventListener("mouseleave", hideTip);
+      svg.appendChild(bar);
+    });
+    if (n <= 16 || i % 2 === 0)
+      svg.appendChild(svgEl("text", { x: cx, y: H - 8, "text-anchor": "middle", class: "axis" }, lb));
+  });
+  mount.appendChild(svg);
+}
+
+function lineChart(mount, labels, series, opts = {}) {
+  const W = opts.width || 520, H = opts.height || 230;
+  const m = { t: 14, r: 10, b: 26, l: opts.left || 46 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const vals = series.flatMap(s => s.values.filter(v => v != null)).concat(opts.ref != null ? [opts.ref] : []);
+  const maxV = opts.max || Math.max(1, ...vals) * 1.08;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", role: "img", "aria-label": opts.aria || "" });
+  const ticks = opts.ticks || 4;
+  for (let i = 0; i <= ticks; i++) {
+    const v = maxV * i / ticks, y = m.t + ih - ih * i / ticks;
+    svg.appendChild(svgEl("line", { x1: m.l, x2: m.l + iw, y1: y, y2: y,
+      stroke: i === 0 ? "var(--baseline)" : "var(--grid)", "stroke-width": 1 }));
+    svg.appendChild(svgEl("text", { x: m.l - 6, y: y + 3.5, "text-anchor": "end", class: "axis" },
+      opts.fmtAxis ? opts.fmtAxis(v) : fmtN(v)));
+  }
+  const n = labels.length;
+  const X = (i) => m.l + (n === 1 ? iw / 2 : iw * i / (n - 1));
+  const Y = (v) => m.t + ih - ih * v / maxV;
+  if (opts.ref != null)
+    svg.appendChild(svgEl("line", { x1: m.l, x2: m.l + iw, y1: Y(opts.ref), y2: Y(opts.ref),
+      stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "4 4" }));
+  labels.forEach((lb, i) => {
+    if (n <= 16 || i % 2 === 0)
+      svg.appendChild(svgEl("text", { x: X(i), y: H - 8, "text-anchor": "middle", class: "axis" }, lb));
+  });
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => v == null ? null : [X(i), Y(v)]);
+    let dstr = "", pen = false;
+    pts.forEach(p => { if (!p) { pen = false; return; } dstr += (pen ? "L" : "M") + p[0] + "," + p[1]; pen = true; });
+    svg.appendChild(svgEl("path", { d: dstr, fill: "none", stroke: s.color, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    pts.forEach((p, i) => {
+      if (!p) return;
+      svg.appendChild(svgEl("circle", { cx: p[0], cy: p[1], r: 3.2, fill: s.color, stroke: "var(--card)", "stroke-width": 2 }));
+      const hit = svgEl("circle", { cx: p[0], cy: p[1], r: 10, fill: "transparent" });
+      hit.addEventListener("mousemove", ev => showTip(`<b>${labels[i]}</b><br>${s.name} : <b>${(opts.fmtVal || fmtN)(s.values[i])}</b>`, ev));
+      hit.addEventListener("mouseleave", hideTip);
+      svg.appendChild(hit);
+    });
+  });
+  mount.appendChild(svg);
+}
+
+function hBars(mount, rows, opts = {}) {
+  const max = Math.max(1, ...rows.map(r => r.v));
+  const wrap = document.createElement("div");
+  rows.forEach(r => {
+    const row = document.createElement("div");
+    row.className = "funnel-row";
+    const lbl = document.createElement("div"); lbl.className = "lbl"; lbl.textContent = r.label;
+    const barBox = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.className = "funnel-bar";
+    bar.style.width = Math.max(1.2, 100 * r.v / max) + "%";
+    bar.style.background = r.color || "var(--s1)";
+    bar.addEventListener("mousemove", ev => showTip(`<b>${r.label}</b> : ${(opts.fmtVal || fmtN)(r.v)}${r.tip ? "<br>" + r.tip : ""}`, ev));
+    bar.addEventListener("mouseleave", hideTip);
+    barBox.appendChild(bar);
+    const val = document.createElement("div"); val.className = "val"; val.textContent = (opts.fmtVal || fmtN)(r.v);
+    row.appendChild(lbl); row.appendChild(barBox); row.appendChild(val);
+    wrap.appendChild(row);
+    if (r.conv) {
+      const cr = document.createElement("div"); cr.className = "funnel-conv";
+      cr.innerHTML = `<div></div><div class="c">${r.conv}</div>`;
+      wrap.appendChild(cr);
+    }
+  });
+  mount.appendChild(wrap);
+}
+
+function legend(mount, items) {
+  const d = document.createElement("div");
+  d.className = "legend";
+  d.innerHTML = items.map(i => `<span class="it"><span class="sw" style="background:${i.c}"></span>${i.n}</span>`).join("");
+  mount.appendChild(d);
+}
+
+/* ================= barre de filtres ================= */
+function buildFilterbar() {
+  const bar = $("filterbar");
+  bar.innerHTML = "";
+  const mkRow = (labelTxt) => {
+    const row = document.createElement("div");
+    row.className = "frow";
+    const lb = document.createElement("span");
+    lb.className = "flabel"; lb.textContent = labelTxt;
+    row.appendChild(lb);
+    bar.appendChild(row);
+    return row;
+  };
+
+  /* ligne 1 : les dates passées · ligne 2 : à venir */
+  const FUTURE_KEYS = ["demain", "3proch", "7proch"];
+  const mkPeriodPill = (p) => {
+    const b = document.createElement("button");
+    b.className = "fpill"; b.textContent = p.label;
+    b.setAttribute("aria-pressed", String(!state.custom && state.period === p.k));
+    b.addEventListener("click", () => { state.period = p.k; state.custom = null; renderAll(); });
+    return b;
+  };
+  const rowDates = mkRow("Période");
+  PERIODS.filter(p => !FUTURE_KEYS.includes(p.k)).forEach(p => rowDates.appendChild(mkPeriodPill(p)));
+  const sep1 = document.createElement("div"); sep1.className = "fsep"; rowDates.appendChild(sep1);
+
+  const cmp = document.createElement("button");
+  cmp.className = "fpill toggle"; cmp.textContent = "Comparatif";
+  cmp.setAttribute("aria-pressed", String(state.compare));
+  cmp.title = "Compare chaque chiffre clé à la période précédente de même durée";
+  cmp.addEventListener("click", () => { state.compare = !state.compare; renderAll(); });
+  rowDates.appendChild(cmp);
+
+  const cust = document.createElement("div");
+  cust.className = "fcustom";
+  cust.innerHTML = `<input type="date" id="cFrom" aria-label="Du"> → <input type="date" id="cTo" aria-label="Au"> `;
+  const go = document.createElement("button");
+  go.className = "fpill"; go.textContent = "Voir";
+  go.addEventListener("click", () => {
+    const f = $("cFrom").value, t = $("cTo").value;
+    if (f && t && f <= t) { state.custom = { from: f, to: t }; renderAll(); }
+  });
+  cust.appendChild(go);
+  if (state.custom) go.setAttribute("aria-pressed", "true");
+  rowDates.appendChild(cust);
+
+  /* ligne 2 : à venir */
+  const rowFuture = mkRow("À venir");
+  PERIODS.filter(p => FUTURE_KEYS.includes(p.k)).forEach(p => rowFuture.appendChild(mkPeriodPill(p)));
+
+  /* ligne 3 : les closers */
+  const rowClosers = mkRow("Closers");
+  const CLOSER_OPTS = [
+    { k: "tous", label: "Tous les closers", title: "Tout le monde : webinaires, anciens, invités inclus" },
+    { k: "top3", label: "3 principaux", title: "Louis, Romain et Adrien seulement" },
+    { k: "Louis Granier", label: "Louis", title: "Louis Granier seulement" },
+    { k: "Romain Gourand", label: "Romain", title: "Romain Gourand seulement" },
+    { k: "Adrien Soret", label: "Adrien", title: "Adrien Soret seulement" },
+  ];
+  for (const o of CLOSER_OPTS) {
+    const b = document.createElement("button");
+    b.className = "fpill"; b.textContent = o.label; b.title = o.title;
+    b.setAttribute("aria-pressed", String(state.closerSel === o.k));
+    b.addEventListener("click", () => { state.closerSel = o.k; renderAll(); });
+    rowClosers.appendChild(b);
+  }
+}
+
+/* ================= rendus ================= */
+function kpiTile(lbl, val, sub, exp, delta) {
+  return `<div class="kpi"><div class="lbl">${lbl}</div><div class="val">${val}${delta || ""}</div>` +
+         (sub ? `<div class="sub">${sub}</div>` : "") + (exp ? `<div class="exp">${exp}</div>` : "") + `</div>`;
+}
+function deltaTag(cur, prev, lowerIsBetter = false) {
+  if (!state.compare) return "";
+  if (prev == null || cur == null || !isFinite(prev) || prev === 0)
+    return ` <span class="delta na">vs préc. : ·</span>`;
+  const pct = 100 * (cur - prev) / Math.abs(prev);
+  const up = pct >= 0;
+  const good = lowerIsBetter ? !up : up;
+  const cls = Math.abs(pct) < 0.5 ? "na" : (good ? "up" : "down");
+  return ` <span class="delta ${cls}" title="vs période précédente">${up ? "▲" : "▼"} ${Math.abs(pct).toFixed(0)} %</span>`;
+}
+
+function renderKpis(r, rows, wks) {
+  const s = st(rows);
+  const spend = wks.reduce((a, w) => a + w.spend, 0);
+  const booked = wks.reduce((a, w) => a + w.calls_booked, 0);
+  let ps = null, pspend = 0, pbooked = 0;
+  if (state.compare) {
+    const pr = prevRange(r);
+    ps = st(callsIn(pr));
+    const pw = weeksIn(pr);
+    pspend = pw.reduce((a, w) => a + w.spend, 0);
+    pbooked = pw.reduce((a, w) => a + w.calls_booked, 0);
+  }
+  /* le budget ads n'est connu que depuis le 04/05/2026 : le ROAS se calcule
+     sur le CA de la partie de période couverte par le tableau ads */
+  const ADS_START = "2026-05-04";
+  const adsCovered = r.from >= ADS_START;
+  const caForRoas = adsCovered ? s.ca : st(rows.filter(c => c.ed >= ADS_START)).ca;
+  const roas = spend > 0 ? caForRoas / spend : null;
+  const proas = ps && pspend > 0 ? ps.ca / pspend : null;
+  const cpc = booked > 0 ? spend / booked : null;
+  const pcpc = ps && pbooked > 0 ? pspend / pbooked : null;
+
+  $("kpiTitle").textContent = "Vue globale · " + rangeLabel(r) + " · " + closerLabel();
+  $("kpiGrid").innerHTML =
+    kpiTile("CA signé", fmtE(s.ca), `${s.ventes} vente(s) · panier ${fmtE(s.panier)}`,
+      "Prix des ventes OUI, TTC. Le CA encaissé n'est pas encore branché (voir Données à brancher).",
+      deltaTag(s.ca, ps?.ca)) +
+    kpiTile("Calls bookés", fmtN(s.calls), `${fmtN(s.shows)} présents · ${fmtN(s.noshow)} no-show`,
+      "Une ligne dans un onglet closing. Il y en a toujours plus que dans le tableau ads : webinaires et organique s'ajoutent.",
+      deltaTag(s.calls, ps?.calls)) +
+    kpiTile("Taux de show-up", fmtP(s.tShow, 1), `${fmtN(s.reprog)} reprogrammés · ${fmtN(s.annule)} annulés`,
+      "Présents sur (présents + no-show). Un no-show coûte le prix du call sans la chance de vendre.",
+      deltaTag(s.tShow, ps?.tShow)) +
+    kpiTile("Taux de closing", fmtP(s.tClosShow, 1), `${fmtP(s.tClosPitche, 1)} sur pitchés · ${fmtP(s.tClosBooke, 1)} sur bookés`,
+      `Ventes sur leads présents au call. ${fmtP(s.tNonPitche, 1)} des présents n'ont pas été pitchés (hors cible, pas le budget).`,
+      deltaTag(s.tClosShow, ps?.tClosShow)) +
+    kpiTile("CA / call présent", fmtE2(s.shows ? s.ca / s.shows : null),
+      `${fmtN(s.shows)} présents sur la période`,
+      "Ce que rapporte en moyenne un lead qui se présente au call. C'est le chiffre qui valorise le travail sur le show-up.",
+      deltaTag(s.shows ? s.ca / s.shows : null, ps?.shows ? ps.ca / ps.shows : null)) +
+    kpiTile("CA / call booké", fmtE2(s.calls ? s.ca / s.calls : null),
+      `${fmtN(s.calls)} calls bookés sur la période`,
+      "Ce que rapporte en moyenne une résa, présents et absents confondus : la vraie valeur d'un booking.",
+      deltaTag(s.calls ? s.ca / s.calls : null, ps?.calls ? ps.ca / ps.calls : null)) +
+    kpiTile("Non pitchés / présents", fmtP(s.tNonPitche, 1), `${fmtN(s.nonPitche)} lead(s) présent(s) non pitché(s)`,
+      "Hors cible, pas le budget, décisionnaire absent : ces leads consomment un call sans chance de vente. À challenger avec la qualification.",
+      deltaTag(s.tNonPitche, ps?.tNonPitche, true)) +
+    kpiTile("Qualité des leads", s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10", `${fmtN(s.qN)} leads notés`,
+      "Note donnée par le closer après le call. En dessous de 5, le lead n'aurait pas dû arriver jusqu'au call.",
+      deltaTag(s.qMoy, ps?.qMoy)) +
+    kpiTile("Budget ads", fmtE(spend), booked ? `${fmtN(booked)} calls bookés côté ads` : "aucune semaine ads sur la période",
+      "Tableau ads, tracké depuis le 04/05/2026. Avant mai, le budget n'est pas connu.",
+      deltaTag(spend, state.compare ? pspend : null, true)) +
+    kpiTile("Coût par call (ads)", fmtE2(cpc), cpc ? "budget divisé par les résas attribuées aux ads" : "pas de données ads sur la période",
+      "",
+      deltaTag(cpc, pcpc, true)) +
+    kpiTile("ROAS", roas == null ? "·" : "×" + roas.toFixed(2).replace(".", ","),
+      adsCovered ? `${fmtN(s.follow)} follow-up en cours · ${fmtN(s.remb)} remboursement(s)`
+                 : `calculé sur le CA depuis le 04/05 (${fmtE(caForRoas)}), début du tracking ads`,
+      "CA signé divisé par le budget ads de la même fenêtre, tous canaux confondus : un ordre de grandeur.",
+      deltaTag(roas, proas));
+}
+
+function renderBottleneck(rows, wks) {
+  const t = (k) => wks.reduce((a, w) => a + w[k], 0);
+  const s = st(rows);
+  const checks = [];
+  if (t("impressions") > 0) {
+    checks.push({ name: "CTR des ads (vues vers clics)", val: 100 * t("clicks") / t("impressions"), bench: 1.5, fix: "créatives et audiences" });
+    checks.push({ name: "Arrivée sur la LP (clics vers arrivées)", val: 100 * t("lp_views") / t("clicks"), bench: 75, fix: "vitesse de chargement de la page" });
+    checks.push({ name: "Prise de RDV (LP vers call booké)", val: 100 * t("calls_booked") / t("lp_views"), bench: 2.5, fix: "VSL, promesse, formulaire de booking" });
+  }
+  if (s.shows + s.noshow > 0)
+    checks.push({ name: "Show-up (booké vers présent)", val: s.tShow, bench: 65, fix: "rappels SMS et email, vidéo de préchauffe" });
+  if (s.pitched > 0)
+    checks.push({ name: "Closing (pitché vers vente)", val: s.tClosPitche, bench: 22, fix: "script et follow-up" });
+  if (!checks.length) { $("bottleneck").innerHTML = ""; return; }
+  checks.forEach(c => c.ratio = c.val / c.bench);
+  checks.sort((a, b) => a.ratio - b.ratio);
+  const w = checks[0], sec = checks[1];
+  const f = (c) => `<b>${c.name}</b> : ${fmtP(c.val, c.val < 10 ? 2 : 1)} constaté pour environ ${fmtP(c.bench, c.bench < 10 ? 1 : 0)} attendu`;
+  $("bottleneck").innerHTML = `<div class="callout">
+    <span class="eyebrow">🎯 Goulot n°1 sur la période</span>
+    ${f(w)}. Levier : ${w.fix}.` +
+    (sec ? `<br><span style="color:var(--ink-2)">Ensuite : ${f(sec)}. Levier : ${sec.fix}.</span>` : "") + `</div>`;
+}
+
+function renderFunnel(r, rows, wks) {
+  const t = (k) => wks.reduce((a, w) => a + w[k], 0);
+  const s = st(rows);
+  $("funnelPeriod").textContent = "Période : " + rangeLabel(r) +
+    (t("spend") ? " · budget dépensé : " + fmtE(t("spend")) : " · aucune semaine ads trackée sur la période") +
+    ". Les deux blocs se rejoignent sur les calls bookés : côté ads on en compte " + fmtN(t("calls_booked")) +
+    ", côté closing " + fmtN(s.calls) + " (tous canaux).";
+  const seq = ["var(--seq-250)", "var(--seq-350)", "var(--seq-450)", "var(--seq-550)"];
+  const mk = (stages) => stages.map((sg, i) => {
+    const row = { label: sg.label, v: sg.n, color: seq[i] };
+    if (i > 0) {
+      const prev = stages[i - 1].n;
+      const rate = prev ? 100 * sg.n / prev : 0;
+      row.conv = `↓ <b>${fmtP(rate, rate < 10 ? 2 : 1)}</b> <span class="loss">− ${fmtN(prev - sg.n)} perdus</span>`;
+    }
+    return row;
+  });
+  $("funnelAds").innerHTML = "";
+  $("funnelSales").innerHTML = "";
+  if (t("impressions") > 0) {
+    hBars($("funnelAds"), mk([
+      { label: "Impressions", n: t("impressions") },
+      { label: "Clics", n: t("clicks") },
+      { label: "Arrivées LP", n: t("lp_views") },
+      { label: "Calls bookés (ads)", n: t("calls_booked") },
+    ]));
+  } else {
+    $("funnelAds").innerHTML = `<p class="lede">Pas de données ads sur la période (le tableau ads démarre au 04/05/2026).</p>`;
+  }
+  hBars($("funnelSales"), mk([
+    { label: "Calls loggés", n: s.calls },
+    { label: "Présents", n: s.shows },
+    { label: "Pitchés", n: s.pitched },
+    { label: "Ventes", n: s.ventes },
+  ]));
+
+  /* coût par étape */
+  const spend = t("spend");
+  const stages = [
+    ["Arrivée sur la LP (ads)", t("lp_views")],
+    ["Call booké (ads)", t("calls_booked")],
+    ["Call booké (tous canaux)", s.calls],
+    ["Présent au call", s.shows],
+    ["Pitché", s.pitched],
+    ["Vente signée", s.ventes],
+  ];
+  $("costTable").innerHTML = `<thead><tr><th>Étape atteinte</th><th class="num">Leads</th><th class="num">Coût par lead arrivé là</th></tr></thead><tbody>` +
+    stages.map(([lb, n]) => `<tr><td>${lb}</td><td class="num">${fmtN(n)}</td>
+      <td class="num">${spend > 0 && n > 0 ? fmtE2(spend / n) : "·"}</td></tr>`).join("") + "</tbody>";
+}
+
+function monthsOf(rows) {
+  const map = new Map();
+  for (const c of rows) {
+    if (!map.has(c.tm)) map.set(c.tm, []);
+    map.get(c.tm).push(c);
+  }
+  return [...map.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
+    .map(([tm, list]) => ({ tm, label: MONTH_SHORT[+tm.slice(5)] + (tm.slice(0, 4) !== "2026" ? " " + tm.slice(2, 4) : ""), s: st(list) }));
+}
+
+function renderMonthly(rows, allWeeksInRange) {
+  const M = monthsOf(rows);
+  const labels = M.map(m => m.label);
+  const spendByTm = {};
+  for (const w of DATA.weeks) {
+    const tm = w.start.slice(0, 7);
+    spendByTm[tm] = (spendByTm[tm] || 0) + w.spend;
+  }
+  ["chMonthlyCalls", "chMonthlyCA", "chMonthlyRates", "chRoas"].forEach(id => $(id).innerHTML = "");
+  if (!M.length) { $("chMonthlyCalls").innerHTML = `<p class="lede">Aucun call sur la période.</p>`; return; }
+  legend($("chMonthlyCalls"), [{ c: "var(--s1)", n: "Calls bookés" }, { c: "var(--s2)", n: "Ventes" }]);
+  barChart($("chMonthlyCalls"), labels, [
+    { name: "Calls bookés", color: "var(--s1)", values: M.map(m => m.s.calls) },
+    { name: "Ventes", color: "var(--s2)", values: M.map(m => m.s.ventes) },
+  ]);
+  barChart($("chMonthlyCA"), labels, [
+    { name: "CA signé", color: "var(--s1)", values: M.map(m => m.s.ca) },
+  ], { fmtVal: fmtE, fmtAxis: v => NF.format(Math.round(v / 1000)) + "k" });
+  legend($("chMonthlyRates"), [{ c: "var(--s1)", n: "Show-up" }, { c: "var(--s2)", n: "Closing (pitchés)" }]);
+  lineChart($("chMonthlyRates"), labels, [
+    { name: "Show-up", color: "var(--s1)", values: M.map(m => m.s.tShow) },
+    { name: "Closing (pitchés)", color: "var(--s2)", values: M.map(m => m.s.tClosPitche) },
+  ], { max: 100, fmtVal: v => fmtP(v, 1), fmtAxis: v => fmtP(v) });
+  lineChart($("chRoas"), labels, [
+    { name: "ROAS signé", color: "var(--s1)", values: M.map(m => spendByTm[m.tm] ? m.s.ca / spendByTm[m.tm] : null) },
+  ], { ref: 1, fmtVal: v => "×" + v.toFixed(2).replace(".", ","), fmtAxis: v => "×" + Math.round(v) });
+}
+
+function renderWeekly(wks) {
+  ["chWeekSpend", "chWeekBooked", "chWeekCPC", "chWeekResa"].forEach(id => $(id).innerHTML = "");
+  if (!wks.length) {
+    $("weeksLede").textContent = "Pas de semaine ads sur la période sélectionnée (le tableau ads démarre au 04/05/2026).";
+    return;
+  }
+  const labels = wks.map(w => w.label.slice(0, 5));
+  const totS = wks.reduce((a, w) => a + w.spend, 0);
+  const totB = wks.reduce((a, w) => a + w.calls_booked, 0);
+  $("weeksLede").textContent = `${wks.length} semaine(s) trackée(s) · ${fmtE(totS)} dépensés · ${fmtN(totB)} calls bookés · coût moyen ${fmtE2(totB ? totS / totB : null)} par call.`;
+  barChart($("chWeekSpend"), labels, [{ name: "Budget", color: "var(--s1)", values: wks.map(w => w.spend) }],
+    { fmtVal: fmtE, fmtAxis: v => NF.format(Math.round(v / 100) / 10) + "k" });
+  barChart($("chWeekBooked"), labels, [{ name: "Calls bookés", color: "var(--s1)", values: wks.map(w => w.calls_booked) }]);
+  lineChart($("chWeekCPC"), labels, [{ name: "Coût par call", color: "var(--s2)", values: wks.map(w => w.calls_booked ? w.spend / w.calls_booked : null) }],
+    { fmtVal: fmtE2, fmtAxis: v => fmtN(v) + " €" });
+  lineChart($("chWeekResa"), labels, [{ name: "Taux de résa", color: "var(--s2)", values: wks.map(w => w.lp_views ? 100 * w.calls_booked / w.lp_views : null) }],
+    { fmtVal: v => fmtP(v, 2), fmtAxis: v => fmtP(v, 1) });
+}
+
+let closerSort = { k: "ca", dir: -1 };
+function renderClosers(rows) {
+  const byCloser = new Map();
+  for (const c of rows) {
+    const name = c.c || "(sans closer)";
+    if (!byCloser.has(name)) byCloser.set(name, []);
+    byCloser.get(name).push(c);
+  }
+  const list = [...byCloser.entries()].map(([name, rs]) => {
+    const s = st(rs);
+    return { name, ...s, caBooke: s.calls ? s.ca / s.calls : null };
+  });
+  const totalV = list.reduce((a, x) => a + x.ventes, 0);
+  const totalCA = list.reduce((a, x) => a + x.ca, 0);
+  $("closerNote").textContent = `${list.length} closer(s) sur la période · ${fmtN(rows.length)} calls · ${fmtN(totalV)} ventes · ${fmtE(totalCA)}.` +
+    (state.closerSel !== "tous" ? ` Filtre closer actif : ${closerLabel()} (barre du haut).` : "");
+  const COLS = [
+    { k: "name", n: "Closer", num: false },
+    { k: "calls", n: "Calls", num: true },
+    { k: "shows", n: "Présents", num: true },
+    { k: "tShow", n: "Show-up", num: true, fmt: v => fmtP(v, 1), bar: 100, dotAt: [60, 45] },
+    { k: "tClosPitche", n: "Closing (pitchés)", num: true, fmt: v => fmtP(v, 1), bar: 50, dotAt: [25, 15] },
+    { k: "tClosShow", n: "Closing / présents", num: true, fmt: v => fmtP(v, 1) },
+    { k: "tClosBooke", n: "Closing / booké", num: true, fmt: v => fmtP(v, 1) },
+    { k: "tNonPitche", n: "Non pitchés / présents", num: true, fmt: v => fmtP(v, 1) },
+    { k: "ventes", n: "Ventes", num: true },
+    { k: "ca", n: "CA signé", num: true, fmt: fmtE },
+    { k: "caBooke", n: "CA / call booké", num: true, fmt: fmtE2 },
+    { k: "panier", n: "Panier moyen", num: true, fmt: fmtE },
+    { k: "qMoy", n: "Qualif moy.", num: true, fmt: v => v == null ? "·" : v.toFixed(1).replace(".", ",") },
+  ];
+  list.sort((a, b) => {
+    const av = a[closerSort.k], bv = b[closerSort.k];
+    if (av == null) return 1; if (bv == null) return -1;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * closerSort.dir;
+  });
+  const thead = "<thead><tr>" + COLS.map(c =>
+    `<th class="sortable ${c.num ? "num" : ""}" data-k="${c.k}">${c.n} <span class="arr">${closerSort.k === c.k ? (closerSort.dir < 0 ? "▼" : "▲") : ""}</span></th>`).join("") + "</tr></thead>";
+  const body = list.map(x => "<tr>" + COLS.map(c => {
+    const v = x[c.k];
+    let txt = v == null ? "·" : (c.fmt ? c.fmt(v) : (c.num ? fmtN(v) : v));
+    if (c.k === "name" && x.calls < 10) txt += ` <span class="miss">(peu de calls)</span>`;
+    if (c.dotAt && v != null) {
+      const cls = v >= c.dotAt[0] ? "g" : v >= c.dotAt[1] ? "o" : "r";
+      txt = `<span class="dot ${cls}"></span>` + txt;
+    }
+    if (c.bar && v != null) {
+      const w = Math.min(100, 100 * v / c.bar);
+      return `<td class="num rowbar"><div class="fill" style="width:${w}%"></div><span>${txt}</span></td>`;
+    }
+    return `<td class="${c.num ? "num" : ""}">${txt}</td>`;
+  }).join("") + "</tr>").join("");
+  $("closerTable").innerHTML = thead + "<tbody>" + body + "</tbody>";
+  $("closerTable").querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.k;
+      if (closerSort.k === k) closerSort.dir *= -1; else closerSort = { k, dir: -1 };
+      renderClosers(rows);
+    });
+  });
+  if (state.closerSel !== "tous") {
+    const all = DATA.calls.filter(c => inRange(c, currentRange()) && !closerOk(c));
+    const others = new Set(all.map(c => c.c || "(sans closer)"));
+    $("closerHidden").textContent = others.size
+      ? `${others.size} autre(s) closer(s) masqué(s) par le filtre (${fmtN(all.length)} calls). Cliquer « Tous les closers » en haut pour tout voir.`
+      : "";
+  } else {
+    $("closerHidden").textContent = "";
+  }
+}
+
+let srcSort = { k: "calls", dir: -1 };
+function renderSources(rows) {
+  const by = new Map();
+  for (const c of rows) {
+    if (!by.has(c.g)) by.set(c.g, { calls: 0, ventes: 0, ca: 0 });
+    const o = by.get(c.g);
+    o.calls++; if (isSale(c)) { o.ventes++; o.ca += c.p; }
+  }
+  const S = [...by.entries()].map(([name, o]) =>
+    ({ name, ...o, tx: o.calls ? 100 * o.ventes / o.calls : null }));
+  const tot = S.reduce((a, s) => a + s.calls, 0);
+  const COLS = [
+    { k: "name", n: "Canal" },
+    { k: "calls", n: "Calls", num: true },
+    { k: "calls2", n: "Part", num: true, get: s => s.calls },
+    { k: "ventes", n: "Ventes", num: true },
+    { k: "tx", n: "Closing / booké", num: true },
+    { k: "ca", n: "CA signé", num: true },
+  ];
+  const col = COLS.find(c => c.k === srcSort.k) || COLS[1];
+  const get = col.get || (s => s[col.k]);
+  S.sort((a, b) => {
+    const av = get(a), bv = get(b);
+    if (av == null) return 1; if (bv == null) return -1;
+    return (av < bv ? -1 : av > bv ? 1 : 0) * srcSort.dir;
+  });
+  $("sourceTable").innerHTML = "<thead><tr>" + COLS.map(c =>
+    `<th class="sortable ${c.num ? "num" : ""}" data-k="${c.k}">${c.n} <span class="arr">${srcSort.k === c.k ? (srcSort.dir < 0 ? "▼" : "▲") : ""}</span></th>`).join("") + "</tr></thead><tbody>" +
+    S.map(s => `<tr>
+      <td>${s.name}${s.name === "Non renseigné" ? ' <span class="pill warn">à corriger</span>' : ""}</td>
+      <td class="num rowbar"><div class="fill" style="width:${100 * s.calls / tot}%"></div><span>${fmtN(s.calls)}</span></td>
+      <td class="num">${fmtP(100 * s.calls / tot, 1)}</td>
+      <td class="num">${fmtN(s.ventes)}</td>
+      <td class="num">${fmtP(s.tx, 1)}</td>
+      <td class="num">${fmtE(s.ca)}</td></tr>`).join("") + "</tbody>";
+  $("sourceTable").querySelectorAll("th.sortable").forEach(th => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.k;
+      if (srcSort.k === k) srcSort.dir *= -1; else srcSort = { k, dir: -1 };
+      renderSources(rows);
+    });
+  });
+}
+
+function renderQuality(rows) {
+  ["chQualif", "chQualifMonth"].forEach(id => $(id).innerHTML = "");
+  const notes = rows.filter(c => c.s === "OUI" && c.q != null);
+  if (!notes.length) {
+    $("qualifLede").textContent = "Aucun lead noté sur la période.";
+    return;
+  }
+  const dist = Array.from({ length: 11 }, (_, i) => ({ note: i, n: 0 }));
+  notes.forEach(c => dist[Math.min(10, Math.round(c.q))].n++);
+  const avg = notes.reduce((a, c) => a + c.q, 0) / notes.length;
+  const sortedQ = notes.map(c => c.q).sort((a, b) => a - b);
+  const med = sortedQ.length % 2 ? sortedQ[(sortedQ.length - 1) / 2]
+    : (sortedQ[sortedQ.length / 2 - 1] + sortedQ[sortedQ.length / 2]) / 2;
+  const good = notes.filter(c => c.q >= 7).length;
+  $("qualifLede").textContent = `${fmtN(notes.length)} leads présents notés · moyenne ${avg.toFixed(1).replace(".", ",")}/10 · médiane ${med.toFixed(1).replace(".", ",")}/10 · ${fmtP(100 * good / notes.length, 0)} des leads notés à 7/10 ou plus.`;
+
+  /* tranches de qualité en pourcentage (barre 100 %) */
+  const TRANCHES = [
+    { label: "0-4 · hors cible", test: q => q <= 4.4, color: "var(--seq-250)" },
+    { label: "5-6 · moyen", test: q => q > 4.4 && q <= 6.4, color: "var(--seq-350)" },
+    { label: "7-8 · bon", test: q => q > 6.4 && q <= 8.4, color: "var(--seq-450)" },
+    { label: "9-10 · excellent", test: q => q > 8.4, color: "var(--seq-550)" },
+  ].map(t => ({ ...t, n: notes.filter(c => t.test(c.q)).length }))
+   .map(t => ({ ...t, pct: 100 * t.n / notes.length }));
+  const seg = document.createElement("div");
+  seg.innerHTML = `<div style="display:flex;height:30px;border-radius:8px;overflow:hidden;gap:2px;margin:2px 0 8px">` +
+    TRANCHES.filter(t => t.n > 0).map(t =>
+      `<div title="${t.label} : ${t.n} leads (${fmtP(t.pct, 1)})" style="width:${t.pct}%;background:${t.color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:11.5px;font-weight:700;min-width:2px">${t.pct >= 9 ? fmtP(t.pct, 0) : ""}</div>`).join("") +
+    `</div><div class="legend">` +
+    TRANCHES.map(t => `<span class="it"><span class="sw" style="background:${t.color}"></span>${t.label} : <b>${fmtP(t.pct, 1)}</b> (${t.n})</span>`).join("") +
+    `</div>
+    <div class="legend" style="margin-top:2px"><span class="it">Moyenne : <b>${avg.toFixed(1).replace(".", ",")}/10</b></span>
+    <span class="it">Médiane : <b>${med.toFixed(1).replace(".", ",")}/10</b></span>
+    <span class="it">Notés 7+ : <b>${fmtP(100 * good / notes.length, 1)}</b></span></div>`;
+  $("chQualif").appendChild(seg);
+
+  const pcts = dist.map(q => 100 * q.n / notes.length);
+  barChart($("chQualif"), dist.map(q => q.note), [
+    { name: "Part des leads", color: "var(--s1)", values: pcts },
+  ], { barMax: 34, fmtVal: v => fmtP(v, 1) + " (" + fmtN(v * notes.length / 100) + " leads)",
+       fmtAxis: v => fmtP(v, 0), labelValues: pcts.filter(p => p > 0).length <= 11 });
+  const M = monthsOf(rows);
+  lineChart($("chQualifMonth"), M.map(m => m.label), [
+    { name: "Qualif moyenne", color: "var(--s1)", values: M.map(m => m.s.qMoy) },
+  ], { max: 10, fmtVal: v => v.toFixed(1).replace(".", ",") + "/10", fmtAxis: v => v.toFixed(0) });
+}
+
+function renderHygiene(rows) {
+  ["chIssuesField", "chIssuesCloser"].forEach(id => $(id).innerHTML = "");
+  const issues = issuesOf(rows);
+  $("hygLede").textContent = `${fmtN(issues.length)} ligne(s) incomplète(s) sur ${fmtN(rows.length)} calls de la période. Chaque ligne corrigée dans le Sheet disparaît d'ici la prochaine mise à jour.`;
+  const fieldCount = {};
+  const closerCount = {};
+  issues.forEach(i => {
+    i.miss.forEach(f => fieldCount[f] = (fieldCount[f] || 0) + 1);
+    const n = i.c.c || "(sans closer)";
+    closerCount[n] = (closerCount[n] || 0) + 1;
+  });
+  const sev = { "show-up": "var(--critical)", "vente ?": "var(--critical)", "prix": "var(--critical)",
+                "qualif /10": "var(--warning)", "closer": "var(--warning)", "source/UTM": "var(--s1)" };
+  hBars($("chIssuesField"), Object.entries(fieldCount).sort((a, b) => b[1] - a[1])
+    .map(([f, n]) => ({ label: f, v: n, color: sev[f] || "var(--s1)" })));
+  hBars($("chIssuesCloser"), Object.entries(closerCount).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([c, n]) => ({ label: c, v: n, color: "var(--s2)" })));
+
+  const order = { "show-up": 0, "vente ?": 1, "prix": 2, "qualif /10": 3, "closer": 4, "source/UTM": 5 };
+  issues.sort((a, b) => Math.min(...a.miss.map(f => order[f] ?? 9)) - Math.min(...b.miss.map(f => order[f] ?? 9))
+    || (b.c.ed < a.c.ed ? -1 : 1));
+  const shown = issues.slice(0, 80);
+  $("issuesCount").textContent = shown.length < issues.length
+    ? `Les ${shown.length} premières sur ${fmtN(issues.length)}.` : `${fmtN(issues.length)} ligne(s).`;
+  $("issueTable").innerHTML = `<thead><tr><th>Mois</th><th>Date</th><th>Closer</th><th>Prospect</th><th>Champs manquants</th></tr></thead><tbody>` +
+    shown.map(i => `<tr><td>${MONTH_SHORT[+i.c.tm.slice(5)]}</td>
+      <td>${i.c.d ? i.c.d.split("-").reverse().join("/") : "·"}</td>
+      <td>${i.c.c || "(sans closer)"}</td><td>${i.c.n || "(sans nom)"}</td>
+      <td>${i.miss.map(f => `<span class="pill ${["show-up", "vente ?", "prix"].includes(f) ? "crit" : f === "source/UTM" ? "info" : "warn"}">${f}</span>`).join(" ")}</td></tr>`).join("") + "</tbody>";
+
+  const srcMissing = fieldCount["source/UTM"] || 0;
+  $("structuralIssues").innerHTML = `
+    <h3>Problèmes structurels des tableaux</h3>
+    <div class="sub">À corriger dans les process, pas ligne par ligne</div>
+    <ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7">
+      <li><b>Tableau ads, lignes VENTES et CA vides :</b> presque aucune semaine n'a ses ventes renseignées alors que les onglets closing en comptent. Le ROAS du tableau ads est donc faux ; celui de cette console est recalculé depuis les onglets closing.</li>
+      <li><b>CA encaissé non suivi :</b> l'onglet « Ventes » (export Stripe) s'arrête en janvier 2026. Impossible de suivre l'encaissé réel depuis : à rebrancher.</li>
+      <li><b>Budget ads avant mai inconnu :</b> le tableau ads démarre au 04/05/2026. Le ROAS de janvier à avril n'est pas calculable.</li>
+      <li><b>UTM absent sur ${fmtN(srcMissing)} call(s) de la période :</b> l'attribution par canal (et le vrai ROAS par pub) restera approximative tant que la source n'est pas remplie systématiquement.</li>
+    </ul>`;
+}
+
+function renderShowUp(rows) {
+  const missing = rows.filter(c => c.s === "" && (c.d == null || c.d < TODAY_ISO))
+    .sort((a, b) => b.ed < a.ed ? -1 : 1);
+  const byCloser = {};
+  missing.forEach(c => { const n = c.c || "(sans closer)"; byCloser[n] = (byCloser[n] || 0) + 1; });
+  const chips = Object.entries(byCloser).sort((a, b) => b[1] - a[1])
+    .map(([c, n]) => `<span class="pill crit">${c} : ${n}</span>`).join(" ");
+  $("suLede").innerHTML = missing.length
+    ? `${fmtN(missing.length)} call(s) passé(s) sans show-up renseigné sur la période. C'est LE champ qui fausse tout le reste (show-up, closing, CA par closer). ${chips}`
+    : "Aucun call sans show-up sur la période. Tableau propre.";
+  $("suTable").innerHTML = missing.length ? `<thead><tr><th>Mois</th><th>Date du call</th><th>Closer</th><th>Prospect</th></tr></thead><tbody>` +
+    missing.map(c => `<tr><td>${MONTH_SHORT[+c.tm.slice(5)]}</td>
+      <td>${c.d ? c.d.split("-").reverse().join("/") : "·"}</td>
+      <td>${c.c || "(sans closer)"}</td><td>${c.n || "(sans nom)"}</td></tr>`).join("") + "</tbody>" : "";
+}
+
+function renderMissingCards() {
+  const cards = [
+    { t: "Abonnés (Instagram, YouTube)", s: "Pas présent dans les Sheets fournis. Envoyer un export Metricool ou les stats natives, ou ajouter un onglet de saisie hebdo.", pill: "en attente" },
+    { t: "Reels publiés par semaine", s: "Aucun onglet ne trace la production de contenu organique.", pill: "en attente" },
+    { t: "Funnel LP détaillé (clic CTA, bookings abandonnés)", s: "Le tableau ads suit les arrivées LP et les bookings confirmés, mais pas les clics CTA ni les tentatives abandonnées. Brancher les events GA4 ou le pixel de la LP.", pill: "en attente" },
+    { t: "CA encaissé temps réel", s: "Export Stripe arrêté en janvier 2026. À rebrancher pour suivre encaissé contre signé.", pill: "prioritaire" },
+  ];
+  $("missingCards").innerHTML = cards.map(c => `<div class="card"><h3>${c.t}
+    <span class="pill ${c.pill === "prioritaire" ? "crit" : "warn"}">${c.pill}</span></h3>
+    <div class="sub" style="margin:6px 0 0">${c.s}</div></div>`).join("");
+}
+
+/* ================= orchestration ================= */
+/* Objectif et projection du mois en cours : rythme actuel prolongé sur le mois.
+   Indépendant des filtres (toujours le mois calendaire, tous closers). */
+const OBJECTIF_CA_MOIS = null; // € (à définir avec Thomas), ex : 60000
+function renderProjection() {
+  const y = NOW.getFullYear(), mo = NOW.getMonth() + 1;
+  const tm = y + "-" + String(mo).padStart(2, "0");
+  const rows = DATA.calls.filter(c => c.tm === tm);
+  const s = st(rows);
+  const elapsed = Math.max(1, NOW.getDate() - 1);
+  const daysTotal = new Date(y, mo, 0).getDate();
+  const projCA = s.ca / elapsed * daysTotal;
+  const projV = s.ventes / elapsed * daysTotal;
+  /* objectif : modifiable ici même (champ €), gardé en mémoire sur ce navigateur ;
+     OBJECTIF_CA_MOIS sert de valeur partagée par défaut pour tout le monde */
+  const objKey = "objectif-" + tm;
+  const stored = parseFloat(localStorage.getItem(objKey));
+  const objectif = isFinite(stored) && stored > 0 ? stored : OBJECTIF_CA_MOIS;
+  let objHtml;
+  const objInput = `<label class="sub" style="display:inline-flex;align-items:center;gap:6px">Objectif du mois :
+    <input type="number" id="objInput" value="${objectif || ""}" placeholder="ex : 60000" min="0" step="1000"
+      style="font:inherit;font-size:13px;color:var(--ink);background:var(--card);border:1px solid var(--baseline);border-radius:8px;padding:4px 8px;width:110px"> €</label>`;
+  if (objectif) {
+    const pct = Math.min(100, 100 * s.ca / objectif);
+    const onTrack = projCA >= objectif;
+    objHtml = `<div style="margin-top:10px">${objInput}
+      <span class="sub"> · réalisé <b>${fmtP(pct, 0)}</b> · au rythme actuel :
+      <b style="color:${onTrack ? "var(--good-text)" : "var(--critical)"}">${onTrack ? "objectif atteint" : "objectif manqué"}</b>
+      (${fmtE(projCA)} projetés sur ${fmtE(objectif)})</span></div>
+      <div style="height:10px;border-radius:999px;background:var(--accent-soft);margin-top:8px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--accent);border-radius:999px"></div>
+      </div>`;
+  } else {
+    objHtml = `<div style="margin-top:10px">${objInput}
+      <span class="sub"> · tape le chiffre et la jauge apparaît (gardé sur ce navigateur)</span></div>`;
+  }
+  $("projCard").innerHTML = `
+    <span class="eyebrow">🎯 ${MONTH_FULL[mo].charAt(0).toUpperCase() + MONTH_FULL[mo].slice(1)} · objectif et projection</span>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 34px;margin-top:8px;align-items:baseline">
+      <div><span class="lbl" style="font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">CA signé à date</span><br>
+        <b style="font-family:var(--serif);font-size:26px">${fmtE(s.ca)}</b> <span class="sub">${s.ventes} vente(s) en ${elapsed} jour(s)</span></div>
+      <div><span class="lbl" style="font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Projection fin de mois</span><br>
+        <b style="font-family:var(--serif);font-size:26px">${fmtE(projCA)}</b> <span class="sub">≈ ${projV.toFixed(1).replace(".", ",")} ventes au rythme actuel</span></div>
+      <div><span class="lbl" style="font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)">Rythme</span><br>
+        <b style="font-family:var(--serif);font-size:26px">${fmtE(s.ca / elapsed)}</b> <span class="sub">par jour · ${elapsed}/${daysTotal} jours écoulés</span></div>
+    </div>${objHtml}`;
+  const inp = $("objInput");
+  inp.addEventListener("change", () => {
+    const v = parseFloat(inp.value);
+    if (isFinite(v) && v > 0) localStorage.setItem(objKey, String(v));
+    else localStorage.removeItem(objKey);
+    renderProjection();
+  });
+}
+
+function renderAll() {
+  buildFilterbar();
+  const r = currentRange();
+  const rows = callsIn(r);
+  const wks = weeksIn(r);
+  renderKpis(r, rows, wks);
+  renderBottleneck(rows, wks);
+  renderFunnel(r, rows, wks);
+  renderMonthly(rows, wks);
+  renderWeekly(wks);
+  renderClosers(rows);
+  renderSources(rows);
+  renderQuality(rows);
+  renderHygiene(rows);
+  renderShowUp(rows);
+}
+
+$("updatedAt").textContent = DATA.updated_at;
+/* bouton Actualiser : sur GitHub Pages il déclenche la vraie MAJ serveur via le
+   pont Apps Script ; ailleurs (artifact claude.ai) il garde l'ouverture de Claude */
+const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
+(function setupRefresh() {
+  const btn = $("btnRefresh");
+  if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      if (btn.dataset.busy) return;
+      btn.dataset.busy = "1";
+      btn.textContent = "MAJ lancée...";
+      try {
+        const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh");
+        await r.text();
+        let left = 170;
+        const t = setInterval(() => {
+          left -= 1;
+          btn.textContent = "MAJ en cours · recharge dans " + Math.floor(left / 60) + " min " + String(left % 60).padStart(2, "0");
+          if (left <= 0) { clearInterval(t); location.reload(); }
+        }, 1000);
+      } catch (err) {
+        btn.textContent = "Échec · réessaie";
+        delete btn.dataset.busy;
+      }
+    };
+  } else {
+    btn.href = "https://claude.ai/new?q=" + encodeURIComponent(
+      "Mets à jour le dashboard Thomas : suis le runbook /Users/alex/Alex/thomas-dashboard/README.md (re-télécharge les Google Sheets, relance le pipeline, republie l'artifact au même URL).");
+  }
+})();
+renderMissingCards();
+renderProjection();
+renderAll();
+
+const backtop = $("backtop");
+addEventListener("scroll", () => backtop.classList.toggle("show", scrollY > 600), { passive: true });
+backtop.addEventListener("click", () => scrollTo({ top: 0 }));
+</script>
