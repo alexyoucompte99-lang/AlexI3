@@ -358,7 +358,7 @@
     <section style="margin-top:16px">
       <span class="eyebrow">Base leads</span>
       <h2>Tous les leads passés en call</h2>
-      <p class="lede">Tous les calls loggés en 2026, vus côté lead, avec les moyennes de la sélection. Clique un en-tête pour trier.</p>
+      <p class="lede">Tous les calls loggés depuis décembre 2025, vus côté lead, avec les moyennes de la sélection. Clique un en-tête pour trier.</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Mois</span><span id="ldMoisPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Dates</span><span id="ldDatesPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -872,7 +872,8 @@ function renderUnfilled(r, rows) {
 
 /* ================= ventes sans virement ================= */
 function renderVirement() {
-  const list = DATA.calls.filter(c => c.v === "OUI" && !c.vir)
+  /* contrôle borné à 2026 : avant, le suivi virement Justine n'existait pas */
+  const list = DATA.calls.filter(c => c.v === "OUI" && !c.vir && c.tm >= "2026")
     .sort((a, b) => (b.d || "") < (a.d || "") ? -1 : 1);
   if (!list.length) {
     $("virList").innerHTML = `<div class="callout ok"><span class="eyebrow" style="color:var(--good-text)">✓ Tout est carré</span>
@@ -889,7 +890,7 @@ function renderVirement() {
 
 /* ================= follow-ups ================= */
 function followups() {
-  return DATA.calls.filter(c => c.v === "FOLLOW_UP" && !c.vir)
+  return DATA.calls.filter(c => c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026")
     .sort((a, b) => (b.d || "") < (a.d || "") ? -1 : 1);
 }
 const fuKey = (c) => "fu-done:" + c.n + "|" + (c.d || "");
@@ -1227,7 +1228,7 @@ function renderLeads() {
     if (av === bv) return 0;
     return (av < bv ? -1 : 1) * ldSort.dir;
   });
-  const CAP = 500;
+  const CAP = 2500;
   const shown = list.slice(0, CAP);
   $("ldMore").textContent = list.length > CAP ? `${CAP} premiers leads affichés sur ${list.length} : affine les filtres pour voir le reste.` : "";
   $("ldTable").innerHTML = "<thead><tr>" + COLS.map(x =>
@@ -1294,7 +1295,7 @@ function buildBrief() {
   lines.push(`Ventes : ${s.ventes} · CA signé sur la période : *${fmtE(s.ca)}*`);
   const tmNow = TODAY_ISO.slice(0, 7);
   const caMois = DATA.calls.filter(c => c.tm === tmNow && isSale(c)).reduce((a, c) => a + (c.p || c.pp || 0), 0);
-  const caTotal = DATA.calls.filter(c => isSale(c)).reduce((a, c) => a + (c.p || c.pp || 0), 0);
+  const caTotal = DATA.calls.filter(c => isSale(c) && c.tm >= "2026").reduce((a, c) => a + (c.p || c.pp || 0), 0);
   lines.push(`CA signé mois en cours : *${fmtE(caMois)}* · total 2026 : *${fmtE(caTotal)}*`);
   lines.push(`Taux de closing : *${fmtP(s.shows ? 100 * s.ventes / s.shows : null, 0)}* des présents · *${fmtP(s.tClosPitche, 0)}* des pitchés`);
   lines.push(`CA par call présent : ${s.shows ? fmtE(s.ca / s.shows) : "·"} · CA par call booké (présent ou non) : ${s.passes ? fmtE(s.ca / s.passes) : "·"}`);
@@ -1441,9 +1442,9 @@ Par setter : ${list.map(x => `${x.n} ${fmtN(x.appeles)} appels/${fmtN(x.acceptes
     (ec.length ? ` (${frDate(ec[0].d)} → ${frDate(ec[ec.length - 1].d)}), la plupart vides. À relancer côté setters si tu veux ce suivi.` : ".");
 }
 function renderAlexChecks() {
-  const sansJustine = DATA.calls.filter(c => c.v === "OUI" && !c.vir)
+  const sansJustine = DATA.calls.filter(c => c.v === "OUI" && !c.vir && c.tm >= "2026")
     .sort((a, b) => (b.d || "") < (a.d || "") ? -1 : 1);
-  const sansCloser = DATA.calls.filter(c => c.vir && c.v !== "OUI" && c.v !== "REMBOURSEMENT")
+  const sansCloser = DATA.calls.filter(c => c.vir && c.v !== "OUI" && c.v !== "REMBOURSEMENT" && c.tm >= "2026")
     .sort((a, b) => (b.d || "") < (a.d || "") ? -1 : 1);
   const tbl = (rows, extraCol) => `<div class="tscroll"><table>
     <thead><tr><th>Date du call</th><th>Closer</th><th>Prospect</th>${extraCol ? "<th>Statut closer</th>" : ""}<th class="num">Prix</th></tr></thead><tbody>` +

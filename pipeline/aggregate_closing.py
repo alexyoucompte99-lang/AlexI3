@@ -121,8 +121,7 @@ def main(data_path, out_path, updated_at):
     d = json.load(open(data_path))
     calls = []
     for c in d["calls"]:
-        if c["year"] != 2026:
-            continue
+        # tous les onglets closing parsés (déc. 2025 inclus)
         prix_eff = c.get("prix_confirme") or c.get("prix") or 0
         calls.append({
             "d": c.get("date"),
