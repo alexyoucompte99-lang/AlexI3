@@ -56,7 +56,6 @@ jobs:
           python parse_xlsx.py investisseurs30.xlsx data.json
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
-          python eow_notify.py investisseurs30.xlsx ../.eow-count || true
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
           HASH=$(cat data.json ads.json | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)

@@ -324,9 +324,9 @@
       <span class="eyebrow">EOW · End of week</span>
       <h2>Ton ressenti de la semaine</h2>
       <p class="lede">Pas de chiffres ici, la console les connaît déjà. Juste ton ressenti de closer : ce que les datas ne montrent pas.
-        Remplis et clique « Envoyer à Alex » : ton récap lui part directement (personne d'autre ne voit tes réponses).
+        Remplis et clique « Valider » : ton récap part directement à Alex (personne d'autre ne voit tes réponses).
         Ton brouillon reste enregistré sur ce navigateur.</p>
-      <div class="card" style="max-width:680px">
+      <div class="card" style="max-width:680px" id="eowCard">
         <div class="field">
           <label for="eowCloser">Ton prénom</label>
           <select id="eowCloser"></select>
@@ -345,8 +345,7 @@
         <div class="field"><label for="eowNeed">Ce dont tu as besoin de la part de l'équipe</label><textarea id="eowNeed" placeholder="Feedback, aide sur un script, leads mieux qualifiés..."></textarea></div>
         <div class="field"><label for="eowFree">Autre chose à partager</label><textarea id="eowFree"></textarea></div>
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
-          <a class="btn" id="eowSend" href="#" target="_blank" rel="noopener">📨 Envoyer à Alex</a>
-          <button class="btn ghost" id="eowCopy" title="Si WhatsApp ne s'ouvre pas, copie le récap et envoie-le à Alex">📋 Copier</button>
+          <button class="btn" id="eowSend">✅ Valider et envoyer à Alex</button>
           <button class="btn ghost" id="eowClear">Effacer</button>
           <span id="eowOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
         </div>
@@ -1086,26 +1085,33 @@ function initEow() {
 🤝 Besoin côté équipe : ${$("eowNeed").value || "·"}
 💬 Autre : ${$("eowFree").value || "·"}`;
   };
-  const eowMsg = (m) => { $("eowOk").textContent = m; $("eowOk").style.display = "inline"; setTimeout(() => $("eowOk").style.display = "none", 4000); };
-  const eowHref = () => { $("eowSend").href = "https://wa.me/__WA_ALEX__?text=" + encodeURIComponent(eowText()); };
-  eowHref();
-  EOW_FIELDS.forEach(id => $(id).addEventListener("input", eowHref));
+  const eowMsg = (m) => { $("eowOk").textContent = m; $("eowOk").style.display = "inline"; setTimeout(() => $("eowOk").style.display = "none", 5000); };
   const eowToSheet = () => bridgePost({
     what: "eow", closer: $("eowCloser").value,
     energie: $("eowEnergy").value, leads: $("eowLeads").value,
     good: $("eowGood").value, hard: $("eowHard").value,
     obj: $("eowObj").value, need: $("eowNeed").value, free: $("eowFree").value,
   });
+  /* validation = envoi direct (Sheet + Telegram d'Alex), puis page de confirmation */
   $("eowSend").addEventListener("click", () => {
-    /* enregistre aussi la réponse dans le Sheet (onglet « EOW Console ») */
+    const btn = $("eowSend");
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
     eowToSheet().then(ok => {
-      eowMsg(ok ? "Enregistré dans le Sheet + WhatsApp s'ouvre : appuie sur envoyer ✓"
-                : "WhatsApp s'ouvre avec ton récap prêt pour Alex : appuie juste sur envoyer ✓");
+      if (ok) {
+        localStorage.removeItem("eow-draft");
+        $("eowCard").innerHTML = `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:52px;margin-bottom:14px">🐯</div>
+          <h2 style="margin:0 0 8px">Ok c'est envoyé à Alex, tié un tigre</h2>
+          <p class="lede" style="margin:0">Ton EOW est bien parti. Bonne semaine, repose-toi bien.</p>
+        </div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "✅ Valider et envoyer à Alex";
+        eowMsg("Envoi impossible pour l'instant : vérifie ta connexion et réessaie dans une minute.");
+      }
     });
-  });
-  $("eowCopy").addEventListener("click", async () => {
-    await copyText(eowText());
-    eowMsg("Copié : envoie-le à Alex ✓");
   });
   $("eowClear").addEventListener("click", () => {
     localStorage.removeItem("eow-draft");
