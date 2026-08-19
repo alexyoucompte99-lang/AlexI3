@@ -210,6 +210,7 @@
   #backtop:hover { background: var(--accent); color: #fff; }
 
   footer { margin-top: 60px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); padding-top: 14px; }
+  td.best { background: #e9f1dd; font-weight: 700; }
   @media (max-width: 640px) { .kpi .val { font-size: 24px; } }
 </style>
 
@@ -230,6 +231,7 @@
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabPilotage" aria-selected="true" data-panel="panelPilotage">Pilotage 🔒</button>
+    <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
@@ -296,6 +298,37 @@
       <div id="virList"></div>
     </section>
     </div>
+  </div>
+
+  <!-- ================== CLOSERS ================== -->
+  <div id="panelClosers" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Par closer</span>
+      <h2>Performances closers</h2>
+      <p class="lede">Les stats du closer choisi sur la période, puis le comparatif des trois. Une vente est comptée si elle est validée par le closer ou par le virement Justine ; le taux de show-up se calcule sur les calls renseignés.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="clCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="clPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+      </div>
+      <p class="lede" id="clLede" style="margin-bottom:10px"></p>
+      <div class="kpis" id="clKpis"></div>
+    </section>
+    <section style="margin-top:26px">
+      <span class="eyebrow">Comparatif</span>
+      <h2>Les 3 closers face à face</h2>
+      <p class="lede">Sur la même période. La meilleure stat de chaque ligne est <span style="background:#e9f1dd;padding:1px 8px;border-radius:6px;font-weight:700">surlignée</span> (pour les non pitchés et les lignes non remplies, le moins est le mieux).</p>
+      <div class="card full"><div class="tscroll"><table id="clCompare"></table></div></div>
+    </section>
+    <section style="margin-top:26px">
+      <span class="eyebrow">Visuel</span>
+      <h2>Le comparatif en graphiques</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px">
+        <div class="card"><h3>CA signé sur la période</h3><div id="clChartCa"></div></div>
+        <div class="card"><h3>Ventes sur la période</h3><div id="clChartVentes"></div></div>
+        <div class="card"><h3>Taux de closing sur les présents</h3><div id="clChartClos"></div></div>
+        <div class="card"><h3>Taux de show-up</h3><div id="clChartShow"></div></div>
+      </div>
+    </section>
   </div>
 
   <!-- ================== FOLLOW-UPS ================== -->
@@ -641,6 +674,90 @@ function buildFilterbar() {
   cust.appendChild(go);
   bar.appendChild(cust);
   if (state.custom) { $("cFrom").value = state.custom.from; $("cTo").value = state.custom.to; }
+}
+
+/* ================= onglet Closers ================= */
+const CL_PERIODS = [
+  { k: "7j", label: "7 jours", range: () => ({ from: iso(new Date(NOW - 7 * DAY)), to: iso(new Date(NOW - DAY)) }) },
+  { k: "mtd", label: "Mois en cours", range: () => ({ from: TODAY_ISO.slice(0, 8) + "01", to: TODAY_ISO }) },
+  { k: "30j", label: "30 jours", range: () => ({ from: iso(new Date(NOW - 30 * DAY)), to: iso(new Date(NOW - DAY)) }) },
+  { k: "3m", label: "3 mois", range: () => ({ from: iso(new Date(NOW - 90 * DAY)), to: TODAY_ISO }) },
+  { k: "ytd", label: "Année en cours", range: () => ({ from: TODAY_ISO.slice(0, 4) + "-01-01", to: TODAY_ISO }) },
+];
+let clSel = TOP3[0], clPeriodK = "7j";
+const clPc = (v) => v == null ? "·" : String(Math.round(v)) + " %";
+const clEur = (v) => v == null ? "·" : fmtE(Math.round(v));
+function clStats(name, r) {
+  const o = st(plannedIn(r).filter(c => (c.c || "") === name));
+  o.fu = DATA.calls.filter(c => c.c === name && c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026").length;
+  o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
+  o.caBooke = o.calls ? o.ca / o.calls : null;
+  o.caShow = o.shows ? o.ca / o.shows : null;
+  o.panier = o.ventes ? o.ca / o.ventes : null;
+  return o;
+}
+function renderClosersTab() {
+  pillRow("clCloserPills", TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), clSel, k => clSel = k, renderClosersTab);
+  pillRow("clPeriodPills", CL_PERIODS.map(pp => ({ k: pp.k, label: pp.label })), clPeriodK, k => clPeriodK = k, renderClosersTab);
+  const r = CL_PERIODS.find(pp => pp.k === clPeriodK).range();
+  $("clLede").textContent = clSel + " · " + rangeLabel(r) + (clPeriodK === "mtd" ? " (onglet du mois complet, relances comprises)" : "");
+  const o = clStats(clSel, r);
+  $("clKpis").innerHTML = [
+    kpiTile("Calls bookés", fmtN(o.calls), "lignes du Sheet sur la période"),
+    kpiTile("Calls présents", fmtN(o.shows), `${fmtN(o.noshow)} no-show · ${fmtN(o.reprog + o.annule)} reprogrammés/annulés`),
+    kpiTile("Taux de show-up", clPc(o.tShowPasses), `présents ÷ ${fmtN(o.passes)} calls renseignés`),
+    kpiTile("Lignes non remplies", fmtN(o.suVide), "show-up vide : à corriger dans le Sheet"),
+    kpiTile("Non pitchés", fmtN(o.nonPitche), "soit " + clPc(o.tNonPitche) + " des présents"),
+    kpiTile("Ventes", fmtN(o.ventes), "closer OUI ou virement Justine"),
+    kpiTile("Closing / pitchés", clPc(o.tClosPitche), `${fmtN(o.pitched)} calls pitchés`),
+    kpiTile("Closing / présents", clPc(o.tClosShow), `${fmtN(o.shows)} présents`),
+    kpiTile("Closing / bookés", clPc(o.tClosBooke), `${fmtN(o.calls)} bookés`),
+    kpiTile("CA total", fmtE(o.ca), "sur la période"),
+    kpiTile("CA / call booké", clEur(o.caBooke), ""),
+    kpiTile("CA / call présent", clEur(o.caShow), ""),
+    kpiTile("CA / vente", clEur(o.panier), "panier moyen"),
+    kpiTile("Qualité moyenne des leads", o.qMoy == null ? "·" : o.qMoy.toFixed(1).replace(".", ",") + "/10", `${fmtN(o.qN)} leads notés`),
+    kpiTile("Follow-ups en cours", fmtN(o.fu), "toutes périodes, encore à relancer"),
+  ].join("");
+
+  const stats = TOP3.map(n => clStats(n, r));
+  const METRICS = [
+    ["Calls bookés", oo => oo.calls, fmtN, "max"],
+    ["Calls présents", oo => oo.shows, fmtN, "max"],
+    ["Taux de show-up", oo => oo.tShowPasses, clPc, "max"],
+    ["Lignes non remplies", oo => oo.suVide, fmtN, "min"],
+    ["Non pitchés", oo => oo.nonPitche, fmtN, "min"],
+    ["Taux de non pitché", oo => oo.tNonPitche, clPc, "min"],
+    ["Ventes", oo => oo.ventes, fmtN, "max"],
+    ["Closing / pitchés", oo => oo.tClosPitche, clPc, "max"],
+    ["Closing / présents", oo => oo.tClosShow, clPc, "max"],
+    ["Closing / bookés", oo => oo.tClosBooke, clPc, "max"],
+    ["CA total", oo => oo.ca, v => fmtE(v || 0), "max"],
+    ["CA / call booké", oo => oo.caBooke, clEur, "max"],
+    ["CA / call présent", oo => oo.caShow, clEur, "max"],
+    ["CA / vente (panier moyen)", oo => oo.panier, clEur, "max"],
+    ["Qualité moyenne des leads", oo => oo.qMoy, v => v == null ? "·" : v.toFixed(1).replace(".", ",") + "/10", null],
+    ["Follow-ups en cours", oo => oo.fu, fmtN, null],
+  ];
+  $("clCompare").innerHTML = "<thead><tr><th></th>" +
+    TOP3.map(n => `<th class="num">${esc(n.split(" ")[0])}</th>`).join("") + "</tr></thead><tbody>" +
+    METRICS.map(([lbl, get, fm, dir]) => {
+      const vals = stats.map(get);
+      let best = null;
+      if (dir) {
+        const usable = vals.filter(v => v != null && !(dir === "max" && v <= 0));
+        if (usable.length) best = dir === "max" ? Math.max(...usable) : Math.min(...usable);
+      }
+      return `<tr><td>${lbl}</td>` + vals.map(v =>
+        `<td class="num${dir != null && v != null && v === best ? " best" : ""}">${fm(v)}</td>`).join("") + "</tr>";
+    }).join("") + "</tbody>";
+
+  const labels = TOP3.map(n => n.split(" ")[0]);
+  const one = (id, values, opts) => { const m = $(id); m.innerHTML = ""; barChart(m, labels, [{ name: "", color: "var(--s1)", values }], opts); };
+  one("clChartCa", stats.map(x => x.ca), { fmtAxis: v => fmtN(Math.round(v / 100) * 100), height: 205 });
+  one("clChartVentes", stats.map(x => x.ventes), { ticks: 3, height: 205 });
+  one("clChartClos", stats.map(x => x.tClosShow ?? 0), { fmtAxis: v => Math.round(v) + " %", max: 100, height: 205 });
+  one("clChartShow", stats.map(x => x.tShowPasses ?? 0), { fmtAxis: v => Math.round(v) + " %", max: 100, height: 205 });
 }
 
 /* ================= KPIs ================= */
@@ -1542,6 +1659,8 @@ function setupRefresh(btn, note) {
 }
 setupRefresh($("btnRefresh"), document.querySelector(".updated"));
 initPilotage();
+$("tabClosers").addEventListener("click", renderClosersTab);
+renderClosersTab();
 renderFollowups();
 renderLeads();
 $("ldSearch").addEventListener("input", renderLeads);
