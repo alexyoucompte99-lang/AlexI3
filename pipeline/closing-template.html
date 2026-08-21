@@ -237,6 +237,7 @@
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabPilotage" aria-selected="true" data-panel="panelPilotage">Pilotage 🔒</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
+    <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
@@ -333,6 +334,20 @@
         <div class="card"><h3>Taux de closing sur les présents</h3><div id="clChartClos"></div></div>
         <div class="card"><h3>Taux de show-up</h3><div id="clChartShow"></div></div>
       </div>
+    </section>
+  </div>
+
+  <!-- ================== RELANCES ICLOSED ================== -->
+  <div id="panelRelances" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Leads iClosed sans réservation</span>
+      <h2>À relancer</h2>
+      <p class="lede" id="icLede">Les leads qui ont rempli leurs infos sur iClosed (formulaire qualifié) mais n'ont pas pu réserver de call, souvent faute de créneau.
+        Coche ta case pour dire « c'est moi qui relance » : c'est enregistré pour toute l'équipe.
+        Clique le numéro : WhatsApp s'ouvre avec le message de relance déjà écrit (coche ta case d'abord pour qu'il soit signé de ton prénom).</p>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px" id="icFilterPills"></div>
+      <div class="card full"><div class="tscroll"><table id="icTable"></table></div></div>
+      <p class="lede" id="icMore" style="margin-top:8px"></p>
     </section>
   </div>
 
@@ -763,6 +778,72 @@ function renderClosersTab() {
   one("clChartVentes", stats.map(x => x.ventes), { ticks: 3, height: 205 });
   one("clChartClos", stats.map(x => x.tClosShow ?? 0), { fmtAxis: v => Math.round(v) + " %", max: 100, height: 205 });
   one("clChartShow", stats.map(x => x.tShowPasses ?? 0), { fmtAxis: v => Math.round(v) + " %", max: 100, height: 205 });
+}
+
+/* ================= relances iClosed ================= */
+let icFilter = "todo";
+const icKey = (l) => "ic-claim:" + l.e;
+function icState(l) {
+  /* état Sheet (l.cl posé au build) sinon coche optimiste de ce navigateur */
+  if (l.cl) return { closer: l.cl, d: l.cld || "" };
+  const loc = localStorage.getItem(icKey(l));
+  if (loc) { const [c, d] = loc.split("|"); return { closer: c, d: d || "" }; }
+  return null;
+}
+function waIclosed(l) {
+  const st2 = icState(l);
+  const who = st2 && st2.closer ? st2.closer.split(" ")[0] + " de l'équipe Investisseurs 3.0" : "l'équipe Investisseurs 3.0";
+  const p = (l.pn || "").trim();
+  return `Bonjour${p ? " " + p : ""}, c'est ${who} ! J'ai vu que vous aviez cherché à réserver un appel avec nous après avoir rempli le formulaire. Avec le volume de demandes en ce moment, il n'y avait sans doute plus de créneau disponible. Bonne nouvelle : on vient d'en rouvrir quelques-uns et on vous les propose en priorité. Quelles seraient vos disponibilités cette semaine ?`;
+}
+function renderRelances() {
+  const all = DATA.iclosed || [];
+  const todo = all.filter(l => !icState(l));
+  $("icBadge").textContent = todo.length;
+  pillRow("icFilterPills", [
+    { k: "todo", label: `À relancer (${todo.length})` },
+    { k: "done", label: `Relancés (${all.length - todo.length})` },
+    { k: "all", label: `Tous (${all.length})` },
+  ], icFilter, k => icFilter = k, renderRelances);
+  const list = all.filter(l => icFilter === "all" ? true : (icFilter === "todo" ? !icState(l) : !!icState(l)));
+  const frD = (d) => (d || "").split(" ")[0] || "·";
+  $("icTable").innerHTML = "<thead><tr><th>Qui relance ?</th><th>Prospect</th><th>Téléphone</th><th>Email</th><th>Inscrit le</th><th>Pub d'origine</th></tr></thead><tbody>" +
+    list.map((l, i) => {
+      const st2 = icState(l);
+      const boxes = TOP3.map(n => {
+        const first = n.split(" ")[0];
+        const checked = st2 && st2.closer === n;
+        return `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;cursor:pointer;font-size:12.5px${st2 && !checked ? ";opacity:.35" : ""}">
+          <input type="checkbox" data-ic="${i}" data-closer="${esc(n)}" ${checked ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">${first}</label>`;
+      }).join("");
+      return `<tr${st2 ? ' style="opacity:.55"' : ""}>
+        <td style="white-space:nowrap">${boxes}${st2 ? `<div class="sub" style="font-size:11px;margin-top:2px">relancé le ${esc(frD(st2.d)) || "·"}</div>` : ""}</td>
+        <td><b>${esc((l.pn + " " + l.n).trim()) || "·"}</b></td>
+        <td>${l.tel ? `<a class="tel" href="https://wa.me/${esc(String(l.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(waIclosed(l)).replace(/'/g, "%27")}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message de relance pré-écrit">${esc(l.tel)}</a>` : "·"}</td>
+        <td style="max-width:22ch;overflow-wrap:anywhere">${esc(l.e)}</td>
+        <td>${esc(frD(l.d))}</td>
+        <td style="max-width:26ch;overflow-wrap:anywhere;font-size:12px">${esc(l.ad || l.camp || l.src || "·")}</td>
+      </tr>`;
+    }).join("") + "</tbody>";
+  $("icMore").textContent = list.length ? "" : (icFilter === "todo" ? "Tout est relancé, machine !" : "Rien ici pour l'instant.");
+  $("icTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const l = list[+cb.dataset.ic];
+      const closer = cb.dataset.closer;
+      if (cb.checked) {
+        localStorage.setItem(icKey(l), closer + "|" + frDateFull(TODAY_ISO));
+        l.cl = closer; l.cld = TODAY_ISO;
+        bridgePost({ what: "iclosed_claim", lead: l.e, closer, value: "RELANCE" })
+          .then(ok => toast(ok ? "Noté pour toute l'équipe ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
+      } else {
+        localStorage.removeItem(icKey(l));
+        delete l.cl; delete l.cld;
+        bridgePost({ what: "iclosed_claim", lead: l.e, closer, value: "ANNULE" })
+          .then(ok => toast(ok ? "Coche retirée ✓" : "Retirée sur ce navigateur"));
+      }
+      renderRelances();
+    });
+  });
 }
 
 /* ================= KPIs ================= */
@@ -1633,29 +1714,62 @@ $("updatedAt").textContent = DATA.updated_at;
 const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
 function setupRefresh(btn, note) {
   if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
-    if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>Le bouton relance la vraie mise à jour (2-3 min),<br>la page se recharge ensuite toute seule.";
+    if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>La page se recharge toute seule dès qu'une version plus récente est en ligne.<br>Le bouton force une MAJ complète immédiate (environ 2 min).";
+    btn.textContent = "↻ Mettre à jour maintenant";
+    btn.title = "Relance la récupération de toutes les datas (Sheet closing + ads + Meta) puis recharge la page automatiquement.";
+    /* détection de version : ETag de la page en HEAD hors cache ; recharge en ?v= pour sauter le cache CDN (~10 min) */
+    let etag0 = null;
+    const pageTag = async () => {
+      try {
+        const r = await fetch(location.pathname + "?ping=" + Date.now(), { method: "HEAD", cache: "no-store" });
+        return r.headers.get("etag") || r.headers.get("last-modified") || "";
+      } catch (err) { return null; }
+    };
+    const initTag = async () => { etag0 = await pageTag(); if (!etag0) setTimeout(initTag, 30000); };
+    initTag();
+    const goFresh = () => location.replace(location.pathname + "?v=" + Date.now());
+    const maybeReload = async () => {
+      if (btn.dataset.busy || document.hidden || !etag0) return;
+      const t = await pageTag();
+      if (t && t !== etag0) goFresh();
+    };
+    setInterval(maybeReload, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
     btn.onclick = async (e) => {
       e.preventDefault();
       if (btn.dataset.busy) return;
       btn.dataset.busy = "1";
-      btn.textContent = "MAJ lancée...";
-      try {
-        const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh");
-        const body = await r.text();
-        if (body.indexOf('"ok":true') === -1) {
-          btn.textContent = "MAJ auto toutes les 15 min (bouton instantané à configurer)";
-          return;
-        }
-        let left = 170;
-        const t = setInterval(() => {
-          left -= 1;
-          btn.textContent = "MAJ en cours · recharge dans " + Math.floor(left / 60) + " min " + String(left % 60).padStart(2, "0");
-          if (left <= 0) { clearInterval(t); location.reload(); }
-        }, 1000);
-      } catch (err) {
-        btn.textContent = "Échec · réessaie";
-        delete btn.dataset.busy;
+      let ok = false;
+      for (let i = 0; i < 3 && !ok; i++) {
+        btn.textContent = i ? "Pont occupé · nouvel essai..." : "Demande envoyée...";
+        try {
+          const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh", { cache: "no-store" });
+          ok = (await r.text()).indexOf('"ok":true') !== -1;
+        } catch (err) { ok = false; }
+        if (!ok) await new Promise(res => setTimeout(res, 2500));
       }
+      if (!ok) {
+        btn.textContent = "Pont indisponible · reclique dans 1 min";
+        delete btn.dataset.busy;
+        return;
+      }
+      const started = Date.now();
+      const t = setInterval(async () => {
+        const sec = Math.round((Date.now() - started) / 1000);
+        btn.textContent = "MAJ en cours · " + sec + " s";
+        const tag = await pageTag();
+        if (tag && etag0 && tag !== etag0) {
+          clearInterval(t);
+          btn.textContent = "Nouvelle version en ligne · rechargement...";
+          goFresh();
+        } else if ((!tag || !etag0) && sec >= 170) {
+          clearInterval(t); goFresh();
+        } else if (sec >= 300) {
+          clearInterval(t);
+          btn.textContent = "Toujours rien après 5 min · reclique";
+          delete btn.dataset.busy;
+        }
+      }, 5000);
     };
   } else {
     btn.href = "https://claude.ai/new?q=" + encodeURIComponent(
@@ -1665,6 +1779,8 @@ function setupRefresh(btn, note) {
 setupRefresh($("btnRefresh"), document.querySelector(".updated"));
 initPilotage();
 $("tabClosers").addEventListener("click", renderClosersTab);
+$("tabRelances").addEventListener("click", renderRelances);
+renderRelances();
 renderClosersTab();
 renderFollowups();
 renderLeads();

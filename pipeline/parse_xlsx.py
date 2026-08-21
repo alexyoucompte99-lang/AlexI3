@@ -164,6 +164,7 @@ def find_header(rows_iter, must_have, scan=12):
 def main(xlsx_path, out_path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
+    iclosed_leads, iclosed_claims = [], []
 
     for ws in wb.worksheets:
         title = ws.title.strip()
@@ -218,6 +219,29 @@ def main(xlsx_path, out_path):
                     "has_vente_raw": bool(cell_str(g("vente"))),
                     "has_qualif_raw": bool(cell_str(g("qualif"))),
                 })
+            continue
+
+        if title == "iClosed Import":
+            # rempli par iclosed_import.py via le pont : Email, Prénom, Nom, Tél,
+            # Créé le, UTM source, UTM campagne, UTM contenu
+            for r in all_rows[1:]:
+                if not r or not cell_str(r[0] if len(r) > 0 else None):
+                    continue
+                def g(i):
+                    return cell_str(r[i]) if i < len(r) else ""
+                iclosed_leads.append({"e": g(0), "pn": g(1), "n": g(2), "tel": g(3),
+                                      "d": g(4)[:16], "src": g(5), "camp": g(6), "ad": g(7)})
+            continue
+
+        if title == "Relances iClosed":
+            # rempli par la console via le pont : Date, Lead(email), Closer, Statut
+            for r in all_rows[1:]:
+                if not r or not cell_str(r[1] if len(r) > 1 else None):
+                    continue
+                iclosed_claims.append({"d": cell_str(r[0])[:16],
+                                       "lead": cell_str(r[1]),
+                                       "closer": cell_str(r[2]) if len(r) > 2 else "",
+                                       "statut": cell_str(r[3]) if len(r) > 3 else ""})
             continue
 
         if title == "Ventes":
@@ -344,7 +368,8 @@ def main(xlsx_path, out_path):
             continue
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
-           "setter_reports": setter_reports, "dm_reports": dm_reports}
+           "setter_reports": setter_reports, "dm_reports": dm_reports,
+           "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 

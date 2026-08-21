@@ -1265,29 +1265,64 @@ $("updatedAt").textContent = DATA.updated_at;
 const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
 (function setupRefresh() {
   const btn = $("btnRefresh");
+  const note = document.querySelector(".updated");
   if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
+    if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>La page se recharge toute seule dès qu'une version plus récente est en ligne.<br>Le bouton force une MAJ complète immédiate (environ 2 min).";
+    btn.textContent = "↻ Mettre à jour maintenant";
+    btn.title = "Relance la récupération de toutes les datas (Sheet closing + ads + Meta) puis recharge la page automatiquement.";
+    /* détection de version : ETag de la page en HEAD hors cache ; recharge en ?v= pour sauter le cache CDN (~10 min) */
+    let etag0 = null;
+    const pageTag = async () => {
+      try {
+        const r = await fetch(location.pathname + "?ping=" + Date.now(), { method: "HEAD", cache: "no-store" });
+        return r.headers.get("etag") || r.headers.get("last-modified") || "";
+      } catch (err) { return null; }
+    };
+    const initTag = async () => { etag0 = await pageTag(); if (!etag0) setTimeout(initTag, 30000); };
+    initTag();
+    const goFresh = () => location.replace(location.pathname + "?v=" + Date.now());
+    const maybeReload = async () => {
+      if (btn.dataset.busy || document.hidden || !etag0) return;
+      const t = await pageTag();
+      if (t && t !== etag0) goFresh();
+    };
+    setInterval(maybeReload, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
     btn.onclick = async (e) => {
       e.preventDefault();
       if (btn.dataset.busy) return;
       btn.dataset.busy = "1";
-      btn.textContent = "MAJ lancée...";
-      try {
-        const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh");
-        const body = await r.text();
-        if (body.indexOf('"ok":true') === -1) {
-          btn.textContent = "MAJ auto toutes les 15 min (bouton instantané à configurer)";
-          return;
-        }
-        let left = 170;
-        const t = setInterval(() => {
-          left -= 1;
-          btn.textContent = "MAJ en cours · recharge dans " + Math.floor(left / 60) + " min " + String(left % 60).padStart(2, "0");
-          if (left <= 0) { clearInterval(t); location.reload(); }
-        }, 1000);
-      } catch (err) {
-        btn.textContent = "Échec · réessaie";
-        delete btn.dataset.busy;
+      let ok = false;
+      for (let i = 0; i < 3 && !ok; i++) {
+        btn.textContent = i ? "Pont occupé · nouvel essai..." : "Demande envoyée...";
+        try {
+          const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh", { cache: "no-store" });
+          ok = (await r.text()).indexOf('"ok":true') !== -1;
+        } catch (err) { ok = false; }
+        if (!ok) await new Promise(res => setTimeout(res, 2500));
       }
+      if (!ok) {
+        btn.textContent = "Pont indisponible · reclique dans 1 min";
+        delete btn.dataset.busy;
+        return;
+      }
+      const started = Date.now();
+      const t = setInterval(async () => {
+        const sec = Math.round((Date.now() - started) / 1000);
+        btn.textContent = "MAJ en cours · " + sec + " s";
+        const tag = await pageTag();
+        if (tag && etag0 && tag !== etag0) {
+          clearInterval(t);
+          btn.textContent = "Nouvelle version en ligne · rechargement...";
+          goFresh();
+        } else if ((!tag || !etag0) && sec >= 170) {
+          clearInterval(t); goFresh();
+        } else if (sec >= 300) {
+          clearInterval(t);
+          btn.textContent = "Toujours rien après 5 min · reclique";
+          delete btn.dataset.busy;
+        }
+      }, 5000);
     };
   } else {
     btn.href = "https://claude.ai/new?q=" + encodeURIComponent(

@@ -163,7 +163,21 @@ def main(data_path, out_path, updated_at):
     except (FileNotFoundError, json.JSONDecodeError):
         pass
     hrows = {c["tab"]: c["hrow"] for c in d["calls"] if c.get("tab") and c.get("hrow")}
+
+    # leads iClosed (formulaire rempli, pas de réservation) + état de relance :
+    # dernière ligne de « Relances iClosed » par lead = état courant
+    iclosed = d.get("iclosed", [])
+    last_claim = {}
+    for cl in d.get("iclosed_claims", []):
+        last_claim[cl["lead"]] = cl
+    for l in iclosed:
+        cl = last_claim.get(l["e"])
+        if cl and cl.get("statut") != "ANNULE":
+            l["cl"] = cl.get("closer") or ""
+            l["cld"] = cl.get("d") or ""
+
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
+           "iclosed": iclosed,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
