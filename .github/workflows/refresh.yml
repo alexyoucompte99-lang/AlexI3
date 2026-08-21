@@ -32,11 +32,11 @@ jobs:
           BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
         working-directory: pipeline
         run: |
-          curl -sfL "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
           if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
           base64 -d closing.b64 > investisseurs30.xlsx
           python -c "import openpyxl; wb=openpyxl.load_workbook('investisseurs30.xlsx', read_only=True); print('onglets:', len(wb.sheetnames))"
-          curl -sfL "$BRIDGE_URL?key=$BRIDGE_KEY&what=ads" -o ads_values.json
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=ads" -o ads_values.json
 
       - name: Pipeline
         env:
