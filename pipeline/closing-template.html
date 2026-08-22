@@ -358,7 +358,8 @@
       <span class="eyebrow">Rappels avant le call</span>
       <h2>Calls à venir</h2>
       <p class="lede">Les calls bookés qui n'ont pas encore eu lieu. Choisis ton prénom, puis clique le numéro : WhatsApp s'ouvre avec le message déjà écrit
-        (prénom du prospect, date et heure du call, vidéo de préchauffe, rareté du créneau, rappel visio). Coche « Rappelé » quand c'est envoyé : c'est enregistré dans le Sheet pour toute l'équipe.</p>
+        (prénom du prospect, date et heure du call, vidéo de préchauffe, rareté du créneau, rappel visio). Coche « Rappelé » quand c'est envoyé : c'est enregistré dans le Sheet pour toute l'équipe.
+        La colonne « Confirmé WhatsApp » te dit qui a cliqué sur le bouton de la page merci (automatique) ; coche « message reçu » quand le message est vraiment arrivé chez toi, ça sert à mesurer l'effet sur le show-up.</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="rpCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="rpPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -384,6 +385,7 @@
       </div>
 
       <div class="card full" style="margin-bottom:14px"><h3 style="margin-top:0">Le point par closer</h3><div class="tscroll"><table id="rpSummary"></table></div></div>
+      <div class="card full" style="margin-bottom:14px" id="rpWaCard"><h3 style="margin-top:0">Confirmation WhatsApp depuis la page merci</h3><div id="rpWa"></div></div>
       <div class="card full"><div class="tscroll"><table id="rpTable"></table></div></div>
       <p class="lede" id="rpMore" style="margin-top:8px"></p>
     </section>
@@ -895,6 +897,20 @@ const rpCfg = {
 let rpCloser = localStorage.getItem("rp-closer") || "", rpPeriod = "7proch", rpFilter = "todo";
 const rpKey = (c) => "rp-done:" + c.st + ":" + c.sr;
 const rpDone = (c) => localStorage.getItem(rpKey(c)) != null || /^RAPPEL/i.test(c.rf || "");
+/* confirmation WhatsApp : wac = 1er clic sur le bouton de la page merci (auto, via le pont),
+   wan = nb de clics, war = date où le closer a coché « message reçu » (onglet Confirmations WhatsApp du Sheet).
+   La coche locale ne prime que tant que la page n'a pas été reconstruite depuis (sinon le Sheet fait foi). */
+const waKey = (c) => "wa-recu:" + c.st + ":" + c.sr;
+const waClicked = (c) => !!c.wac;
+function waRecu(c) {
+  try {
+    const l = JSON.parse(localStorage.getItem(waKey(c)) || "null");
+    if (l && l.at === DATA.updated_at) return !!l.v;
+  } catch (e) {}
+  return !!c.war;
+}
+const waConfirmed = (c) => waClicked(c) || waRecu(c);
+const waWhen = (s) => s ? frDate(s.slice(0, 10)) + (s.length > 10 ? " à " + s.slice(11, 16).replace(":", "h") : "") : "";
 const RP_JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const RP_MOIS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 function rpHeure(hh) { if (!hh) return ""; const [h, m] = hh.split(":"); return String(+h) + "h" + (m === "00" ? "" : m); }
@@ -974,16 +990,19 @@ function renderRappels() {
   pillRow("rpFilterPills", [
     { k: "todo", label: `À rappeler (${todo.length})` },
     { k: "done", label: `Rappelés (${mine.length - todo.length})` },
+    { k: "conf", label: `Ont confirmé sur WhatsApp (${mine.filter(waConfirmed).length})` },
+    { k: "noconf", label: `Pas confirmé (${mine.filter(c => !waConfirmed(c)).length})` },
     { k: "all", label: `Tous (${mine.length})` },
   ], rpFilter, k => rpFilter = k, renderRappels);
 
   /* récap par closer (sur la période choisie, tous closers confondus) */
   const closers = [...TOP3, ...[...new Set(inPer.map(c => c.c))].filter(n => !TOP3.includes(n))];
   const demainIso = RP_PERIODS[1].to(), j3 = RP_PERIODS[2].to(), j7 = RP_PERIODS[3].to();
-  $("rpSummary").innerHTML = "<thead><tr><th>Closer</th><th class=\"num\">Aujourd'hui</th><th class=\"num\">Demain</th><th class=\"num\">3 prochains jours</th><th class=\"num\">7 prochains jours</th><th class=\"num\">Sur la période</th><th class=\"num\">Rappelés</th><th class=\"num\">Reste à rappeler</th><th>Prochain call</th></tr></thead><tbody>" +
+  $("rpSummary").innerHTML = "<thead><tr><th>Closer</th><th class=\"num\">Aujourd'hui</th><th class=\"num\">Demain</th><th class=\"num\">3 prochains jours</th><th class=\"num\">7 prochains jours</th><th class=\"num\">Sur la période</th><th class=\"num\">Rappelés</th><th class=\"num\">Reste à rappeler</th><th class=\"num\" title=\"Ont cliqué sur le bouton WhatsApp de la page merci\">Ont cliqué WhatsApp</th><th class=\"num\" title=\"Message de confirmation bien reçu (coché par le closer)\">Messages reçus</th><th>Prochain call</th></tr></thead><tbody>" +
     closers.map(n => {
       const c7 = all.filter(c => c.c === n && c.d <= j7), cp = inPer.filter(c => c.c === n);
       const done = cp.filter(rpDone).length, next = all.find(c => c.c === n);
+      const clicked = cp.filter(waClicked).length, recu = cp.filter(waRecu).length;
       const hl = rpCloser === n ? ' style="background:var(--good-bg, rgba(120,160,110,.12))"' : "";
       return `<tr${hl}><td><b>${esc(n.split(" ")[0])}</b></td>
         <td class="num">${fmtN(all.filter(c => c.c === n && c.d === RP_REAL_TODAY).length)}</td>
@@ -993,20 +1012,27 @@ function renderRappels() {
         <td class="num"><b>${fmtN(cp.length)}</b></td>
         <td class="num">${fmtN(done)}</td>
         <td class="num"${cp.length - done ? ' style="color:var(--accent);font-weight:600"' : ""}>${fmtN(cp.length - done)}</td>
+        <td class="num">${fmtN(clicked)}${cp.length ? `<div class="sub" style="font-size:11px">${Math.round(100 * clicked / cp.length)} %</div>` : ""}</td>
+        <td class="num">${fmtN(recu)}${cp.length ? `<div class="sub" style="font-size:11px">${Math.round(100 * recu / cp.length)} %</div>` : ""}</td>
         <td>${next ? `${esc(JOURS[new Date(next.d + "T12:00:00").getDay()])} ${frDate(next.d)}${next.hh ? " à " + rpHeure(next.hh) : ""} · ${esc(next.n)}` : "·"}</td></tr>`;
     }).join("") + "</tbody>";
 
-  const list = mine.filter(c => rpFilter === "all" ? true : (rpFilter === "todo" ? !rpDone(c) : rpDone(c)));
+  renderWaCard();
+
+  const list = mine.filter(c => rpFilter === "all" ? true : rpFilter === "todo" ? !rpDone(c) : rpFilter === "done" ? rpDone(c) : rpFilter === "conf" ? waConfirmed(c) : !waConfirmed(c));
   const delaiTxt = (c) => {
     const n = Math.round((new Date(c.d + "T12:00:00") - new Date(RP_REAL_TODAY + "T12:00:00")) / DAY);
     return n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j";
   };
-  $("rpTable").innerHTML = "<thead><tr><th>Rappelé</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
+  $("rpTable").innerHTML = "<thead><tr><th>Rappelé</th><th title=\"Clic sur le bouton WhatsApp de la page merci (auto) + message vraiment reçu (à cocher)\">Confirmé WhatsApp</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
     list.map((c, i) => {
       const done = rpDone(c);
       const dd = new Date(c.d + "T12:00:00");
+      const clicked = waClicked(c), recu = waRecu(c);
       return `<tr${done ? ' style="opacity:.55"' : ""}>
         <td style="white-space:nowrap"><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px"><input type="checkbox" data-rpi="${i}" ${done ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">${done ? "oui" : "non"}</label>${done && /^RAPPEL/i.test(c.rf || "") ? `<div class="sub" style="font-size:11px;margin-top:2px">${esc(c.rf.replace(/^RAPPEL\s*/i, "le "))}</div>` : ""}</td>
+        <td style="white-space:nowrap;font-size:12.5px">${clicked ? `<span style="color:var(--good-text);font-weight:600">✅ a cliqué</span><div class="sub" style="font-size:11px">le ${esc(waWhen(c.wac))}${c.wan > 1 ? " (×" + c.wan + ")" : ""}</div>` : `<span class="sub">pas cliqué</span>`}
+          <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-top:4px" title="Coche quand le message de confirmation est bien arrivé sur ton WhatsApp"><input type="checkbox" data-wai="${i}" ${recu ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">message reçu</label>${recu && c.war ? `<div class="sub" style="font-size:11px">coché le ${frDate(c.war)}</div>` : ""}</td>
         <td style="white-space:nowrap"><b>${esc(JOURS[dd.getDay()])} ${frDate(c.d)}</b>${c.hh ? " à " + rpHeure(c.hh) : ""}<div class="sub" style="font-size:11px">${delaiTxt(c)}</div></td>
         <td>${esc((c.c || "·").split(" ")[0])}</td>
         <td><b>${esc(c.n) || "·"}</b></td>
@@ -1031,6 +1057,16 @@ function renderRappels() {
       renderRappels();
     });
   });
+  $("rpTable").querySelectorAll("input[data-wai]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const c = list[+cb.dataset.wai];
+      localStorage.setItem(waKey(c), JSON.stringify({ v: cb.checked ? 1 : 0, at: DATA.updated_at }));
+      if (cb.checked) c.war = c.war || RP_REAL_TODAY;
+      bridgePost({ what: "wa_confirm", lead: c.n, email: c.mail, closer: c.c, call: c.d, statut: cb.checked ? "RECU" : "NONRECU", source: "console" })
+        .then(ok => toast(ok ? "Noté dans le Sheet pour toute l'équipe ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
+      renderRappels();
+    });
+  });
   $("rpTable").querySelectorAll("[data-rpcopy]").forEach(b => b.addEventListener("click", () => {
     copyText(waRappel(list[+b.dataset.rpcopy])).then(ok => toast(ok ? "Message copié ✓" : "Copie impossible, utilise le bouton Voir"));
   }));
@@ -1039,6 +1075,39 @@ function renderRappels() {
     box.textContent = waRappel(list[+b.dataset.rpsee]);
     box.style.display = box.style.display === "none" ? "" : "none";
   }));
+}
+
+/* carte « Confirmation WhatsApp » : volumes depuis le lancement + effet sur le show-up + confirmations orphelines */
+function renderWaCard() {
+  const all = DATA.calls.filter(c => c.d);
+  const withAny = all.filter(c => waClicked(c) || c.war || c.wan);
+  const orphans = DATA.wa_orphans || [];
+  const box = $("rpWa");
+  if (!withAny.length && !orphans.length) {
+    box.innerHTML = `<p class="lede" style="margin:0">Aucune confirmation remontée pour l'instant. Dès qu'un prospect clique sur « Confirmer mon audit sur WhatsApp » sur la page merci, ça apparaît ici et dans la colonne « Confirmé WhatsApp » du tableau.</p>`;
+    return;
+  }
+  const clicked = all.filter(waClicked), recu = all.filter(waRecu);
+  const past = all.filter(c => c.d < RP_REAL_TODAY && c.s);
+  const conf = past.filter(waConfirmed), non = past.filter(c => !waConfirmed(c));
+  const rate = (arr) => arr.length ? Math.round(100 * arr.filter(c => c.s === "OUI").length / arr.length) : null;
+  const rc = rate(conf), rn = rate(non);
+  const kpi = (v, l) => `<div style="min-width:120px"><div style="font-family:Georgia,serif;font-size:26px;line-height:1.1">${v}</div><div class="sub" style="font-size:12px">${l}</div></div>`;
+  let html = `<div style="display:flex;flex-wrap:wrap;gap:22px;margin-bottom:10px">`
+    + kpi(fmtN(clicked.length), "ont cliqué sur le bouton")
+    + kpi(fmtN(recu.length), "messages reçus (cochés)")
+    + kpi(clicked.length ? Math.round(100 * clicked.filter(waRecu).length / clicked.length) + " %" : "·", "des clics ont donné un message reçu")
+    + kpi(conf.length ? (rc + " %") : "·", `show-up des confirmés (${fmtN(conf.length)} calls passés)`)
+    + kpi(non.length ? (rn + " %") : "·", `show-up des autres (${fmtN(non.length)} calls passés)`)
+    + `</div>`;
+  if (!conf.length) html += `<p class="lede" style="margin:0 0 6px">L'effet sur le show-up (confirmés vs non confirmés) s'affichera dès que les premiers calls confirmés seront passés.</p>`;
+  if (orphans.length) {
+    html += `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px">${orphans.length} confirmation${orphans.length > 1 ? "s" : ""} pas encore rattachée${orphans.length > 1 ? "s" : ""} à une ligne du Sheet (la ligne du call n'existe pas encore, ou mail différent)</summary>
+      <div class="tscroll"><table style="margin-top:6px"><thead><tr><th>Prospect</th><th>Mail</th><th>Closer</th><th>Call prévu</th><th>A cliqué</th><th>Message reçu</th></tr></thead><tbody>`
+      + orphans.map(o => `<tr><td><b>${esc(o.lead || "·")}</b></td><td style="overflow-wrap:anywhere">${esc(o.email || "·")}</td><td>${esc((o.closer || "·").split(" ")[0])}</td><td>${o.call ? frDate(o.call) : "·"}</td><td>${o.wac ? "le " + esc(waWhen(o.wac)) + (o.wan > 1 ? " (×" + o.wan + ")" : "") : "·"}</td><td>${o.war ? "le " + frDate(o.war) : "·"}</td></tr>`).join("")
+      + `</tbody></table></div></details>`;
+  }
+  box.innerHTML = html;
 }
 
 /* ================= KPIs ================= */

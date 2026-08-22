@@ -117,6 +117,85 @@ def relance_estimee(com, call_date):
     return min(cands).isoformat() if cands else None
 
 
+def _norm_name(s):
+    import unicodedata
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch)).lower()
+    toks = sorted(t for t in re.split(r"[^a-z0-9]+", s) if len(t) > 1)
+    return " ".join(toks)
+
+
+def _call_day(iso_or_txt):
+    """Date (YYYY-MM-DD, heure de Paris) du call transmise par la page merci."""
+    s = (iso_or_txt or "").strip()
+    m = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})", s)
+    if m:
+        try:
+            from zoneinfo import ZoneInfo
+            t = dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if t.tzinfo:
+                t = t.astimezone(ZoneInfo("Europe/Paris"))
+            return t.date().isoformat()
+        except Exception:
+            return m.group(1)
+    m = re.match(r"(\d{4}-\d{2}-\d{2})", s)
+    return m.group(1) if m else ""
+
+
+def attach_wa_confirms(calls, confirms):
+    """Pose sur chaque call : wac (1er clic WhatsApp, 'YYYY-MM-DD HH:MM'),
+    wan (nb de clics), war (date où le closer a coché « reçu », '' sinon).
+    Retourne les confirmations qu'on n'a pu rattacher à aucune ligne du Sheet."""
+    by_mail, by_name = {}, {}
+    for c in calls:
+        if c["mail"]:
+            by_mail.setdefault(c["mail"].lower().strip(), []).append(c)
+        nn = _norm_name(c["n"])
+        if nn:
+            by_name.setdefault(nn, []).append(c)
+
+    def pick(cands, day):
+        if not cands:
+            return None
+        if day:
+            same = [c for c in cands if c["d"] == day]
+            if same:
+                return same[-1]
+            fut = [c for c in cands if c["d"] and c["d"] >= day]
+            if fut:
+                return min(fut, key=lambda c: c["d"])
+        return max(cands, key=lambda c: c["d"] or "")
+
+    orphans = {}
+    for cf in sorted(confirms, key=lambda x: x["d"]):
+        day = _call_day(cf["call"])
+        cands = by_mail.get(cf["email"]) if cf["email"] else None
+        if not cands:
+            cands = by_name.get(_norm_name(cf["lead"]))
+        call = pick(cands, day)
+        st = cf["statut"]
+        if call is None:
+            k = cf["email"] or _norm_name(cf["lead"])
+            o = orphans.setdefault(k, {"lead": cf["lead"], "email": cf["email"], "closer": cf["closer"],
+                                       "call": day, "wac": "", "wan": 0, "war": ""})
+            if st == "CLIC":
+                o["wan"] += 1
+                o["wac"] = o["wac"] or cf["d"]
+            elif st == "RECU":
+                o["war"] = cf["d"][:10]
+            elif st == "NONRECU":
+                o["war"] = ""
+            continue
+        if st == "CLIC":
+            call["wan"] = call.get("wan", 0) + 1
+            call["wac"] = call.get("wac") or cf["d"]
+        elif st == "RECU":
+            call["war"] = cf["d"][:10]
+        elif st == "NONRECU":
+            call["war"] = ""
+    return [o for o in orphans.values() if o["wac"] or o["war"]]
+
+
 def main(data_path, out_path, updated_at):
     d = json.load(open(data_path))
     calls = []
@@ -178,8 +257,12 @@ def main(data_path, out_path, updated_at):
             l["cl"] = cl.get("closer") or ""
             l["cld"] = cl.get("d") or ""
 
+    # confirmations WhatsApp (page merci : clic ; console : reçu / non reçu),
+    # rattachées aux calls par e-mail, sinon par nom ; le reste = orphelines
+    wa_orphans = attach_wa_confirms(calls, d.get("wa_confirms", []))
+
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
-           "iclosed": iclosed,
+           "iclosed": iclosed, "wa_orphans": wa_orphans,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)

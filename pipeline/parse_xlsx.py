@@ -175,7 +175,7 @@ def find_header(rows_iter, must_have, scan=12):
 def main(xlsx_path, out_path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
-    iclosed_leads, iclosed_claims = [], []
+    iclosed_leads, iclosed_claims, wa_confirms = [], [], []
 
     for ws in wb.worksheets:
         title = ws.title.strip()
@@ -254,6 +254,26 @@ def main(xlsx_path, out_path):
                                        "lead": cell_str(r[1]),
                                        "closer": cell_str(r[2]) if len(r) > 2 else "",
                                        "statut": cell_str(r[3]) if len(r) > 3 else ""})
+            continue
+
+        if title == "Confirmations WhatsApp":
+            # rempli par le pont : clic sur le bouton WhatsApp de la page merci
+            # (statut CLIC, source page) ou coche du closer dans la console
+            # (RECU / NONRECU, source console). Colonnes : Date, Lead, Email,
+            # Closer, Call, Statut, Source, UTM. Les lignes source=test sont ignorées.
+            for r in all_rows[1:]:
+                if not r or len(r) < 6:
+                    continue
+                def g(i):
+                    return cell_str(r[i]) if i < len(r) else ""
+                src = g(6).lower()
+                if src == "test" or (not g(1) and not g(2)):
+                    continue
+                dv = r[0]
+                when = dv.strftime("%Y-%m-%d %H:%M") if isinstance(dv, dt.datetime) else g(0)[:16]
+                wa_confirms.append({"d": when, "lead": g(1)[:80], "email": g(2).lower()[:80],
+                                    "closer": g(3)[:40], "call": g(4)[:40],
+                                    "statut": g(5).upper()[:12], "source": src[:12], "utm": g(7)[:100]})
             continue
 
         if title == "Ventes":
@@ -381,7 +401,8 @@ def main(xlsx_path, out_path):
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
            "setter_reports": setter_reports, "dm_reports": dm_reports,
-           "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims}
+           "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
+           "wa_confirms": wa_confirms}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 
@@ -392,6 +413,7 @@ def main(xlsx_path, out_path):
     print("ventes 2026:", Counter(c["vente"] for c in c26), file=sys.stderr)
     print(f"stripe={len(stripe)} total={sum(s['montant_ttc'] for s in stripe):.0f}", file=sys.stderr)
     print(f"settings={len(settings_rows)} setter={len(setter_reports)} dm={len(dm_reports)}", file=sys.stderr)
+    print(f"confirmations whatsapp={len(wa_confirms)}", file=sys.stderr)
 
 
 if __name__ == "__main__":
