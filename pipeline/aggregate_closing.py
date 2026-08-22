@@ -125,6 +125,7 @@ def main(data_path, out_path, updated_at):
         prix_eff = c.get("prix_confirme") or c.get("prix") or 0
         calls.append({
             "d": c.get("date"),
+            "hh": c.get("hour") or "",      # heure du call (HH:MM) si connue
             "b": c.get("booking_date"),
             "tm": f"{c['year']:04d}-{c['month']:02d}",
             "c": re.sub(r"\s+", " ", c.get("closer") or "").strip(),
@@ -148,6 +149,7 @@ def main(data_path, out_path, updated_at):
             "st": c.get("tab"),          # onglet + ligne Sheet : écriture retour
             "sr": c.get("row"),
             "rf": (c.get("relance_faite") or "").strip(),
+            "utm": (c.get("utm") or "").strip()[:40],
         })
 
     eod_appel = [r for r in d.get("setter_reports", []) if r.get("year") == 2026]

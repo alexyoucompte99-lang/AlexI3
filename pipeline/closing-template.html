@@ -238,6 +238,7 @@
     <button class="tab" role="tab" id="tabPilotage" aria-selected="true" data-panel="panelPilotage">Pilotage 🔒</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
+    <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
@@ -348,6 +349,46 @@
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px" id="icFilterPills"></div>
       <div class="card full"><div class="tscroll"><table id="icTable"></table></div></div>
       <p class="lede" id="icMore" style="margin-top:8px"></p>
+    </section>
+  </div>
+
+  <!-- ================== RAPPELS CALLS À VENIR ================== -->
+  <div id="panelRappels" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Rappels avant le call</span>
+      <h2>Calls à venir</h2>
+      <p class="lede">Les calls bookés qui n'ont pas encore eu lieu. Choisis ton prénom, puis clique le numéro : WhatsApp s'ouvre avec le message déjà écrit
+        (prénom du prospect, date et heure du call, vidéo de préchauffe, rareté du créneau, rappel visio). Coche « Rappelé » quand c'est envoyé : c'est enregistré dans le Sheet pour toute l'équipe.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="rpCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="rpPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="rpFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <button class="btn ghost" id="rpSettingsBtn">⚙️ Message et liens</button>
+        </div>
+      </div>
+
+      <div class="card" id="rpSettings" style="display:none;margin-bottom:14px">
+        <h3 style="margin-top:0">Le message envoyé sur WhatsApp</h3>
+        <p class="lede" style="margin-bottom:10px">Variables disponibles : <code>{prenom}</code> (prospect), <code>{closer}</code> (ton prénom), <code>{quand}</code> (« demain à 14h30 », « le jeudi 27 août à 10h »), <code>{video}</code>, <code>{visio}</code>. Tout est gardé sur ce navigateur.</p>
+        <div class="field"><label for="rpTpl">Message</label><textarea id="rpTpl" style="min-height:150px"></textarea></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;margin-top:10px">
+          <div class="field"><label for="rpVideo">Lien de la vidéo de préchauffe</label><input type="text" id="rpVideo" placeholder="https://…"></div>
+          <div class="field"><label for="rpVisioLouis">Lien visio de Louis</label><input type="text" id="rpVisioLouis" placeholder="https://meet.google.com/… (vide = « le lien est dans ton mail de confirmation »)"></div>
+          <div class="field"><label for="rpVisioRomain">Lien visio de Romain</label><input type="text" id="rpVisioRomain" placeholder="https://meet.google.com/…"></div>
+          <div class="field"><label for="rpVisioAdrien">Lien visio d'Adrien</label><input type="text" id="rpVisioAdrien" placeholder="https://meet.google.com/…"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+          <button class="btn" id="rpSave">Enregistrer</button>
+          <button class="btn ghost" id="rpReset">Remettre le message d'origine</button>
+          <span id="rpSaveOk" style="font-size:12.5px;color:var(--good-text);display:none">Enregistré ✓</span>
+        </div>
+        <div style="margin-top:12px"><span class="eyebrow">Aperçu</span><div id="rpPreview" class="sub" style="white-space:pre-wrap;font-size:13px;margin-top:4px;padding:10px 12px;border:1px dashed var(--border);border-radius:10px"></div></div>
+      </div>
+
+      <div class="card full" style="margin-bottom:14px"><h3 style="margin-top:0">Le point par closer</h3><div class="tscroll"><table id="rpSummary"></table></div></div>
+      <div class="card full"><div class="tscroll"><table id="rpTable"></table></div></div>
+      <p class="lede" id="rpMore" style="margin-top:8px"></p>
     </section>
   </div>
 
@@ -846,6 +887,171 @@ function renderRelances() {
   });
 }
 
+/* ================= rappels calls à venir ================= */
+const RP_REAL_TODAY = iso(new Date());
+const RP_DEFAULT_TPL = "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Je te confirme notre appel diagnostic {quand}, en visio : {visio}\n\nAvant notre échange, prends le temps de regarder la vidéo de préparation, c'est ce qui rend le call vraiment utile pour toi : {video}\n\nOn a très peu de créneaux en ce moment et celui-là est bloqué pour toi. Si tu as le moindre empêchement, préviens-moi pour que je puisse le libérer à quelqu'un d'autre. Prévois un endroit calme, idéalement devant ton ordi. À très vite !";
+const RP_DEFAULT_VIDEO = "https://go.academiedesinvestisseurs.com/masterclass-ads-5980254b-b5d9b6a1-8edb81f8";
+const rpCfg = {
+  get tpl() { return localStorage.getItem("rp-tpl") || RP_DEFAULT_TPL; },
+  get video() { const v = localStorage.getItem("rp-video"); return v == null ? RP_DEFAULT_VIDEO : v; },
+  visio(closer) { return localStorage.getItem("rp-visio:" + (closer || "").split(" ")[0]) || ""; },
+};
+let rpCloser = localStorage.getItem("rp-closer") || "", rpPeriod = "7proch", rpFilter = "todo";
+const rpKey = (c) => "rp-done:" + c.st + ":" + c.sr;
+const rpDone = (c) => localStorage.getItem(rpKey(c)) != null || /^RAPPEL/i.test(c.rf || "");
+const RP_JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const RP_MOIS = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function rpHeure(hh) { if (!hh) return ""; const [h, m] = hh.split(":"); return String(+h) + "h" + (m === "00" ? "" : m); }
+function rpQuand(c) {
+  const d = c.d ? new Date(c.d + "T12:00:00") : null;
+  let q;
+  if (!d) q = "très bientôt";
+  else if (c.d === RP_REAL_TODAY) q = "aujourd'hui";
+  else if (c.d === iso(new Date(+new Date(RP_REAL_TODAY + "T12:00:00") + DAY))) q = "demain";
+  else q = "le " + RP_JOURS[d.getDay()] + " " + String(+c.d.slice(8)) + " " + RP_MOIS[+c.d.slice(5, 7)];
+  const h = rpHeure(c.hh);
+  return h ? q + " à " + h : q;
+}
+function waRappel(c) {
+  const p = (c.n || "").trim().split(/\s+/)[0] || "";
+  const cl = (c.c || "").trim().split(/\s+/)[0] || "l'équipe";
+  const visio = rpCfg.visio(c.c) || "le lien est dans ton mail de confirmation";
+  return rpCfg.tpl
+    .replace(/\{prenom\}/g, p).replace(/\{closer\}/g, cl).replace(/\{quand\}/g, rpQuand(c))
+    .replace(/\{video\}/g, rpCfg.video).replace(/\{visio\}/g, visio)
+    .replace(/ +,/g, ",").replace(/Salut ,/, "Salut,");
+}
+const rpWaHref = (c) => `https://wa.me/${esc(String(c.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(waRappel(c)).replace(/'/g, "%27")}`;
+function rpUpcoming() {
+  /* calls bookés pas encore passés : date future, ou aujourd'hui sans show-up renseigné */
+  return DATA.calls.filter(c => c.d && !c.s && !c.v && (c.d > RP_REAL_TODAY || c.d === RP_REAL_TODAY));
+}
+const RP_PERIODS = [
+  { k: "auj", label: "Aujourd'hui", to: () => RP_REAL_TODAY },
+  { k: "demain", label: "Jusqu'à demain", to: () => iso(new Date(+new Date(RP_REAL_TODAY + "T12:00:00") + DAY)) },
+  { k: "3proch", label: "3 prochains jours", to: () => iso(new Date(+new Date(RP_REAL_TODAY + "T12:00:00") + 3 * DAY)) },
+  { k: "7proch", label: "7 prochains jours", to: () => iso(new Date(+new Date(RP_REAL_TODAY + "T12:00:00") + 7 * DAY)) },
+  { k: "all", label: "Tous les calls à venir", to: () => "9999" },
+];
+function rpSettingsInit() {
+  const show = () => {
+    $("rpTpl").value = rpCfg.tpl; $("rpVideo").value = rpCfg.video;
+    $("rpVisioLouis").value = rpCfg.visio("Louis"); $("rpVisioRomain").value = rpCfg.visio("Romain"); $("rpVisioAdrien").value = rpCfg.visio("Adrien");
+    rpPreview();
+  };
+  function rpPreview() {
+    const sample = rpUpcoming().find(c => !rpCloser || c.c === rpCloser) || { n: "Camille Durand", c: rpCloser || "Louis Granier", d: RP_REAL_TODAY, hh: "14:30" };
+    /* aperçu avec les valeurs en cours de saisie */
+    const tpl = $("rpTpl").value || RP_DEFAULT_TPL, video = $("rpVideo").value;
+    const first = (sample.c || "").split(" ")[0];
+    const visioField = { Louis: "rpVisioLouis", Romain: "rpVisioRomain", Adrien: "rpVisioAdrien" }[first];
+    const visio = (visioField && $(visioField).value) || rpCfg.visio(sample.c) || "le lien est dans ton mail de confirmation";
+    $("rpPreview").textContent = tpl
+      .replace(/\{prenom\}/g, (sample.n || "").split(/\s+/)[0]).replace(/\{closer\}/g, first).replace(/\{quand\}/g, rpQuand(sample))
+      .replace(/\{video\}/g, video).replace(/\{visio\}/g, visio);
+  }
+  $("rpSettingsBtn").addEventListener("click", () => {
+    const box = $("rpSettings");
+    box.style.display = box.style.display === "none" ? "" : "none";
+    if (box.style.display !== "none") show();
+  });
+  ["rpTpl", "rpVideo", "rpVisioLouis", "rpVisioRomain", "rpVisioAdrien"].forEach(id => $(id).addEventListener("input", rpPreview));
+  $("rpSave").addEventListener("click", () => {
+    const tpl = $("rpTpl").value.trim();
+    if (tpl && tpl !== RP_DEFAULT_TPL) localStorage.setItem("rp-tpl", tpl); else localStorage.removeItem("rp-tpl");
+    const v = $("rpVideo").value.trim();
+    if (v === RP_DEFAULT_VIDEO) localStorage.removeItem("rp-video"); else localStorage.setItem("rp-video", v);
+    [["Louis", "rpVisioLouis"], ["Romain", "rpVisioRomain"], ["Adrien", "rpVisioAdrien"]].forEach(([n, id]) => {
+      const val = $(id).value.trim();
+      if (val) localStorage.setItem("rp-visio:" + n, val); else localStorage.removeItem("rp-visio:" + n);
+    });
+    $("rpSaveOk").style.display = ""; setTimeout(() => $("rpSaveOk").style.display = "none", 2500);
+    renderRappels();
+  });
+  $("rpReset").addEventListener("click", () => { localStorage.removeItem("rp-tpl"); localStorage.removeItem("rp-video"); show(); renderRappels(); });
+}
+function renderRappels() {
+  const all = rpUpcoming().sort((a, b) => (a.d + " " + (a.hh || "99")) < (b.d + " " + (b.hh || "99")) ? -1 : 1);
+  const per = RP_PERIODS.find(o => o.k === rpPeriod) || RP_PERIODS[3];
+  const to = per.to();
+  const inPer = all.filter(c => c.d <= to);
+  const mine = inPer.filter(c => !rpCloser || c.c === rpCloser);
+  const todo = mine.filter(c => !rpDone(c));
+  $("rpBadge").textContent = all.filter(c => (!rpCloser || c.c === rpCloser) && !rpDone(c) && c.d <= RP_PERIODS[3].to()).length || "";
+  pillRow("rpCloserPills", [{ k: "", label: "Tous" }, ...TOP3.map(n => ({ k: n, label: n.split(" ")[0] }))],
+    rpCloser, k => { rpCloser = k; localStorage.setItem("rp-closer", k); }, renderRappels);
+  pillRow("rpPeriodPills", RP_PERIODS.map(o => ({ k: o.k, label: o.label + ` (${all.filter(c => (!rpCloser || c.c === rpCloser) && c.d <= o.to()).length})` })),
+    rpPeriod, k => rpPeriod = k, renderRappels);
+  pillRow("rpFilterPills", [
+    { k: "todo", label: `À rappeler (${todo.length})` },
+    { k: "done", label: `Rappelés (${mine.length - todo.length})` },
+    { k: "all", label: `Tous (${mine.length})` },
+  ], rpFilter, k => rpFilter = k, renderRappels);
+
+  /* récap par closer (sur la période choisie, tous closers confondus) */
+  const closers = [...TOP3, ...[...new Set(inPer.map(c => c.c))].filter(n => !TOP3.includes(n))];
+  const demainIso = RP_PERIODS[1].to(), j3 = RP_PERIODS[2].to(), j7 = RP_PERIODS[3].to();
+  $("rpSummary").innerHTML = "<thead><tr><th>Closer</th><th class=\"num\">Aujourd'hui</th><th class=\"num\">Demain</th><th class=\"num\">3 prochains jours</th><th class=\"num\">7 prochains jours</th><th class=\"num\">Sur la période</th><th class=\"num\">Rappelés</th><th class=\"num\">Reste à rappeler</th><th>Prochain call</th></tr></thead><tbody>" +
+    closers.map(n => {
+      const c7 = all.filter(c => c.c === n && c.d <= j7), cp = inPer.filter(c => c.c === n);
+      const done = cp.filter(rpDone).length, next = all.find(c => c.c === n);
+      const hl = rpCloser === n ? ' style="background:var(--good-bg, rgba(120,160,110,.12))"' : "";
+      return `<tr${hl}><td><b>${esc(n.split(" ")[0])}</b></td>
+        <td class="num">${fmtN(all.filter(c => c.c === n && c.d === RP_REAL_TODAY).length)}</td>
+        <td class="num">${fmtN(all.filter(c => c.c === n && c.d === demainIso).length)}</td>
+        <td class="num">${fmtN(all.filter(c => c.c === n && c.d <= j3).length)}</td>
+        <td class="num">${fmtN(c7.length)}</td>
+        <td class="num"><b>${fmtN(cp.length)}</b></td>
+        <td class="num">${fmtN(done)}</td>
+        <td class="num"${cp.length - done ? ' style="color:var(--accent);font-weight:600"' : ""}>${fmtN(cp.length - done)}</td>
+        <td>${next ? `${esc(JOURS[new Date(next.d + "T12:00:00").getDay()])} ${frDate(next.d)}${next.hh ? " à " + rpHeure(next.hh) : ""} · ${esc(next.n)}` : "·"}</td></tr>`;
+    }).join("") + "</tbody>";
+
+  const list = mine.filter(c => rpFilter === "all" ? true : (rpFilter === "todo" ? !rpDone(c) : rpDone(c)));
+  const delaiTxt = (c) => {
+    const n = Math.round((new Date(c.d + "T12:00:00") - new Date(RP_REAL_TODAY + "T12:00:00")) / DAY);
+    return n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j";
+  };
+  $("rpTable").innerHTML = "<thead><tr><th>Rappelé</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
+    list.map((c, i) => {
+      const done = rpDone(c);
+      const dd = new Date(c.d + "T12:00:00");
+      return `<tr${done ? ' style="opacity:.55"' : ""}>
+        <td style="white-space:nowrap"><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px"><input type="checkbox" data-rpi="${i}" ${done ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">${done ? "oui" : "non"}</label>${done && /^RAPPEL/i.test(c.rf || "") ? `<div class="sub" style="font-size:11px;margin-top:2px">${esc(c.rf.replace(/^RAPPEL\s*/i, "le "))}</div>` : ""}</td>
+        <td style="white-space:nowrap"><b>${esc(JOURS[dd.getDay()])} ${frDate(c.d)}</b>${c.hh ? " à " + rpHeure(c.hh) : ""}<div class="sub" style="font-size:11px">${delaiTxt(c)}</div></td>
+        <td>${esc((c.c || "·").split(" ")[0])}</td>
+        <td><b>${esc(c.n) || "·"}</b></td>
+        <td>${c.tel ? `<a class="tel" href="${rpWaHref(c)}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message de rappel pré-écrit">${esc(c.tel)}</a>` : "·"}</td>
+        <td style="max-width:22ch;overflow-wrap:anywhere">${esc(c.mail) || "·"}</td>
+        <td>${frDate(c.b)}</td>
+        <td style="max-width:22ch;overflow-wrap:anywhere;font-size:12px">${esc(c.utm || "·")}</td>
+        <td style="white-space:nowrap"><button class="btn ghost" data-rpcopy="${i}" style="padding:3px 9px;font-size:12px">📋 Copier</button> <button class="btn ghost" data-rpsee="${i}" style="padding:3px 9px;font-size:12px">👁 Voir</button><div class="sub" id="rpMsg${i}" style="display:none;white-space:pre-wrap;font-size:12px;max-width:46ch;margin-top:6px"></div></td>
+      </tr>`;
+    }).join("") + "</tbody>";
+  $("rpMore").textContent = list.length ? "" : (rpFilter === "todo" ? (mine.length ? "Tout le monde est rappelé, machine !" : "Aucun call à venir sur cette période.") : "Rien ici pour l'instant.");
+  $("rpTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const c = list[+cb.dataset.rpi];
+      const val = cb.checked ? "RAPPEL " + frDate(RP_REAL_TODAY) : "";
+      if (cb.checked) { localStorage.setItem(rpKey(c), RP_REAL_TODAY); c.rf = val; }
+      else { localStorage.removeItem(rpKey(c)); c.rf = ""; }
+      if (c.st && c.sr) {
+        bridgePost({ what: "relance", tab: c.st, row: c.sr, headerRow: (DATA.hrows || {})[c.st] || 1, value: val })
+          .then(ok => toast(ok ? "Noté dans le Sheet pour toute l'équipe ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
+      }
+      renderRappels();
+    });
+  });
+  $("rpTable").querySelectorAll("[data-rpcopy]").forEach(b => b.addEventListener("click", () => {
+    copyText(waRappel(list[+b.dataset.rpcopy])).then(ok => toast(ok ? "Message copié ✓" : "Copie impossible, utilise le bouton Voir"));
+  }));
+  $("rpTable").querySelectorAll("[data-rpsee]").forEach(b => b.addEventListener("click", () => {
+    const box = $("rpMsg" + b.dataset.rpsee);
+    box.textContent = waRappel(list[+b.dataset.rpsee]);
+    box.style.display = box.style.display === "none" ? "" : "none";
+  }));
+}
+
 /* ================= KPIs ================= */
 function kpiTile(lbl, val, sub, delta) {
   return `<div class="kpi"><div class="lbl">${lbl}</div><div class="val">${val}${delta || ""}</div>` +
@@ -1099,7 +1305,7 @@ function followups() {
 const fuKey = (c) => "fu-done:" + c.n + "|" + (c.d || "");
 /* relance considérée faite si cochée sur ce navigateur OU notée dans le Sheet
    (colonne « RELANCE FAITE (console) », partagée entre tous) */
-const fuDone = (c) => localStorage.getItem(fuKey(c)) != null || !!c.rf;
+const fuDone = (c) => localStorage.getItem(fuKey(c)) != null || (!!c.rf && !/^RAPPEL/i.test(c.rf));
 
 /* ---- écriture retour vers le Google Sheet via le pont Apps Script ---- */
 const bridgeReady = () => typeof BRIDGE !== "undefined" && BRIDGE.url.indexOf("http") === 0;
@@ -1781,6 +1987,8 @@ initPilotage();
 $("tabClosers").addEventListener("click", renderClosersTab);
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
+rpSettingsInit();
+renderRappels();
 renderClosersTab();
 renderFollowups();
 renderLeads();

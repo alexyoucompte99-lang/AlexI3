@@ -45,6 +45,17 @@ def cell_str(v):
     return str(v).strip()
 
 
+def parse_time(v):
+    """Heure du call (HH:MM) si la cellule la contient, sinon ''."""
+    if isinstance(v, dt.datetime):
+        return f"{v.hour:02d}:{v.minute:02d}" if (v.hour or v.minute) else ""
+    s = cell_str(v)
+    m = re.search(r"(\d{1,2})\s*[:hH]\s*(\d{2})", s or "")
+    if m and int(m.group(1)) < 24 and int(m.group(2)) < 60:
+        return f"{int(m.group(1)):02d}:{m.group(2)}"
+    return ""
+
+
 def parse_date(v):
     if isinstance(v, (dt.datetime, dt.date)):
         return (v.year, v.month, v.day)
@@ -199,6 +210,7 @@ def main(xlsx_path, out_path):
                     "closer": re.sub(r"\s+", " ", closer),
                     "prospect": prospect,
                     "date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None,
+                    "hour": parse_time(g("date")),
                     "year": year, "month": month,
                     "show_up": show_up, "vente": vente,
                     "qualif": parse_num(g("qualif")),
