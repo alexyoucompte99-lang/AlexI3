@@ -267,7 +267,7 @@ def main(xlsx_path, out_path):
                 def g(i):
                     return cell_str(r[i]) if i < len(r) else ""
                 src = g(6).lower()
-                if src == "test" or (not g(1) and not g(2)):
+                if src == "test" or g(2).lower().endswith("@example.com") or (not g(1) and not g(2)):
                     continue
                 dv = r[0]
                 when = dv.strftime("%Y-%m-%d %H:%M") if isinstance(dv, dt.datetime) else g(0)[:16]
