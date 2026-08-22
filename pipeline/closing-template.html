@@ -357,9 +357,9 @@
     <section style="margin-top:16px">
       <span class="eyebrow">Rappels avant le call</span>
       <h2>Calls à venir</h2>
-      <p class="lede">Les calls bookés qui n'ont pas encore eu lieu. Choisis ton prénom, puis clique le numéro : WhatsApp s'ouvre avec le message déjà écrit
-        (prénom du prospect, date et heure du call, vidéo de préchauffe, rareté du créneau, rappel visio). Coche « Rappelé » quand c'est envoyé : c'est enregistré dans le Sheet pour toute l'équipe.
-        La colonne « Confirmé WhatsApp » te dit qui a cliqué sur le bouton de la page merci (automatique) ; coche « message reçu » quand le message est vraiment arrivé chez toi, ça sert à mesurer l'effet sur le show-up.</p>
+      <p class="lede">Les calls bookés pas encore passés. Choisis ton prénom, clique le numéro : WhatsApp s'ouvre avec le message de la prochaine relance déjà écrit.
+        Coche « Appel fait » et « Relance 1 / 2 / 3 » au fur et à mesure : c'est noté dans le Sheet pour toute l'équipe.
+        « Confirmé WhatsApp » = le prospect a cliqué sur le bouton de la page merci ; coche « reçu » quand son message est bien arrivé chez toi.</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="rpCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="rpPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -370,18 +370,22 @@
       </div>
 
       <div class="card" id="rpSettings" style="display:none;margin-bottom:14px">
-        <h3 style="margin-top:0">Le message envoyé sur WhatsApp</h3>
-        <p class="lede" style="margin-bottom:10px">Variables disponibles : <code>{prenom}</code> (prospect), <code>{closer}</code> (ton prénom), <code>{quand}</code> (« demain à 14h30 », « le jeudi 27 août à 10h »), <code>{video}</code>. Le lien visio change à chaque résa (iClosed), le message renvoie donc au mail de confirmation. Tout est gardé sur ce navigateur.</p>
-        <div class="field"><label for="rpTpl">Message</label><textarea id="rpTpl" style="min-height:150px"></textarea></div>
+        <h3 style="margin-top:0">Les 3 messages WhatsApp</h3>
+        <p class="lede" style="margin-bottom:10px">Le lien WhatsApp utilise le message de la prochaine relance non cochée (relance 1, puis 2, puis 3). Variables : <code>{prenom}</code>, <code>{closer}</code>, <code>{quand}</code> (« demain à 14h30 »), <code>{video}</code>. Le lien visio est dans le mail de confirmation du prospect. Gardé sur ce navigateur.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:10px">
+          <div class="field"><label for="rpTpl1">Relance 1 · confirmation + vidéo</label><textarea id="rpTpl1" style="min-height:130px"></textarea></div>
+          <div class="field"><label for="rpTpl2">Relance 2 · rappel</label><textarea id="rpTpl2" style="min-height:130px"></textarea></div>
+          <div class="field"><label for="rpTpl3">Relance 3 · dernier rappel</label><textarea id="rpTpl3" style="min-height:130px"></textarea></div>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;margin-top:10px">
           <div class="field"><label for="rpVideo">Lien de la vidéo de préchauffe</label><input type="text" id="rpVideo" placeholder="https://…"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
           <button class="btn" id="rpSave">Enregistrer</button>
-          <button class="btn ghost" id="rpReset">Remettre le message d'origine</button>
+          <button class="btn ghost" id="rpReset">Remettre les messages d'origine</button>
           <span id="rpSaveOk" style="font-size:12.5px;color:var(--good-text);display:none">Enregistré ✓</span>
         </div>
-        <div style="margin-top:12px"><span class="eyebrow">Aperçu</span><div id="rpPreview" class="sub" style="white-space:pre-wrap;font-size:13px;margin-top:4px;padding:10px 12px;border:1px dashed var(--border);border-radius:10px"></div></div>
+        <div style="margin-top:12px"><span class="eyebrow">Aperçu (relance 1)</span><div id="rpPreview" class="sub" style="white-space:pre-wrap;font-size:13px;margin-top:4px;padding:10px 12px;border:1px dashed var(--border);border-radius:10px"></div></div>
       </div>
 
       <div class="card full" style="margin-bottom:14px"><h3 style="margin-top:0">Le point par closer</h3><div class="tscroll"><table id="rpSummary"></table></div></div>
@@ -888,15 +892,62 @@ function renderRelances() {
 
 /* ================= rappels calls à venir ================= */
 const RP_REAL_TODAY = iso(new Date());
-const RP_DEFAULT_TPL = "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Je te confirme notre appel diagnostic {quand}, en visio (le lien est dans ton mail de confirmation).\n\nAvant notre échange, prends le temps de regarder la vidéo de préparation, c'est ce qui rend le call vraiment utile pour toi : {video}\n\nOn a très peu de créneaux en ce moment et celui-là est bloqué pour toi. Si tu as le moindre empêchement, préviens-moi pour que je puisse le libérer à quelqu'un d'autre. Prévois un endroit calme, idéalement devant ton ordi. À très vite !";
+/* 3 messages courts, un par relance (le lien WhatsApp prend celui de la prochaine relance non cochée) */
+const RP_DEFAULT_TPLS = [
+  "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Je te confirme notre call {quand}, en visio (le lien est dans ton mail de confirmation).\n\nAvant le call, regarde cette vidéo de préparation, elle le rend bien plus utile pour toi : {video}\n\nLe créneau est bloqué pour toi : en cas d'empêchement, préviens-moi. À très vite !",
+  "Salut {prenom}, c'est {closer} ! Petit rappel : notre call c'est {quand}, en visio (lien dans ton mail).\n\nTu as pu regarder la vidéo ? {video}\n\nSi tu as un empêchement, dis-le-moi pour que je libère le créneau. À très vite !",
+  "Salut {prenom}, c'est {closer} ! On se retrouve {quand} en visio, le lien est dans ton mail de confirmation. Prévois un endroit calme, idéalement devant ton ordi. À tout à l'heure !",
+];
+const RP_DEFAULT_TPL = RP_DEFAULT_TPLS[0];
 const RP_DEFAULT_VIDEO = "https://go.academiedesinvestisseurs.com/masterclass-ads-5980254b-b5d9b6a1-8edb81f8";
 const rpCfg = {
-  get tpl() { return localStorage.getItem("rp-tpl") || RP_DEFAULT_TPL; },
+  tpl(n) { return localStorage.getItem("rp-tpl" + n) || (n === 1 ? localStorage.getItem("rp-tpl") : null) || RP_DEFAULT_TPLS[n - 1]; },
   get video() { const v = localStorage.getItem("rp-video"); return v == null ? RP_DEFAULT_VIDEO : v; },
 };
 let rpCloser = localStorage.getItem("rp-closer") || "", rpPeriod = "7proch", rpFilter = "todo";
-const rpKey = (c) => "rp-done:" + c.st + ":" + c.sr;
-const rpDone = (c) => localStorage.getItem(rpKey(c)) != null || /^RAPPEL/i.test(c.rf || "");
+/* état des actions par call : appel fait + relances 1/2/3, chacune datée jj/mm.
+   Stocké dans la colonne RELANCE FAITE (console) du Sheet sous la forme
+   « RAPPEL appel 22/08 · R1 22/08 · R2 23/08 » (ancien format « RAPPEL 22/08 » = relance 1).
+   La coche locale prime tant que la page n'a pas été reconstruite depuis (sinon le Sheet fait foi). */
+const RP_STEPS = [
+  { k: "appel", label: "Appel fait", short: "Appel", tok: "appel" },
+  { k: "r1", label: "Relance 1", short: "R1", tok: "R1" },
+  { k: "r2", label: "Relance 2", short: "R2", tok: "R2" },
+  { k: "r3", label: "Relance 3", short: "R3", tok: "R3" },
+];
+const rpKey = (c) => "rp-state:" + c.st + ":" + c.sr;
+function rpParse(rf) {
+  const st = { appel: "", r1: "", r2: "", r3: "" };
+  const v = (rf || "").trim();
+  if (!/^RAPPEL/i.test(v)) return st;
+  const body = v.replace(/^RAPPEL\s*/i, "");
+  let hit = false;
+  for (const s of RP_STEPS) {
+    const m = body.match(new RegExp("(?:^|[^A-Za-z0-9])" + s.tok + "\\s*(\\d{1,2}/\\d{1,2})", "i"));
+    if (m) { st[s.k] = m[1]; hit = true; }
+  }
+  if (!hit) { const m = body.match(/(\d{1,2}\/\d{1,2})/); st.r1 = m ? m[1] : "oui"; }
+  return st;
+}
+const rpSerialize = (st) => {
+  const parts = RP_STEPS.filter(s => st[s.k]).map(s => s.tok + " " + st[s.k]);
+  return parts.length ? "RAPPEL " + parts.join(" · ") : "";
+};
+function rpState(c) {
+  try {
+    const l = JSON.parse(localStorage.getItem(rpKey(c)) || "null");
+    if (l && l.at === DATA.updated_at && l.st) return l.st;
+  } catch (e) {}
+  const legacy = localStorage.getItem("rp-done:" + c.st + ":" + c.sr);
+  const st = rpParse(c.rf);
+  if (legacy && !st.r1 && !st.appel && !st.r2 && !st.r3) st.r1 = frDate(legacy);
+  return st;
+}
+const rpAny = (c) => { const s = rpState(c); return !!(s.appel || s.r1 || s.r2 || s.r3); };
+const rpDone = rpAny;
+const rpRelanced = (c) => { const s = rpState(c); return !!(s.r1 || s.r2 || s.r3); };
+/* numéro de la prochaine relance à envoyer (1, 2 ou 3) */
+const rpNext = (c) => { const s = rpState(c); return !s.r1 ? 1 : !s.r2 ? 2 : 3; };
 /* confirmation WhatsApp : wac = 1er clic sur le bouton de la page merci (auto, via le pont),
    wan = nb de clics, war = date où le closer a coché « message reçu » (onglet Confirmations WhatsApp du Sheet).
    La coche locale ne prime que tant que la page n'a pas été reconstruite depuis (sinon le Sheet fait foi). */
@@ -924,10 +975,10 @@ function rpQuand(c) {
   const h = rpHeure(c.hh);
   return h ? q + " à " + h : q;
 }
-function waRappel(c) {
+function waRappel(c, n) {
   const p = (c.n || "").trim().split(/\s+/)[0] || "";
   const cl = (c.c || "").trim().split(/\s+/)[0] || "l'équipe";
-  return rpCfg.tpl
+  return rpCfg.tpl(n || rpNext(c))
     .replace(/\{prenom\}/g, p).replace(/\{closer\}/g, cl).replace(/\{quand\}/g, rpQuand(c))
     .replace(/\{video\}/g, rpCfg.video).replace(/\{visio\}/g, "le lien est dans ton mail de confirmation")
     .replace(/ +,/g, ",").replace(/Salut ,/, "Salut,");
@@ -946,13 +997,13 @@ const RP_PERIODS = [
 ];
 function rpSettingsInit() {
   const show = () => {
-    $("rpTpl").value = rpCfg.tpl; $("rpVideo").value = rpCfg.video;
+    [1, 2, 3].forEach(n => $("rpTpl" + n).value = rpCfg.tpl(n)); $("rpVideo").value = rpCfg.video;
     rpPreview();
   };
   function rpPreview() {
     const sample = rpUpcoming().find(c => !rpCloser || c.c === rpCloser) || { n: "Camille Durand", c: rpCloser || "Louis Granier", d: RP_REAL_TODAY, hh: "14:30" };
     /* aperçu avec les valeurs en cours de saisie */
-    const tpl = $("rpTpl").value || RP_DEFAULT_TPL, video = $("rpVideo").value;
+    const tpl = $("rpTpl1").value || RP_DEFAULT_TPL, video = $("rpVideo").value;
     const first = (sample.c || "").split(" ")[0];
     const visio = "le lien est dans ton mail de confirmation";
     $("rpPreview").textContent = tpl
@@ -964,16 +1015,19 @@ function rpSettingsInit() {
     box.style.display = box.style.display === "none" ? "" : "none";
     if (box.style.display !== "none") show();
   });
-  ["rpTpl", "rpVideo"].forEach(id => $(id).addEventListener("input", rpPreview));
+  ["rpTpl1", "rpTpl2", "rpTpl3", "rpVideo"].forEach(id => $(id).addEventListener("input", rpPreview));
   $("rpSave").addEventListener("click", () => {
-    const tpl = $("rpTpl").value.trim();
-    if (tpl && tpl !== RP_DEFAULT_TPL) localStorage.setItem("rp-tpl", tpl); else localStorage.removeItem("rp-tpl");
+    localStorage.removeItem("rp-tpl");
+    [1, 2, 3].forEach(n => {
+      const tpl = $("rpTpl" + n).value.trim();
+      if (tpl && tpl !== RP_DEFAULT_TPLS[n - 1]) localStorage.setItem("rp-tpl" + n, tpl); else localStorage.removeItem("rp-tpl" + n);
+    });
     const v = $("rpVideo").value.trim();
     if (v === RP_DEFAULT_VIDEO) localStorage.removeItem("rp-video"); else localStorage.setItem("rp-video", v);
     $("rpSaveOk").style.display = ""; setTimeout(() => $("rpSaveOk").style.display = "none", 2500);
     renderRappels();
   });
-  $("rpReset").addEventListener("click", () => { localStorage.removeItem("rp-tpl"); localStorage.removeItem("rp-video"); show(); renderRappels(); });
+  $("rpReset").addEventListener("click", () => { ["rp-tpl", "rp-tpl1", "rp-tpl2", "rp-tpl3", "rp-video"].forEach(k => localStorage.removeItem(k)); show(); renderRappels(); });
 }
 function renderRappels() {
   const all = rpUpcoming().sort((a, b) => (a.d + " " + (a.hh || "99")) < (b.d + " " + (b.hh || "99")) ? -1 : 1);
@@ -988,8 +1042,9 @@ function renderRappels() {
   pillRow("rpPeriodPills", RP_PERIODS.map(o => ({ k: o.k, label: o.label + ` (${all.filter(c => (!rpCloser || c.c === rpCloser) && c.d <= o.to()).length})` })),
     rpPeriod, k => rpPeriod = k, renderRappels);
   pillRow("rpFilterPills", [
-    { k: "todo", label: `À rappeler (${todo.length})` },
-    { k: "done", label: `Rappelés (${mine.length - todo.length})` },
+    { k: "todo", label: `À traiter (${todo.length})` },
+    { k: "appel", label: `Appel fait (${mine.filter(c => rpState(c).appel).length})` },
+    { k: "done", label: `Relancés (${mine.filter(rpRelanced).length})` },
     { k: "conf", label: `Ont confirmé sur WhatsApp (${mine.filter(waConfirmed).length})` },
     { k: "noconf", label: `Pas confirmé (${mine.filter(c => !waConfirmed(c)).length})` },
     { k: "all", label: `Tous (${mine.length})` },
@@ -998,10 +1053,11 @@ function renderRappels() {
   /* récap par closer (sur la période choisie, tous closers confondus) */
   const closers = [...TOP3, ...[...new Set(inPer.map(c => c.c))].filter(n => !TOP3.includes(n))];
   const demainIso = RP_PERIODS[1].to(), j3 = RP_PERIODS[2].to(), j7 = RP_PERIODS[3].to();
-  $("rpSummary").innerHTML = "<thead><tr><th>Closer</th><th class=\"num\">Aujourd'hui</th><th class=\"num\">Demain</th><th class=\"num\">3 prochains jours</th><th class=\"num\">7 prochains jours</th><th class=\"num\">Sur la période</th><th class=\"num\">Rappelés</th><th class=\"num\">Reste à rappeler</th><th class=\"num\" title=\"Ont cliqué sur le bouton WhatsApp de la page merci\">Ont cliqué WhatsApp</th><th class=\"num\" title=\"Message de confirmation bien reçu (coché par le closer)\">Messages reçus</th><th>Prochain call</th></tr></thead><tbody>" +
+  $("rpSummary").innerHTML = "<thead><tr><th>Closer</th><th class=\"num\">Aujourd'hui</th><th class=\"num\">Demain</th><th class=\"num\">3 prochains jours</th><th class=\"num\">7 prochains jours</th><th class=\"num\">Sur la période</th><th class=\"num\" title=\"Appel téléphonique fait\">Appel fait</th><th class=\"num\">Relance 1</th><th class=\"num\">Relance 2</th><th class=\"num\">Relance 3</th><th class=\"num\" title=\"Ni appel ni relance cochés\">Rien fait</th><th class=\"num\" title=\"Ont cliqué sur le bouton WhatsApp de la page merci\">Ont cliqué WhatsApp</th><th class=\"num\" title=\"Message de confirmation bien reçu (coché par le closer)\">Messages reçus</th><th>Prochain call</th></tr></thead><tbody>" +
     closers.map(n => {
       const c7 = all.filter(c => c.c === n && c.d <= j7), cp = inPer.filter(c => c.c === n);
-      const done = cp.filter(rpDone).length, next = all.find(c => c.c === n);
+      const done = cp.filter(rpAny).length, next = all.find(c => c.c === n);
+      const cnt = (k) => cp.filter(c => rpState(c)[k]).length;
       const clicked = cp.filter(waClicked).length, recu = cp.filter(waRecu).length;
       const hl = rpCloser === n ? ' style="background:var(--good-bg, rgba(120,160,110,.12))"' : "";
       return `<tr${hl}><td><b>${esc(n.split(" ")[0])}</b></td>
@@ -1010,7 +1066,10 @@ function renderRappels() {
         <td class="num">${fmtN(all.filter(c => c.c === n && c.d <= j3).length)}</td>
         <td class="num">${fmtN(c7.length)}</td>
         <td class="num"><b>${fmtN(cp.length)}</b></td>
-        <td class="num">${fmtN(done)}</td>
+        <td class="num">${fmtN(cnt("appel"))}</td>
+        <td class="num">${fmtN(cnt("r1"))}</td>
+        <td class="num">${fmtN(cnt("r2"))}</td>
+        <td class="num">${fmtN(cnt("r3"))}</td>
         <td class="num"${cp.length - done ? ' style="color:var(--accent);font-weight:600"' : ""}>${fmtN(cp.length - done)}</td>
         <td class="num">${fmtN(clicked)}${cp.length ? `<div class="sub" style="font-size:11px">${Math.round(100 * clicked / cp.length)} %</div>` : ""}</td>
         <td class="num">${fmtN(recu)}${cp.length ? `<div class="sub" style="font-size:11px">${Math.round(100 * recu / cp.length)} %</div>` : ""}</td>
@@ -1019,37 +1078,41 @@ function renderRappels() {
 
   renderWaCard();
 
-  const list = mine.filter(c => rpFilter === "all" ? true : rpFilter === "todo" ? !rpDone(c) : rpFilter === "done" ? rpDone(c) : rpFilter === "conf" ? waConfirmed(c) : !waConfirmed(c));
+  const list = mine.filter(c => rpFilter === "all" ? true : rpFilter === "todo" ? !rpAny(c) : rpFilter === "appel" ? !!rpState(c).appel : rpFilter === "done" ? rpRelanced(c) : rpFilter === "conf" ? waConfirmed(c) : !waConfirmed(c));
   const delaiTxt = (c) => {
     const n = Math.round((new Date(c.d + "T12:00:00") - new Date(RP_REAL_TODAY + "T12:00:00")) / DAY);
     return n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j";
   };
-  $("rpTable").innerHTML = "<thead><tr><th>Rappelé</th><th title=\"Clic sur le bouton WhatsApp de la page merci (auto) + message vraiment reçu (à cocher)\">Confirmé WhatsApp</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
+  const rpCell = (c, i, s) => { const v = rpState(c)[s.k]; return `<td style="white-space:nowrap;text-align:center"><label style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11.5px" title="${s.label}"><input type="checkbox" data-rpi="${i}" data-step="${s.k}" ${v ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer"><span class="sub" style="font-size:10.5px">${v && v !== "oui" ? esc(v) : "&nbsp;"}</span></label></td>`; };
+  $("rpTable").innerHTML = "<thead><tr>" + RP_STEPS.map(s => `<th style="text-align:center" title="${s.label}">${s.label}</th>`).join("") + "<th title=\"Clic sur le bouton WhatsApp de la page merci (auto) + message vraiment reçu (à cocher)\">Confirmé WhatsApp</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
     list.map((c, i) => {
-      const done = rpDone(c);
+      const st = rpState(c), done = !!(st.appel && st.r1 && st.r2 && st.r3);
       const dd = new Date(c.d + "T12:00:00");
       const clicked = waClicked(c), recu = waRecu(c);
       return `<tr${done ? ' style="opacity:.55"' : ""}>
-        <td style="white-space:nowrap"><label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px"><input type="checkbox" data-rpi="${i}" ${done ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">${done ? "oui" : "non"}</label>${done && /^RAPPEL/i.test(c.rf || "") ? `<div class="sub" style="font-size:11px;margin-top:2px">${esc(c.rf.replace(/^RAPPEL\s*/i, "le "))}</div>` : ""}</td>
+        ${RP_STEPS.map(s => rpCell(c, i, s)).join("")}
         <td style="white-space:nowrap;font-size:12.5px">${clicked ? `<span style="color:var(--good-text);font-weight:600">✅ a cliqué</span><div class="sub" style="font-size:11px">le ${esc(waWhen(c.wac))}${c.wan > 1 ? " (×" + c.wan + ")" : ""}</div>` : `<span class="sub">pas cliqué</span>`}
           <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;margin-top:4px" title="Coche quand le message de confirmation est bien arrivé sur ton WhatsApp"><input type="checkbox" data-wai="${i}" ${recu ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">message reçu</label>${recu && c.war ? `<div class="sub" style="font-size:11px">coché le ${frDate(c.war)}</div>` : ""}</td>
         <td style="white-space:nowrap"><b>${esc(JOURS[dd.getDay()])} ${frDate(c.d)}</b>${c.hh ? " à " + rpHeure(c.hh) : ""}<div class="sub" style="font-size:11px">${delaiTxt(c)}</div></td>
         <td>${esc((c.c || "·").split(" ")[0])}</td>
         <td><b>${esc(c.n) || "·"}</b></td>
-        <td>${c.tel ? `<a class="tel" href="${rpWaHref(c)}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message de rappel pré-écrit">${esc(c.tel)}</a>` : "·"}</td>
+        <td>${c.tel ? `<a class="tel" href="${rpWaHref(c)}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message de la relance ${rpNext(c)} pré-écrit">${esc(c.tel)}</a><div class="sub" style="font-size:10.5px">msg relance ${rpNext(c)}</div>` : "·"}</td>
         <td style="max-width:22ch;overflow-wrap:anywhere">${esc(c.mail) || "·"}</td>
         <td>${frDate(c.b)}</td>
         <td style="max-width:22ch;overflow-wrap:anywhere;font-size:12px">${esc(c.utm || "·")}</td>
         <td style="white-space:nowrap"><button class="btn ghost" data-rpcopy="${i}" style="padding:3px 9px;font-size:12px">📋 Copier</button> <button class="btn ghost" data-rpsee="${i}" style="padding:3px 9px;font-size:12px">👁 Voir</button><div class="sub" id="rpMsg${i}" style="display:none;white-space:pre-wrap;font-size:12px;max-width:46ch;margin-top:6px"></div></td>
       </tr>`;
     }).join("") + "</tbody>";
-  $("rpMore").textContent = list.length ? "" : (rpFilter === "todo" ? (mine.length ? "Tout le monde est rappelé, machine !" : "Aucun call à venir sur cette période.") : "Rien ici pour l'instant.");
-  $("rpTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+  $("rpMore").textContent = list.length ? "" : (rpFilter === "todo" ? (mine.length ? "Tout le monde est traité, machine !" : "Aucun call à venir sur cette période.") : "Rien ici pour l'instant.");
+  $("rpTable").querySelectorAll("input[data-rpi]").forEach(cb => {
     cb.addEventListener("change", () => {
       const c = list[+cb.dataset.rpi];
-      const val = cb.checked ? "RAPPEL " + frDate(RP_REAL_TODAY) : "";
-      if (cb.checked) { localStorage.setItem(rpKey(c), RP_REAL_TODAY); c.rf = val; }
-      else { localStorage.removeItem(rpKey(c)); c.rf = ""; }
+      const st = Object.assign({}, rpState(c));
+      st[cb.dataset.step] = cb.checked ? frDate(RP_REAL_TODAY) : "";
+      const val = rpSerialize(st);
+      localStorage.setItem(rpKey(c), JSON.stringify({ st, at: DATA.updated_at }));
+      localStorage.removeItem("rp-done:" + c.st + ":" + c.sr);
+      c.rf = val;
       if (c.st && c.sr) {
         bridgePost({ what: "relance", tab: c.st, row: c.sr, headerRow: (DATA.hrows || {})[c.st] || 1, value: val })
           .then(ok => toast(ok ? "Noté dans le Sheet pour toute l'équipe ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
@@ -1397,16 +1460,16 @@ function waDraft(c) {
   const cl = (c.c || "").trim().split(/\s+/)[0];
   const quand = c.d ? " du " + frDate(c.d) : "";
   const obj = (c.obj || "").trim();
-  if (c.d && c.d > TODAY_ISO && !c.s) return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! On a notre call prévu ensemble le ${frDate(c.d)}. Si tu as la moindre question d'ici là n'hésite pas, à très vite !`;
+  if (c.d && c.d > TODAY_ISO && !c.s) return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Notre call est prévu le ${frDate(c.d)}. Une question d'ici là ? Je suis là. À très vite !`;
   if (c.v === "FOLLOW_UP") {
     let m = `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Je reviens vers toi comme convenu suite à notre échange${quand}.`;
-    if (obj && obj.length <= 45) m += ` La dernière fois tu hésitais encore (${obj.toLowerCase()}).`;
-    m += ` Tu en es où de ta réflexion ? Si tu veux on se cale 10 minutes cette semaine pour en reparler.`;
+    if (obj && obj.length <= 45) m += ` Tu hésitais encore (${obj.toLowerCase()}).`;
+    m += ` Tu en es où ? On se cale 10 min cette semaine pour en reparler ?`;
     return m;
   }
-  if (c.s === "NON") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. On avait un call prévu${quand} et on s'est manqués. Quel créneau t'arrangerait pour le reprogrammer ?`;
-  if (c.s === "REPROGRAMMER" || c.s === "ANNULE") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Notre call${quand} avait été décalé, je te propose qu'on le remette au planning. Quelles sont tes dispos cette semaine ?`;
-  return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Je me permets de revenir vers toi suite à notre échange${quand}. Dis-moi si tu veux qu'on en reparle !`;
+  if (c.s === "NON") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. On s'est manqués pour notre call${quand}. Quel créneau t'arrange pour le reprogrammer ?`;
+  if (c.s === "REPROGRAMMER" || c.s === "ANNULE") return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Notre call${quand} avait été décalé : on le remet au planning ? Tes dispos cette semaine ?`;
+  return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0. Je reviens vers toi suite à notre échange${quand}. On en reparle quand tu veux !`;
 }
 const waLink = (c) => c.tel
   ? `<a class="tel" href="https://wa.me/${esc(String(c.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(waDraft(c)).replace(/'/g, "%27")}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec un message pré-écrit">${esc(c.tel)}</a>`
