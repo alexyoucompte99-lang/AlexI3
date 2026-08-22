@@ -1042,12 +1042,12 @@ function renderRappels() {
   pillRow("rpPeriodPills", RP_PERIODS.map(o => ({ k: o.k, label: o.label + ` (${all.filter(c => (!rpCloser || c.c === rpCloser) && c.d <= o.to()).length})` })),
     rpPeriod, k => rpPeriod = k, renderRappels);
   pillRow("rpFilterPills", [
+    { k: "all", label: `Tous (${mine.length})` },
     { k: "todo", label: `À traiter (${todo.length})` },
     { k: "appel", label: `Appel fait (${mine.filter(c => rpState(c).appel).length})` },
     { k: "done", label: `Relancés (${mine.filter(rpRelanced).length})` },
     { k: "conf", label: `Ont confirmé sur WhatsApp (${mine.filter(waConfirmed).length})` },
     { k: "noconf", label: `Pas confirmé (${mine.filter(c => !waConfirmed(c)).length})` },
-    { k: "all", label: `Tous (${mine.length})` },
   ], rpFilter, k => rpFilter = k, renderRappels);
 
   /* récap par closer (sur la période choisie, tous closers confondus) */
