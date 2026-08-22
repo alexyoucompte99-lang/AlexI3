@@ -370,13 +370,10 @@
 
       <div class="card" id="rpSettings" style="display:none;margin-bottom:14px">
         <h3 style="margin-top:0">Le message envoyé sur WhatsApp</h3>
-        <p class="lede" style="margin-bottom:10px">Variables disponibles : <code>{prenom}</code> (prospect), <code>{closer}</code> (ton prénom), <code>{quand}</code> (« demain à 14h30 », « le jeudi 27 août à 10h »), <code>{video}</code>, <code>{visio}</code>. Tout est gardé sur ce navigateur.</p>
+        <p class="lede" style="margin-bottom:10px">Variables disponibles : <code>{prenom}</code> (prospect), <code>{closer}</code> (ton prénom), <code>{quand}</code> (« demain à 14h30 », « le jeudi 27 août à 10h »), <code>{video}</code>. Le lien visio change à chaque résa (iClosed), le message renvoie donc au mail de confirmation. Tout est gardé sur ce navigateur.</p>
         <div class="field"><label for="rpTpl">Message</label><textarea id="rpTpl" style="min-height:150px"></textarea></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:10px;margin-top:10px">
           <div class="field"><label for="rpVideo">Lien de la vidéo de préchauffe</label><input type="text" id="rpVideo" placeholder="https://…"></div>
-          <div class="field"><label for="rpVisioLouis">Lien visio de Louis</label><input type="text" id="rpVisioLouis" placeholder="https://meet.google.com/… (vide = « le lien est dans ton mail de confirmation »)"></div>
-          <div class="field"><label for="rpVisioRomain">Lien visio de Romain</label><input type="text" id="rpVisioRomain" placeholder="https://meet.google.com/…"></div>
-          <div class="field"><label for="rpVisioAdrien">Lien visio d'Adrien</label><input type="text" id="rpVisioAdrien" placeholder="https://meet.google.com/…"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
           <button class="btn" id="rpSave">Enregistrer</button>
@@ -889,12 +886,11 @@ function renderRelances() {
 
 /* ================= rappels calls à venir ================= */
 const RP_REAL_TODAY = iso(new Date());
-const RP_DEFAULT_TPL = "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Je te confirme notre appel diagnostic {quand}, en visio : {visio}\n\nAvant notre échange, prends le temps de regarder la vidéo de préparation, c'est ce qui rend le call vraiment utile pour toi : {video}\n\nOn a très peu de créneaux en ce moment et celui-là est bloqué pour toi. Si tu as le moindre empêchement, préviens-moi pour que je puisse le libérer à quelqu'un d'autre. Prévois un endroit calme, idéalement devant ton ordi. À très vite !";
+const RP_DEFAULT_TPL = "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Je te confirme notre appel diagnostic {quand}, en visio (le lien est dans ton mail de confirmation).\n\nAvant notre échange, prends le temps de regarder la vidéo de préparation, c'est ce qui rend le call vraiment utile pour toi : {video}\n\nOn a très peu de créneaux en ce moment et celui-là est bloqué pour toi. Si tu as le moindre empêchement, préviens-moi pour que je puisse le libérer à quelqu'un d'autre. Prévois un endroit calme, idéalement devant ton ordi. À très vite !";
 const RP_DEFAULT_VIDEO = "https://go.academiedesinvestisseurs.com/masterclass-ads-5980254b-b5d9b6a1-8edb81f8";
 const rpCfg = {
   get tpl() { return localStorage.getItem("rp-tpl") || RP_DEFAULT_TPL; },
   get video() { const v = localStorage.getItem("rp-video"); return v == null ? RP_DEFAULT_VIDEO : v; },
-  visio(closer) { return localStorage.getItem("rp-visio:" + (closer || "").split(" ")[0]) || ""; },
 };
 let rpCloser = localStorage.getItem("rp-closer") || "", rpPeriod = "7proch", rpFilter = "todo";
 const rpKey = (c) => "rp-done:" + c.st + ":" + c.sr;
@@ -915,10 +911,9 @@ function rpQuand(c) {
 function waRappel(c) {
   const p = (c.n || "").trim().split(/\s+/)[0] || "";
   const cl = (c.c || "").trim().split(/\s+/)[0] || "l'équipe";
-  const visio = rpCfg.visio(c.c) || "le lien est dans ton mail de confirmation";
   return rpCfg.tpl
     .replace(/\{prenom\}/g, p).replace(/\{closer\}/g, cl).replace(/\{quand\}/g, rpQuand(c))
-    .replace(/\{video\}/g, rpCfg.video).replace(/\{visio\}/g, visio)
+    .replace(/\{video\}/g, rpCfg.video).replace(/\{visio\}/g, "le lien est dans ton mail de confirmation")
     .replace(/ +,/g, ",").replace(/Salut ,/, "Salut,");
 }
 const rpWaHref = (c) => `https://wa.me/${esc(String(c.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(waRappel(c)).replace(/'/g, "%27")}`;
@@ -936,7 +931,6 @@ const RP_PERIODS = [
 function rpSettingsInit() {
   const show = () => {
     $("rpTpl").value = rpCfg.tpl; $("rpVideo").value = rpCfg.video;
-    $("rpVisioLouis").value = rpCfg.visio("Louis"); $("rpVisioRomain").value = rpCfg.visio("Romain"); $("rpVisioAdrien").value = rpCfg.visio("Adrien");
     rpPreview();
   };
   function rpPreview() {
@@ -944,8 +938,7 @@ function rpSettingsInit() {
     /* aperçu avec les valeurs en cours de saisie */
     const tpl = $("rpTpl").value || RP_DEFAULT_TPL, video = $("rpVideo").value;
     const first = (sample.c || "").split(" ")[0];
-    const visioField = { Louis: "rpVisioLouis", Romain: "rpVisioRomain", Adrien: "rpVisioAdrien" }[first];
-    const visio = (visioField && $(visioField).value) || rpCfg.visio(sample.c) || "le lien est dans ton mail de confirmation";
+    const visio = "le lien est dans ton mail de confirmation";
     $("rpPreview").textContent = tpl
       .replace(/\{prenom\}/g, (sample.n || "").split(/\s+/)[0]).replace(/\{closer\}/g, first).replace(/\{quand\}/g, rpQuand(sample))
       .replace(/\{video\}/g, video).replace(/\{visio\}/g, visio);
@@ -955,16 +948,12 @@ function rpSettingsInit() {
     box.style.display = box.style.display === "none" ? "" : "none";
     if (box.style.display !== "none") show();
   });
-  ["rpTpl", "rpVideo", "rpVisioLouis", "rpVisioRomain", "rpVisioAdrien"].forEach(id => $(id).addEventListener("input", rpPreview));
+  ["rpTpl", "rpVideo"].forEach(id => $(id).addEventListener("input", rpPreview));
   $("rpSave").addEventListener("click", () => {
     const tpl = $("rpTpl").value.trim();
     if (tpl && tpl !== RP_DEFAULT_TPL) localStorage.setItem("rp-tpl", tpl); else localStorage.removeItem("rp-tpl");
     const v = $("rpVideo").value.trim();
     if (v === RP_DEFAULT_VIDEO) localStorage.removeItem("rp-video"); else localStorage.setItem("rp-video", v);
-    [["Louis", "rpVisioLouis"], ["Romain", "rpVisioRomain"], ["Adrien", "rpVisioAdrien"]].forEach(([n, id]) => {
-      const val = $(id).value.trim();
-      if (val) localStorage.setItem("rp-visio:" + n, val); else localStorage.removeItem("rp-visio:" + n);
-    });
     $("rpSaveOk").style.display = ""; setTimeout(() => $("rpSaveOk").style.display = "none", 2500);
     renderRappels();
   });
