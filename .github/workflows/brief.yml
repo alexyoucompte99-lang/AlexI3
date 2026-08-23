@@ -1,0 +1,95 @@
+name: Bilan Telegram du soir
+
+# Un seul message Telegram à Alex chaque soir (~21h45 Paris) : jour par jour
+# (aujourd'hui, hier, avant-hier), 3 et 7 derniers jours, mois en cours, à venir.
+# Les données sont rafraîchies juste avant (pont Apps Script + Meta), comme refresh.yml.
+# Indépendant du Mac d'Alex. Le bot local (telegram_bot.py) sert de filet à 22h30
+# si ce workflow n'a pas réussi. Marqueur .bilan-sent (date Paris) = anti-doublon.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Afficher le bilan dans le log sans l'envoyer"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "45 19 * * *"   # 21h45 Paris en heure d'été
+    - cron: "45 20 * * *"   # 21h45 Paris en heure d'hiver (l'autre déclenchement est ignoré)
+
+concurrency:
+  group: bilan
+  cancel-in-progress: false
+
+jobs:
+  bilan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Faut-il envoyer ? (heure de Paris + anti-doublon)
+        id: go
+        run: |
+          TODAY=$(TZ=Europe/Paris date '+%Y-%m-%d')
+          HOUR=$(TZ=Europe/Paris date '+%H')
+          SENT=$(cat .bilan-sent 2>/dev/null || echo none)
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "$SENT" = "$TODAY" ]; then echo "deja envoye aujourd'hui ($SENT)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ "$HOUR" -lt 21 ]; then echo "trop tot ($HOUR h Paris, heure d'hiver)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
+          echo "send=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.send == 'yes'
+        with:
+          python-version: "3.12"
+
+      - name: Dependances
+        if: steps.go.outputs.send == 'yes'
+        run: pip install --quiet openpyxl
+
+      - name: Recuperer les donnees (pont Apps Script)
+        if: steps.go.outputs.send == 'yes'
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+        working-directory: pipeline
+        run: |
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
+          base64 -d closing.b64 > investisseurs30.xlsx
+          python -c "import openpyxl; wb=openpyxl.load_workbook('investisseurs30.xlsx', read_only=True); print('onglets:', len(wb.sheetnames))"
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=ads" -o ads_values.json
+
+      - name: Pipeline + bilan Telegram
+        if: steps.go.outputs.send == 'yes'
+        env:
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+          META_ACCOUNT: ${{ secrets.META_ACCOUNT }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        working-directory: pipeline
+        run: |
+          python parse_xlsx.py investisseurs30.xlsx data.json
+          python parse_ads_values.py ads_values.json ads.json
+          python meta_fetch.py
+          if [ "$DRY_RUN" = "true" ]; then
+            python brief_bilan.py --dry-run
+          else
+            python brief_bilan.py
+          fi
+
+      - name: Marquer comme envoye
+        if: steps.go.outputs.send == 'yes' && inputs.dry_run != true
+        run: |
+          echo "${{ steps.go.outputs.today }}" > .bilan-sent
+          git config user.name "console-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .bilan-sent
+          git diff --cached --quiet && exit 0
+          git commit -m "Bilan Telegram envoye"
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 10; done

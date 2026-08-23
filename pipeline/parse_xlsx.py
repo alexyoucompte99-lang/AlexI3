@@ -200,6 +200,9 @@ def main(xlsx_path, out_path):
                 # garde-fou anti-blocs parasites à droite des tabs
                 if closer and len(closer) > 60:
                     continue
+                # lignes de test (résas « alex test » faites pour tester le funnel)
+                if re.search(r"\btests?\b", prospect, re.I):
+                    continue
                 show_up = norm_show_up(cell_str(g("show_up")))
                 vente = norm_vente(cell_str(g("vente")))
                 booking = parse_date(g("booking_date"))

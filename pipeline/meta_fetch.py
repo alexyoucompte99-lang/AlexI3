@@ -2,7 +2,8 @@
 """Récupère la data ads depuis l'API Meta (Insights) et met à jour ads.json.
 
 - spend / impressions / clicks viennent de Meta (source de vérité, quotidien
-  agrégé en semaines lundi -> dimanche, depuis 2026-01-01)
+  agrégé en semaines lundi -> dimanche, depuis 2026-01-01 ; + détail par jour
+  des 90 derniers jours dans "days", pour le bilan Telegram quotidien)
 - les champs funnel du Sheet (lp_views, call_page_views, calls_booked, ventes,
   ca_ttc, ca_encaisse) sont conservés depuis l'ads.json existant (produit par
   parse_ads_md.py) pour les semaines où ils existent
@@ -104,11 +105,20 @@ def main():
             w[f] = sheet.get(f) or 0
         weeks.append(w)
 
+    # détail par jour (90 derniers jours) pour le bilan Telegram quotidien
+    cutoff = (dt.date.today() - dt.timedelta(days=90)).isoformat()
+    daily = sorted(
+        ({"date": row["date_start"], "spend": round(float(row.get("spend") or 0), 2),
+          "impressions": int(row.get("impressions") or 0), "clicks": int(row.get("clicks") or 0)}
+         for row in days if row["date_start"] >= cutoff),
+        key=lambda r: r["date"])
+
     out = {
         "source": "API Meta Insights (spend/impressions/clics) + tableau ads Google Sheet (funnel)",
         "meta_account": cfg["account_id"],
         "meta_fetched_at": dt.datetime.now().strftime("%d/%m/%Y %H:%M"),
         "weeks": weeks,
+        "days": daily,
     }
     print(f"{len(weeks)} semaines Meta ({weeks[0]['start']} -> {weeks[-1]['start']})", file=sys.stderr)
     for w in weeks[-5:]:
