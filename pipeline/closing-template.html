@@ -254,19 +254,19 @@
   </header>
 
   <div class="tabs" role="tablist">
-    <button class="tab" role="tab" id="tabPilotage" aria-selected="true" data-panel="panelPilotage">Pilotage 🔒</button>
+    <button class="tab" role="tab" id="tabFill" aria-selected="true" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
+    <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
-    <button class="tab" role="tab" id="tabFill" aria-selected="false" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
-    <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
+    <button class="tab" role="tab" id="tabPilotage" aria-selected="false" data-panel="panelPilotage">Pilotage 🔒</button>
   </div>
 
   <!-- ================== PILOTAGE ================== -->
-  <div id="panelPilotage" role="tabpanel">
+  <div id="panelPilotage" role="tabpanel" hidden>
     <section style="margin-top:16px" id="pilotLock">
       <span class="eyebrow">Accès restreint</span>
       <h2>Onglet Pilotage</h2>
@@ -415,8 +415,8 @@
     </section>
   </div>
 
-  <!-- ================== À REMPLIR (saisie closers) ================== -->
-  <div id="panelFill" role="tabpanel" hidden>
+  <!-- ================== À REMPLIR (saisie closers, onglet par défaut) ================== -->
+  <div id="panelFill" role="tabpanel">
     <section style="margin-top:16px">
       <span class="eyebrow">Après le call</span>
       <h2>À remplir</h2>
@@ -1714,6 +1714,7 @@ let fillFilter = "todo";
       if (o.p) { c.p = o.p; }
       if (o.com) c.com = c.com ? c.com + "\n" + o.com : o.com;
       if (o.obj) c.obj = c.obj || o.obj;
+      if (o.rel) c.rel = c.rel || o.rel;
       c._fillSent = o.when || 1;
     } catch (e) { localStorage.removeItem(fillKey(c)); }
   }
@@ -1751,7 +1752,7 @@ function fillCard(c) {
   const card = document.createElement("div");
   card.className = "fill-card" + (c._fillSent ? " sent" : "");
   const quand = frDateFull(c.d) + (c.hh ? " à " + c.hh : "");
-  const state = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", com: "", obj: "" };
+  const state = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", com: "", obj: "", rel: "" };
   const seg = (label, opts, cur, onPick) => {
     const wrap = document.createElement("div");
     wrap.innerHTML = `<div class="flabel">${label}</div>`;
@@ -1789,13 +1790,28 @@ function fillCard(c) {
         p.addEventListener("input", () => state.pp = p.value);
         card.appendChild(p);
       }
+      if (state.v === "FOLLOW_UP") {
+        const rl = document.createElement("div");
+        rl.innerHTML = `<div class="flabel">Relance prévue le</div>`;
+        const rd = document.createElement("input");
+        rd.type = "date"; rd.value = state.rel || "";
+        rd.addEventListener("input", () => state.rel = rd.value);
+        rl.appendChild(rd);
+        card.appendChild(rl);
+      }
       card.appendChild(seg("Lead qualifié ? /10", Array.from({ length: 10 }, (_, i) => [i + 1, String(i + 1)]), state.q, k => state.q = +k));
     }
     const ta = document.createElement("textarea");
-    ta.placeholder = "Recap du call (objections, contexte, prochaine étape...)";
+    ta.placeholder = "Recap du call (contexte, prochaine étape...)";
     ta.value = state.com;
     ta.addEventListener("input", () => state.com = ta.value);
     card.appendChild(ta);
+    if (state.s === "OUI") {
+      const ob = document.createElement("input");
+      ob.type = "text"; ob.placeholder = "Objection / peur principale (optionnel)"; ob.value = state.obj || "";
+      ob.addEventListener("input", () => state.obj = ob.value);
+      card.appendChild(ob);
+    }
     if (c.com) {
       const old = document.createElement("div");
       old.className = "flabel";
@@ -1822,6 +1838,11 @@ async function fillSend(c, state, btn) {
     fields.vente = FILL_V_SHEET[state.v];
     if (state.q != null) fields.qualif = state.q;
     if (state.v === "OUI" && state.pp) fields.prix = +state.pp;
+    if (state.v === "FOLLOW_UP" && state.rel) {
+      const [y, m, d] = state.rel.split("-");
+      fields.relance = `${d}/${m}/${y}`;
+    }
+    if (state.obj.trim()) fields.objection = state.obj.trim();
   }
   if (state.com.trim()) fields.commentaire = state.com.trim();
   const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
@@ -1839,8 +1860,10 @@ async function fillSend(c, state, btn) {
     if (state.v === "OUI" && state.pp) { c.pp = +state.pp; c.p = +state.pp; }
   }
   if (state.com.trim()) c.com = c.com ? c.com + "\n" + state.com.trim() : state.com.trim();
+  if (state.s === "OUI" && state.obj.trim()) c.obj = c.obj || state.obj.trim();
+  if (state.v === "FOLLOW_UP" && state.rel) c.rel = state.rel;
   c._fillSent = Date.now();
-  localStorage.setItem(fillKey(c), JSON.stringify({ s: c.s, v: c.v, q: c.q, pp: c.pp, p: c.p, com: state.com.trim(), when: c._fillSent }));
+  localStorage.setItem(fillKey(c), JSON.stringify({ s: c.s, v: c.v, q: c.q, pp: c.pp, p: c.p, com: state.com.trim(), obj: state.obj.trim(), rel: state.rel, when: c._fillSent }));
   toast("✅ C'est dans le Sheet, tié un tigre 🐯");
   renderFill();
 }
@@ -2300,6 +2323,10 @@ function setupRefresh(btn, note) {
 setupRefresh($("btnRefresh"), document.querySelector(".updated"));
 initPilotage();
 $("tabClosers").addEventListener("click", renderClosersTab);
+/* Pilotage n'est plus l'onglet par défaut : re-rendre ses graphes quand il devient visible */
+$("tabPilotage").addEventListener("click", () => {
+  if ($("pilotContent").style.display !== "none") { renderPilotage(); renderVirement(); }
+});
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
 rpSettingsInit();
