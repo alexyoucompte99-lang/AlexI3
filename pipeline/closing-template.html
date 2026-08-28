@@ -1805,7 +1805,7 @@ function fillCard(c) {
     if (c._fillSent) {
       const ok = document.createElement("div");
       ok.className = "okline";
-      ok.textContent = `✓ Envoyé au Sheet : ${FILL_SU[c.s] || c.s}${c.v ? " · " + (FILL_V[c.v] || c.v) : ""}${c.q != null ? " · " + c.q + "/10" : ""}${c.pp ? " · " + c.pp + " €" : ""}`;
+      ok.textContent = `✓ Validé (envoyé au Sheet) : ${FILL_SU[c.s] || c.s}${c.v ? " · " + (FILL_V[c.v] || c.v) : ""}${c.q != null ? " · " + c.q + "/10" : ""}${c.pp ? " · " + c.pp + " €" : ""}`;
       card.appendChild(ok);
       return;
     }
@@ -1852,7 +1852,7 @@ function fillCard(c) {
     }
     const send = document.createElement("button");
     send.type = "button"; send.className = "btn send";
-    send.textContent = (orig.s || orig.v) ? "Mettre à jour le Sheet" : "Envoyer dans le Sheet";
+    send.textContent = "Validé"; /* écrit dans le Sheet ET valide la carte dans la console */
     send.addEventListener("click", () => fillSend(c, orig, state, send));
     card.appendChild(send);
   };
@@ -1885,7 +1885,7 @@ async function fillSend(c, orig, state, btn) {
     headerRow: (DATA.hrows || {})[c.st] || 1, fields });
   delete btn.dataset.busy;
   if (!ok) {
-    btn.textContent = "Réessayer l'envoi";
+    btn.textContent = "Réessayer";
     toast("❌ Pas pu écrire dans le Sheet. Réessaie ; si ça persiste, dis-le à Alex.");
     return;
   }
