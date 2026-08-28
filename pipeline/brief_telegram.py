@@ -69,8 +69,12 @@ def build_brief(data, ads, days, today):
     shows = [c for c in filled if c["show_up"] == "OUI"]
     noshow = sum(1 for c in filled if c["show_up"] == "NON")
     reprog = sum(1 for c in filled if c["show_up"] in ("REPROGRAMMER", "ANNULE"))
-    pitched = [c for c in rows if c["show_up"] == "OUI"
-               and c["vente"] in ("OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT")]
+    # buckets disjoints : présents = pitchés + follow-ups + non pitchés (+ sans statut)
+    pitched_all = [c for c in rows if c["show_up"] == "OUI"
+                   and c["vente"] in ("OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT")]
+    fu = sum(1 for c in pitched_all if c["vente"] == "FOLLOW_UP")
+    pitched = pitched_all  # dénominateur du taux de closing (follow-ups compris)
+    n_pitche_seul = len(pitched_all) - fu
     non_pitche = sum(1 for c in rows if c["show_up"] == "OUI" and c["vente"] == "NON_PITCHE")
     ventes = [c for c in rows if is_sale(c)]
     ca = sum((c.get("prix_confirme") or c.get("prix") or 0) for c in ventes)
@@ -92,7 +96,7 @@ def build_brief(data, ads, days, today):
         f"Calls passés et renseignés : {len(filled)} · non renseignés ou à venir : {len(rows) - len(filled)}",
         f"Présents : {len(shows)} sur {len(filled)} calls renseignés, soit *{fmt_p(t_show)}* de show-up",
         f"No-show : {noshow} · reprogrammés/annulés : {reprog}",
-        f"Pitchés : {len(pitched)} · non pitchés : {non_pitche}", "",
+        f"Sur les présents : {n_pitche_seul} pitché(s) + {fu} follow-up(s) + {non_pitche} non pitché(s)", "",
         f"Ventes : {len(ventes)} · CA signé sur la période : *{fmt_e(ca)}*",
         f"CA signé mois en cours : *{fmt_e(ca_mois(data, today))}* · total 2026 : *{fmt_e(ca_total(data))}*",
         f"Taux de closing : *{fmt_p(100 * len(ventes) / len(shows) if shows else None)}* des présents"

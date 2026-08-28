@@ -676,7 +676,7 @@ const bookedIn = (r) => DATA.calls.filter(c => inRange(c.b, r));
 const isSale = (c) => c.v === "OUI" || (c.vir && c.v !== "REMBOURSEMENT");
 function st(rows) {
   const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
-              pitched: 0, nonPitche: 0, ventes: 0, follow: 0, ca: 0, qSum: 0, qN: 0 };
+              pitched: 0, fuShows: 0, nonPitche: 0, ventes: 0, follow: 0, ca: 0, qSum: 0, qN: 0 };
   for (const c of rows) {
     if (c.s === "OUI") o.shows++;
     else if (c.s === "NON") o.noshow++;
@@ -684,8 +684,10 @@ function st(rows) {
     else if (c.s === "ANNULE") o.annule++;
     else o.suVide++;
     if (c.s === "OUI") {
+      /* buckets disjoints : présents = pitchés + follow-ups + non pitchés (+ sans statut) */
       if (c.v === "NON_PITCHE") o.nonPitche++;
-      else if (["OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
+      else if (c.v === "FOLLOW_UP") o.fuShows++;
+      else if (["OUI", "NON", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
       if (c.q != null) { o.qSum += c.q; o.qN++; }
     }
     /* vente comptée si validée par le closer (OUI) ou par Justine (virement) */
@@ -700,7 +702,8 @@ function st(rows) {
   o.tShowPasses = o.passes ? 100 * o.shows / o.passes : null;
   const dsh = o.shows + o.noshow;
   o.tShow = dsh ? 100 * o.shows / dsh : null;
-  o.tClosPitche = o.pitched ? 100 * o.ventes / o.pitched : null;
+  o.pitchedAll = o.pitched + o.fuShows; /* tous les calls pitchés, follow-ups compris */
+  o.tClosPitche = o.pitchedAll ? 100 * o.ventes / o.pitchedAll : null;
   o.tClosShow = o.shows ? 100 * o.ventes / o.shows : null;
   o.tClosBooke = o.calls ? 100 * o.ventes / o.calls : null;
   o.qMoy = o.qN ? o.qSum / o.qN : null;
@@ -773,7 +776,7 @@ function renderClosersTab() {
     kpiTile("Lignes non remplies", fmtN(o.suVide), "show-up vide : à corriger dans le Sheet"),
     kpiTile("Non pitchés", fmtN(o.nonPitche), "soit " + clPc(o.tNonPitche) + " des présents"),
     kpiTile("Ventes", fmtN(o.ventes), "closer OUI ou virement Justine"),
-    kpiTile("Closing / pitchés", clPc(o.tClosPitche), `${fmtN(o.pitched)} calls pitchés`),
+    kpiTile("Closing / pitchés", clPc(o.tClosPitche), `${fmtN(o.pitchedAll)} calls pitchés (dont ${fmtN(o.fuShows)} follow-ups)`),
     kpiTile("Closing / présents", clPc(o.tClosShow), `${fmtN(o.shows)} présents`),
     kpiTile("Closing / bookés", clPc(o.tClosBooke), `${fmtN(o.calls)} bookés`),
     kpiTile("CA total", fmtE(o.ca), "sur la période"),
@@ -1205,7 +1208,7 @@ function renderKpis(r, rows) {
     kpiTile("Calls bookés (résas prises)", fmtN(booked), "réservations créées sur la période", deltaTag(booked, pbooked)) +
     kpiTile("Présents", fmtN(s.shows), `show-up ${fmtP(s.tShowPasses, 0)} des calls renseignés`, deltaTag(s.shows, ps?.shows)) +
     kpiTile("No-show", fmtN(s.noshow), s.suVide ? `${fmtN(s.suVide)} call(s) pas encore renseigné(s)` : "tout est renseigné ✓", deltaTag(s.noshow, ps?.noshow, true)) +
-    kpiTile("Pitchés", fmtN(s.pitched), `${fmtN(s.nonPitche)} non pitché(s), soit ${fmtP(s.shows ? 100 * s.nonPitche / s.shows : null, 0)} des présents`, deltaTag(s.pitched, ps?.pitched)) +
+    kpiTile("Pitchés", fmtN(s.pitched), `+ ${fmtN(s.fuShows)} follow-up(s) + ${fmtN(s.nonPitche)} non pitché(s), sur ${fmtN(s.shows)} présents`, deltaTag(s.pitched, ps?.pitched)) +
     kpiTile("Ventes", fmtN(s.ventes), `closing ${fmtP(s.tClosPitche, 0)} / pitchés · ${fmtP(s.tClosShow, 0)} / présents · ${fmtP(s.tClosBooke, 0)} / prévus`, deltaTag(s.ventes, ps?.ventes)) +
     kpiTile("CA signé", fmtE(s.ca), `${fmtN(s.follow)} follow-up créés sur la période`, deltaTag(s.ca, ps?.ca)) +
     kpiTile("Qualité des leads", s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10", `${fmtN(s.qN)} lead(s) noté(s)`, deltaTag(s.qMoy, ps?.qMoy));
@@ -1227,7 +1230,7 @@ function renderClosers(rows) {
       <div class="name">${esc(x.name)}</div>
       <div class="row"><span>Calls prévus</span><b>${fmtN(s.calls)}</b></div>
       <div class="row"><span>Présents (show-up)</span><b>${fmtN(s.shows)} (${fmtP(s.tShowPasses, 0)})</b></div>
-      <div class="row"><span>Ventes</span><b>${fmtN(s.ventes)}${s.pitched ? " · " + fmtP(s.tClosPitche, 0) + " des pitchés" : ""}</b></div>
+      <div class="row"><span>Ventes</span><b>${fmtN(s.ventes)}${s.pitchedAll ? " · " + fmtP(s.tClosPitche, 0) + " des pitchés" : ""}</b></div>
       <div class="row"><span>CA signé</span><b>${fmtE(s.ca)}</b></div>
       <div class="row"><span>Qualif moyenne</span><b>${s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10"}</b></div>
       ${s.suVide ? `<div class="row"><span class="late">À renseigner</span><b class="late">${fmtN(s.suVide)} call(s)</b></div>` : ""}
@@ -1820,7 +1823,7 @@ function buildBrief() {
   lines.push(`Calls passés et renseignés : ${s.passes} · non renseignés ou à venir : ${s.calls - s.passes}`);
   lines.push(`Présents : ${s.shows} sur les ${s.passes} calls renseignés, soit *${fmtP(s.tShowPasses, 0)}* de show-up`);
   lines.push(`No-show : ${s.noshow} · reprogrammés/annulés : ${s.reprog + s.annule}`);
-  lines.push(`Pitchés : ${s.pitched} · non pitchés : ${s.nonPitche}`);
+  lines.push(`Sur les présents : ${s.pitched} pitché(s) + ${s.fuShows} follow-up(s) + ${s.nonPitche} non pitché(s)`);
   lines.push("");
   lines.push(`Ventes : ${s.ventes} · CA signé sur la période : *${fmtE(s.ca)}*`);
   const tmNow = TODAY_ISO.slice(0, 7);

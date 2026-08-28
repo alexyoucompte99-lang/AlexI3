@@ -104,9 +104,10 @@ def stats(calls, rows):
     s["shows"] = [c for c in rows if c["show_up"] == "OUI"]
     s["noshow"] = [c for c in rows if c["show_up"] == "NON"]
     s["reprog"] = [c for c in rows if c["show_up"] in ("REPROGRAMMER", "ANNULE")]
-    s["pitched"] = [c for c in s["shows"] if c["vente"] in ("OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT")]
-    s["nonpitch"] = [c for c in s["shows"] if c["vente"] == "NON_PITCHE"]
+    # buckets disjoints : présents = pitchés + follow-ups + non pitchés (+ sans statut)
+    s["pitched"] = [c for c in s["shows"] if c["vente"] in ("OUI", "NON", "REMBOURSEMENT")]
     s["fu"] = [c for c in s["shows"] if c["vente"] == "FOLLOW_UP"]
+    s["nonpitch"] = [c for c in s["shows"] if c["vente"] == "NON_PITCHE"]
     s["ventes"] = [c for c in rows if is_sale(c)]
     s["ca"] = sum(sale_amount(c) for c in s["ventes"])
     notes = [c["qualif"] for c in s["shows"] if c.get("qualif") is not None]
@@ -129,61 +130,86 @@ def ventes_detail(ventes):
 
 
 # ---------- blocs ----------
-def day_block(calls, ads, day, title):
+def pitch_line(s, qual):
+    """Décomposition des présents en buckets disjoints + qualif."""
+    seg = (f"Sur les présents : {len(s['pitched'])} pitché(s)"
+           f" + {len(s['fu'])} follow-up(s) + {len(s['nonpitch'])} non pitché(s)")
+    autres = len(s["shows"]) - len(s["pitched"]) - len(s["fu"]) - len(s["nonpitch"])
+    if autres:
+        seg += f" + {autres} sans statut"
+    return seg + (" · " + qual if qual else "")
+
+
+def day_block(calls, ads, day, title, with_ads=True, pending_is_noshow=True):
     rows = [c for c in calls if c.get("date") == day.isoformat()]
     s = stats(calls, rows)
-    spend, exact = spend_day(ads, day)
-    booked = booked_between(calls, day, day)
     lines = [f"🗓 {b(title + ' ' + dlabel(day))}"]
     if not rows:
         lines.append("Aucun call prévu")
     else:
+        # non renseignés (jour passé) = no-show, règle Alex 28/08
+        ns = len(s["noshow"]) + (len(s["pending"]) if pending_is_noshow else 0)
+        den = len(s["shows"]) + ns
         segs = [f"Calls prévus {s['n']}", f"présents {len(s['shows'])}"]
-        if s["shows"] or s["noshow"]:
-            segs.append(f"show-up {bpct(len(s['shows']), len(s['shows']) + len(s['noshow']))}")
-        l1 = " · ".join(segs)
-        extra = []
-        if s["noshow"]:
-            extra.append(f"no-show {len(s['noshow'])}")
+        if den:
+            segs.append(f"show-up {bpct(len(s['shows']), den)}")
+        if ns and pending_is_noshow:
+            segs.append(f"no-show {ns}" + (f" (dont {len(s['pending'])} à renseigner)" if s["pending"] else ""))
+        elif s["noshow"]:
+            segs.append(f"no-show {len(s['noshow'])}")
+        if s["pending"] and not pending_is_noshow:
+            segs.append(f"à renseigner {len(s['pending'])}")
         if s["reprog"]:
-            extra.append(f"reprog./annulés {len(s['reprog'])}")
-        if s["pending"]:
-            extra.append(f"à renseigner {len(s['pending'])}")
-        if extra:
-            l1 += " · " + " · ".join(extra)
-        lines.append(l1)
+            segs.append(f"reprog./annulés {len(s['reprog'])}")
+        lines.append(" · ".join(segs))
         if s["shows"]:
             q = (f"qualifiés (7+) {s['qualifies']} sur {len(s['notes'])} notés" if s["notes"]
                  else "qualif : pas de note")
-            lines.append(f"Pitchés {len(s['pitched'])} · follow-ups {len(s['fu'])} · non pitchés {len(s['nonpitch'])} · {q}")
+            lines.append(pitch_line(s, q))
         if s["ventes"]:
             lines.append(f"✅ Ventes {len(s['ventes'])} · CA {b(e(s['ca']))} : {ventes_detail(s['ventes'])}")
         else:
-            lines.append("Ventes 0 · CA 0 €")
-    ads_line = f"Ads {'' if exact else '≈ '}{e(spend)} · {booked} call{'s' if booked > 1 else ''} booké{'s' if booked > 1 else ''}"
-    if booked:
-        ads_line += f" · {e(spend / booked)} par call booké"
-    lines.append(ads_line)
+            lines.append("Ventes 0")
+    if with_ads:
+        spend, exact = spend_day(ads, day)
+        booked = booked_between(calls, day, day)
+        ads_line = f"Ads {'' if exact else '≈ '}{e(spend)} · {booked} call{'s' if booked > 1 else ''} booké{'s' if booked > 1 else ''}"
+        if booked:
+            ads_line += f" · {e(spend / booked)} par call booké"
+        lines.append(ads_line)
     return "\n".join(lines)
 
 
-def period_block(calls, ads, first, last, title):
+def period_block(calls, ads, first, last, title, today=None):
     rows = [c for c in calls if c.get("date") and first.isoformat() <= c["date"] <= last.isoformat()]
     s = stats(calls, rows)
     spend = spend_between(ads, first, last)
     booked = booked_between(calls, first, last)
+    # non renseignés des jours passés = no-show ; ceux d'aujourd'hui restent à part
+    today_iso = (today or last).isoformat()
+    pend_past = [c for c in s["pending"] if c["date"] < today_iso]
+    pend_today = len(s["pending"]) - len(pend_past)
+    ns = len(s["noshow"]) + len(pend_past)
     lines = [f"📈 {b(title)} ({first:%d/%m} → {last:%d/%m})"]
-    l1 = (f"Calls {len(s['filled'])} renseignés"
-          + (f" (+{len(s['pending'])} à renseigner)" if s["pending"] else "")
-          + f" · présents {len(s['shows'])} · show-up {bpct(len(s['shows']), len(s['shows']) + len(s['noshow']))}"
-          + f" · pitchés {len(s['pitched'])} · follow-ups {len(s['fu'])}")
+    l1 = (f"Calls prévus {s['n']} · présents {len(s['shows'])}"
+          f" · show-up {bpct(len(s['shows']), len(s['shows']) + ns)}"
+          + (f" · no-show {ns}" + (f" (dont {len(pend_past)} à renseigner)" if pend_past else "") if ns else "")
+          + (f" · {pend_today} aujourd'hui à renseigner" if pend_today else ""))
     lines.append(l1)
-    qmoy = (" · qualif moy. " + f"{sum(s['notes']) / len(s['notes']):.1f}".replace(".", ",") + "/10"
+    qmoy = ("qualif moy. " + f"{sum(s['notes']) / len(s['notes']):.1f}".replace(".", ",") + "/10"
             if s["notes"] else "")
-    lines.append(f"Ventes {len(s['ventes'])} · CA {b(e(s['ca']))} · closing {pct(len(s['ventes']), len(s['shows']))} des présents"
-                 f" · CA/présent {ratio(s['ca'], len(s['shows']))}{qmoy}")
-    lines.append(f"Ads {e(spend)} · {booked} bookés · {ratio(spend, booked)}/booké · {ratio(spend, len(s['shows']))}/présent"
-                 f" · {cost_client(spend, s['ventes'])} · ROAS {b(roas(s['ca'], spend))}")
+    if s["shows"]:
+        lines.append(pitch_line(s, qmoy))
+    if s["ventes"]:
+        lines.append(f"✅ Ventes {len(s['ventes'])} · CA {b(e(s['ca']))} · closing {pct(len(s['ventes']), len(s['shows']))} des présents"
+                     f" · CA/présent {ratio(s['ca'], len(s['shows']))}")
+    else:
+        lines.append("Ventes 0")
+    ads_line = (f"Ads {e(spend)} · {booked} bookés · {ratio(spend, booked)}/booké"
+                f" · {ratio(spend, len(s['shows']))}/présent")
+    if s["ventes"]:
+        ads_line += f" · {cost_client(spend, s['ventes'])} · ROAS {b(roas(s['ca'], spend))}"
+    lines.append(ads_line)
     return "\n".join(lines)
 
 
@@ -196,12 +222,18 @@ def month_block(calls, ads, today):
     total_2026 = sum(sale_amount(c) for c in calls if c["year"] == today.year and is_sale(c))
     spend = spend_between(ads, first, today)
     booked = booked_between(calls, first, today)
+    panier = f" · panier moyen {ratio(s['ca'], len(s['ventes']))}" if s["ventes"] else ""
     lines = [f"💰 {b(MOIS[today.month - 1].upper() + ' (mois en cours)')}"]
-    lines.append(f"CA signé {b(e(s['ca']))} · {len(s['ventes'])} ventes · total {today.year} : {e(total_2026)}")
-    lines.append(f"Calls présents {len(s['shows'])} · show-up {pct(len(s['shows']), len(s['shows']) + len(s['noshow']))}"
-                 f" · closing {pct(len(s['ventes']), len(s['shows']))} des présents · CA/présent {ratio(s['ca'], len(s['shows']))}")
-    lines.append(f"Ads {e(spend)} · {booked} bookés · {ratio(spend, booked)}/booké"
-                 f" · {cost_client(spend, s['ventes'])} · ROAS {b(roas(s['ca'], spend))}")
+    lines.append(f"CA signé {b(e(s['ca']))} · {len(s['ventes'])} ventes{panier} · total {today.year} : {e(total_2026)}")
+    lines.append(f"Calls bookés {booked} · présents {len(s['shows'])}"
+                 f" · show-up {pct(len(s['shows']), len(s['shows']) + len(s['noshow']))}"
+                 f" · closing {pct(len(s['ventes']), len(s['shows']))} des présents")
+    lines.append(f"CA/booké {ratio(s['ca'], booked)} · CA/présent {ratio(s['ca'], len(s['shows']))}")
+    ads_line = (f"Ads {e(spend)} · {ratio(spend, booked)}/booké · {ratio(spend, len(s['shows']))}/présent"
+                f" · {cost_client(spend, s['ventes'])}")
+    if s["ventes"]:
+        ads_line += f" · ROAS {b(roas(s['ca'], spend))}"
+    lines.append(ads_line)
     return "\n".join(lines)
 
 
@@ -221,16 +253,18 @@ def build_bilan(data, ads, today, now=None, data_time=None):
     head = f"📊 {b('BILAN CLOSING · ' + dlabel(today))} · {now:%H:%M}"
     if today == now.date() and now.hour < 20:
         head += " (journée en cours)"
+    head += f"\n🔄 Données à jour du {(data_time or now):%d/%m à %H:%M} (classeur closing + Meta Ads)"
     blocks = [head,
-              day_block(calls, ads, today, "AUJOURD'HUI"),
+              month_block(calls, ads, today),
+              # aujourd'hui : pas d'ads ni de bookés (la data du jour remonte trop tard),
+              # et les calls pas encore renseignés ne comptent pas no-show
+              day_block(calls, ads, today, "AUJOURD'HUI", with_ads=False, pending_is_noshow=False),
               day_block(calls, ads, today - dt.timedelta(days=1), "HIER"),
               day_block(calls, ads, today - dt.timedelta(days=2), "AVANT-HIER"),
-              period_block(calls, ads, today - dt.timedelta(days=2), today, "3 DERNIERS JOURS"),
-              period_block(calls, ads, today - dt.timedelta(days=6), today, "7 DERNIERS JOURS"),
-              month_block(calls, ads, today),
+              period_block(calls, ads, today - dt.timedelta(days=2), today, "3 DERNIERS JOURS", today),
+              period_block(calls, ads, today - dt.timedelta(days=6), today, "7 DERNIERS JOURS", today),
               upcoming_block(calls, today)]
-    foot = f"Données rafraîchies le {(data_time or now):%d/%m à %H:%M} (classeur closing + Meta Ads)"
-    foot += "\nRéponds 3, 7, 30... pour une période, ou « bilan » pour ce récap"
+    foot = "Réponds 3, 7, 30... pour une période, ou « bilan » pour ce récap"
     blocks.append(foot)
     # découpe en messages < 4096 caractères, aux frontières de blocs
     msgs, cur = [], ""
