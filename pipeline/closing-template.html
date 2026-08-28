@@ -105,22 +105,28 @@
   .fpill.toggle[aria-pressed="true"]::before { content: "✓ "; }
 
   /* ---- onglet À remplir : saisie pensée pour le téléphone ---- */
-  .fill-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; }
-  .fill-card { background: var(--card, #fff); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-  .fill-card .who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-  .fill-card .who b { font-size: 16px; }
+  .fill-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr)); gap: 14px; align-items: start; }
+  .fill-card { background: var(--card, #fff); border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 11px; box-shadow: 0 1px 3px rgba(60, 46, 25, .05); }
+  .fill-card .who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 9px; }
+  .fill-card .who b { font-size: 16.5px; }
   .fill-card .who span { color: var(--muted); font-size: 12.5px; }
-  .fill-card .flabel { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: -4px; }
-  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
-  .seg button { flex: 1 1 calc(25% - 6px); min-width: 72px; min-height: 42px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; padding: 6px 8px; }
+  .fill-card .flabel { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .seg button { min-height: 42px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; padding: 5px 4px; line-height: 1.15; }
   .seg button[aria-pressed="true"] { background: var(--pill-bg); color: var(--pill-ink); border-color: var(--pill-bg); font-weight: 700; }
-  .seg.qn button { flex: 1 1 calc(10% - 6px); min-width: 38px; }
-  .fill-card textarea, .fill-card input[type=number], .fill-card input[type=text] { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px; font: inherit; font-size: 14px; background: transparent; color: var(--ink); }
-  .fill-card textarea { min-height: 74px; resize: vertical; }
-  .fill-card .send { min-height: 46px; font-size: 15px; }
+  .seg.qn { grid-template-columns: repeat(5, 1fr); }
+  .seg.qn button { min-height: 38px; }
+  .seg.two { grid-template-columns: repeat(2, 1fr); }
+  .seg.three { grid-template-columns: repeat(3, 1fr); }
+  .fill-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fill-card textarea, .fill-card input[type=number], .fill-card input[type=text], .fill-card input[type=url], .fill-card input[type=date] { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px; font: inherit; font-size: 14px; background: transparent; color: var(--ink); }
+  .fill-card textarea { min-height: 66px; resize: vertical; }
+  .fill-old { background: var(--plane, #f6efe3); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; color: var(--ink-2, #5d5344); white-space: pre-wrap; max-height: 110px; overflow-y: auto; }
+  .fill-old b { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 2px; }
+  .fill-card .send { min-height: 47px; font-size: 15px; margin-top: 2px; }
   .fill-card.sent { opacity: .72; }
   .fill-card .okline { color: #2c7a3f; font-weight: 600; font-size: 13.5px; }
-  @media (max-width: 480px) { .seg button { font-size: 14.5px; min-height: 46px; } .seg.qn button { min-height: 42px; } }
+  @media (max-width: 520px) { .seg { grid-template-columns: repeat(2, 1fr); } .seg.qn { grid-template-columns: repeat(5, 1fr); } .seg button { font-size: 14px; min-height: 46px; } .seg.qn button { min-height: 42px; } }
   .fsep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
   .fcustom { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
   .fcustom input {
@@ -420,8 +426,9 @@
     <section style="margin-top:16px">
       <span class="eyebrow">Après le call</span>
       <h2>À remplir</h2>
-      <p class="lede">Tes derniers calls pas encore renseignés. Choisis ton prénom, remplis show-up, résultat, note du lead et ton recap :
-        c'est écrit directement dans le Sheet de tracking. Tu peux aussi remplir le Sheet comme d'habitude, la console se met à jour toute seule.</p>
+      <p class="lede">Tes derniers calls pas encore renseignés, avec toutes les infos du tracking : show-up, résultat, note /10, +250k cash,
+        vidéo préchauffe, prix, mensualités, enregistrement, recap. Ce qui est déjà dans le Sheet est pré-rempli : tu complètes juste ce qui manque,
+        et seul ce qui change est envoyé. Tu peux aussi remplir le Sheet comme d'habitude, la console se met à jour toute seule.</p>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:6px"><span class="eyebrow" style="min-width:62px">Closer</span><span id="fillCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="fillFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       <div id="fillList" class="fill-list"></div>
@@ -1701,20 +1708,28 @@ const fillKey = (c) => "fill:" + c.st + "|" + c.sr;
 let fillCloser = localStorage.getItem("fill-closer") || "";
 let fillFilter = "todo";
 (function applyFillOverlays() {
+  /* overlay optimiste en attendant que le Sheet redescende (MAJ ~15 min).
+     Purgé dès que le Sheet reflète l'état envoyé (show-up + résultat), ou après 3 jours. */
   for (const c of DATA.calls) {
     if (!c.st || !c.sr) continue;
     const raw = localStorage.getItem(fillKey(c));
     if (!raw) continue;
-    if (c.s) { localStorage.removeItem(fillKey(c)); continue; } /* le Sheet a pris le relais */
     try {
       const o = JSON.parse(raw);
-      c.s = o.s || c.s; c.v = o.v || c.v;
-      if (o.q != null) c.q = o.q;
-      if (o.pp) c.pp = o.pp;
-      if (o.p) { c.p = o.p; }
-      if (o.com) c.com = c.com ? c.com + "\n" + o.com : o.com;
-      if (o.obj) c.obj = c.obj || o.obj;
-      if (o.rel) c.rel = c.rel || o.rel;
+      const f = o.f || o; /* compat ancien format */
+      const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v) && (f.q == null || c.q === f.q);
+      if (caughtUp || Date.now() - (o.when || 0) > 3 * 86400e3) { localStorage.removeItem(fillKey(c)); continue; }
+      if (f.s) c.s = f.s;
+      if (f.v) c.v = f.v;
+      if (f.q != null) c.q = f.q;
+      if (f.pp) c.pp = f.pp;
+      if (f.mens) c.mens = f.mens;
+      if (f.c250) c.c250 = f.c250;
+      if (f.vid) c.vid = f.vid;
+      if (f.rec) c.rec = f.rec;
+      if (f.rel) c.rel = f.rel;
+      if (f.com && (c.com || "").indexOf(f.com) === -1) c.com = c.com ? c.com + "\n" + f.com : f.com;
+      if (f.obj) c.obj = c.obj || f.obj;
       c._fillSent = o.when || 1;
     } catch (e) { localStorage.removeItem(fillKey(c)); }
   }
@@ -1749,15 +1764,19 @@ function renderFill() {
   for (const c of list.slice(0, CAP)) mount.appendChild(fillCard(c));
 }
 function fillCard(c) {
+  /* tous les champs du tracking Sheet, PRÉ-REMPLIS avec ce qui est déjà dedans ;
+     à l'envoi, seuls les champs modifiés/ajoutés partent (le reste ne bouge pas) */
   const card = document.createElement("div");
   card.className = "fill-card" + (c._fillSent ? " sent" : "");
   const quand = frDateFull(c.d) + (c.hh ? " à " + c.hh : "");
-  const state = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", com: "", obj: "", rel: "" };
-  const seg = (label, opts, cur, onPick) => {
+  const orig = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", mens: c.mens || "",
+                 c250: c.c250 || "", vid: c.vid || "", rec: c.rec || "", rel: c.rel || "" };
+  const state = Object.assign({}, orig, { com: "", obj: "" });
+  const seg = (label, opts, cur, onPick, cls) => {
     const wrap = document.createElement("div");
     wrap.innerHTML = `<div class="flabel">${label}</div>`;
     const s = document.createElement("div");
-    s.className = "seg" + (opts.length > 6 ? " qn" : "");
+    s.className = "seg" + (cls ? " " + cls : "");
     for (const [k, lbl] of opts) {
       const b = document.createElement("button");
       b.type = "button"; b.textContent = lbl;
@@ -1768,6 +1787,15 @@ function fillCard(c) {
     wrap.appendChild(s);
     return wrap;
   };
+  const labeledInput = (label, type, val, ph, onInput) => {
+    const w = document.createElement("div");
+    w.innerHTML = `<div class="flabel">${label}</div>`;
+    const i = document.createElement("input");
+    i.type = type; i.value = val || ""; i.placeholder = ph || "";
+    i.addEventListener("input", () => onInput(i.value));
+    w.appendChild(i);
+    return w;
+  };
   const redraw = () => {
     card.innerHTML = "";
     const who = document.createElement("div");
@@ -1777,93 +1805,106 @@ function fillCard(c) {
     if (c._fillSent) {
       const ok = document.createElement("div");
       ok.className = "okline";
-      ok.textContent = `✓ Envoyé au Sheet : ${FILL_SU[c.s] || c.s}${c.v ? " · " + (FILL_V[c.v] || c.v) : ""}${c.q != null ? " · " + c.q + "/10" : ""}`;
+      ok.textContent = `✓ Envoyé au Sheet : ${FILL_SU[c.s] || c.s}${c.v ? " · " + (FILL_V[c.v] || c.v) : ""}${c.q != null ? " · " + c.q + "/10" : ""}${c.pp ? " · " + c.pp + " €" : ""}`;
       card.appendChild(ok);
       return;
     }
     card.appendChild(seg("Show-up", Object.entries(FILL_SU), state.s, k => state.s = k));
-    if (state.s === "OUI") {
-      card.appendChild(seg("Résultat du call", Object.entries(FILL_V), state.v, k => state.v = k));
-      if (state.v === "OUI") {
-        const p = document.createElement("input");
-        p.type = "number"; p.placeholder = "Prix proposé (€)"; p.value = state.pp || "";
-        p.addEventListener("input", () => state.pp = p.value);
-        card.appendChild(p);
-      }
-      if (state.v === "FOLLOW_UP") {
-        const rl = document.createElement("div");
-        rl.innerHTML = `<div class="flabel">Relance prévue le</div>`;
-        const rd = document.createElement("input");
-        rd.type = "date"; rd.value = state.rel || "";
-        rd.addEventListener("input", () => state.rel = rd.value);
-        rl.appendChild(rd);
-        card.appendChild(rl);
-      }
-      card.appendChild(seg("Lead qualifié ? /10", Array.from({ length: 10 }, (_, i) => [i + 1, String(i + 1)]), state.q, k => state.q = +k));
+    /* un résultat rempli implique que le lead était présent (règle Alex) */
+    card.appendChild(seg("Résultat du call", Object.entries(FILL_V), state.v,
+      k => { state.v = k; if (!state.s) state.s = "OUI"; }));
+    card.appendChild(seg("Lead qualifié ? /10",
+      Array.from({ length: 10 }, (_, i) => [i + 1, String(i + 1)]), state.q, k => state.q = +k, "qn"));
+    card.appendChild(seg("+250k cash à placer ?", [["OUI", "Oui"], ["NON", "Non"]], state.c250, k => state.c250 = k, "two"));
+    card.appendChild(seg("A vu la vidéo préchauffe ?", [["OUI", "Oui"], ["NON", "Non"], ["PAS", "Pas regardé"]], state.vid, k => state.vid = k, "three"));
+    const duo2 = document.createElement("div");
+    duo2.className = "fill-duo";
+    duo2.appendChild(labeledInput("Prix proposé (€)", "number", state.pp, "ex : 5000", v => state.pp = v));
+    duo2.appendChild(labeledInput("Mensualités", "text", state.mens, "ex : 3x 1800", v => state.mens = v));
+    card.appendChild(duo2);
+    card.appendChild(labeledInput("Enregistrement de l'appel (lien)", "url", state.rec, "https://...", v => state.rec = v));
+    if (state.v === "FOLLOW_UP") {
+      card.appendChild(labeledInput("Relance prévue le", "date", state.rel, "", v => state.rel = v));
+    }
+    if (c.com) {
+      const old = document.createElement("div");
+      old.className = "fill-old";
+      old.innerHTML = `<b>Recap déjà dans le Sheet</b>`;
+      old.appendChild(document.createTextNode(c.com));
+      card.appendChild(old);
     }
     const ta = document.createElement("textarea");
-    ta.placeholder = "Recap du call (contexte, prochaine étape...)";
+    ta.placeholder = c.com ? "Ajouter au recap (ça s'ajoute à la suite, rien n'est écrasé)" : "Recap du call (contexte, prochaine étape...)";
     ta.value = state.com;
     ta.addEventListener("input", () => state.com = ta.value);
     card.appendChild(ta);
-    if (state.s === "OUI") {
+    if (c.obj) {
+      const oldO = document.createElement("div");
+      oldO.className = "fill-old";
+      oldO.innerHTML = `<b>Objection déjà notée</b>`;
+      oldO.appendChild(document.createTextNode(c.obj));
+      card.appendChild(oldO);
+    } else {
       const ob = document.createElement("input");
       ob.type = "text"; ob.placeholder = "Objection / peur principale (optionnel)"; ob.value = state.obj || "";
       ob.addEventListener("input", () => state.obj = ob.value);
       card.appendChild(ob);
     }
-    if (c.com) {
-      const old = document.createElement("div");
-      old.className = "flabel";
-      old.style.cssText = "text-transform:none;letter-spacing:0";
-      old.textContent = "Déjà dans le Sheet : " + c.com.slice(0, 160);
-      card.appendChild(old);
-    }
     const send = document.createElement("button");
     send.type = "button"; send.className = "btn send";
-    send.textContent = "Envoyer dans le Sheet";
-    send.addEventListener("click", () => fillSend(c, state, send));
+    send.textContent = (orig.s || orig.v) ? "Mettre à jour le Sheet" : "Envoyer dans le Sheet";
+    send.addEventListener("click", () => fillSend(c, orig, state, send));
     card.appendChild(send);
   };
   redraw();
   return card;
 }
-async function fillSend(c, state, btn) {
-  if (!state.s) { toast("Choisis d'abord le show-up"); return; }
-  if (state.s === "OUI" && !state.v) { toast("Choisis le résultat du call"); return; }
-  if (btn.dataset.busy) return;
-  btn.dataset.busy = "1"; btn.textContent = "Envoi...";
-  const fields = { show_up: FILL_SU_SHEET[state.s] };
-  if (state.s === "OUI") {
-    fields.vente = FILL_V_SHEET[state.v];
-    if (state.q != null) fields.qualif = state.q;
-    if (state.v === "OUI" && state.pp) fields.prix = +state.pp;
-    if (state.v === "FOLLOW_UP" && state.rel) {
-      const [y, m, d] = state.rel.split("-");
-      fields.relance = `${d}/${m}/${y}`;
-    }
-    if (state.obj.trim()) fields.objection = state.obj.trim();
+async function fillSend(c, orig, state, btn) {
+  /* n'envoie QUE ce qui a changé ou été ajouté : ce qui est déjà dans le Sheet ne bouge pas */
+  const fields = {};
+  if (state.s && state.s !== orig.s) fields.show_up = FILL_SU_SHEET[state.s];
+  if (state.v && state.v !== orig.v) fields.vente = FILL_V_SHEET[state.v];
+  if (state.q != null && state.q !== orig.q) fields.qualif = state.q;
+  if (state.pp && +state.pp !== +(orig.pp || 0)) fields.prix = +state.pp;
+  if (String(state.mens).trim() && String(state.mens).trim() !== orig.mens) fields.mensualites = String(state.mens).trim();
+  /* case à cocher dans le Sheet -> booléen ; vidéo -> texte comme dans le Sheet */
+  if (state.c250 && state.c250 !== orig.c250) fields.cash250 = state.c250 === "OUI";
+  if (state.vid && state.vid !== orig.vid) fields.video = { OUI: "Oui", NON: "Non", PAS: "Pas regardé" }[state.vid];
+  if (state.rec.trim() && state.rec.trim() !== orig.rec) fields.recording = state.rec.trim();
+  if (state.rel && state.rel !== orig.rel) {
+    const [y, m, d] = state.rel.split("-");
+    fields.relance = `${d}/${m}/${y}`;
   }
   if (state.com.trim()) fields.commentaire = state.com.trim();
+  if (state.obj.trim() && !c.obj) fields.objection = state.obj.trim();
+  if (!state.s && !state.v) { toast("Renseigne au moins le show-up (ou le résultat)"); return; }
+  if (!Object.keys(fields).length) { toast("Rien de nouveau à envoyer : tout est déjà dans le Sheet ✓"); return; }
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = "1"; btn.textContent = "Envoi...";
   const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
     headerRow: (DATA.hrows || {})[c.st] || 1, fields });
   delete btn.dataset.busy;
   if (!ok) {
-    btn.textContent = "Envoyer dans le Sheet";
-    toast("❌ Pas pu écrire dans le Sheet. Réessaie ; si ça persiste, dis-le à Alex (pont à mettre à jour).");
+    btn.textContent = "Réessayer l'envoi";
+    toast("❌ Pas pu écrire dans le Sheet. Réessaie ; si ça persiste, dis-le à Alex.");
     return;
   }
   /* MAJ optimiste locale, purgée dès que le Sheet renvoie la vraie valeur */
-  c.s = state.s;
-  if (state.s === "OUI") {
-    c.v = state.v; c.q = state.q;
-    if (state.v === "OUI" && state.pp) { c.pp = +state.pp; c.p = +state.pp; }
-  }
-  if (state.com.trim()) c.com = c.com ? c.com + "\n" + state.com.trim() : state.com.trim();
-  if (state.s === "OUI" && state.obj.trim()) c.obj = c.obj || state.obj.trim();
-  if (state.v === "FOLLOW_UP" && state.rel) c.rel = state.rel;
+  if (state.s) c.s = state.s;
+  if (state.v) c.v = state.v;
+  if (state.q != null) c.q = state.q;
+  if (fields.prix) { c.pp = +state.pp; if (c.v === "OUI") c.p = +state.pp; }
+  if (fields.mensualites) c.mens = String(state.mens).trim();
+  if (fields.cash250) c.c250 = state.c250;
+  if (fields.video) c.vid = state.vid;
+  if (fields.recording) c.rec = state.rec.trim();
+  if (fields.relance) c.rel = state.rel;
+  if (fields.commentaire) c.com = c.com ? c.com + "\n" + state.com.trim() : state.com.trim();
+  if (fields.objection) c.obj = state.obj.trim();
   c._fillSent = Date.now();
-  localStorage.setItem(fillKey(c), JSON.stringify({ s: c.s, v: c.v, q: c.q, pp: c.pp, p: c.p, com: state.com.trim(), obj: state.obj.trim(), rel: state.rel, when: c._fillSent }));
+  localStorage.setItem(fillKey(c), JSON.stringify({ when: c._fillSent,
+    f: { s: c.s, v: c.v, q: c.q, pp: c.pp, mens: c.mens, c250: c.c250, vid: c.vid, rec: c.rec,
+         rel: c.rel, com: state.com.trim(), obj: state.obj.trim() } }));
   toast("✅ C'est dans le Sheet, tié un tigre 🐯");
   renderFill();
 }

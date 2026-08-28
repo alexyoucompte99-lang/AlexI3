@@ -220,6 +220,17 @@ def main(data_path, out_path, updated_at):
             "vir": bool(c.get("virement")),
             "com": (c.get("commentaire") or "").strip(),
             "obj": (c.get("objection") or "").strip(),
+            "mens": (c.get("mensualites") or "").strip(),
+            # case à cocher dans le Sheet : TRUE/FALSE -> OUI/NON
+            "c250": {"TRUE": "OUI", "OUI": "OUI", "VRAI": "OUI",
+                     "FALSE": "NON", "NON": "NON", "FAUX": "NON"}.get(
+                         (c.get("cash250") or "").strip().upper(), ""),
+            # texte libre : Oui / Non / Pas regardé
+            "vid": ("OUI" if (c.get("video") or "").strip().upper().startswith("OUI")
+                    else "NON" if (c.get("video") or "").strip().upper().startswith("NON")
+                    else "PAS" if (c.get("video") or "").strip().upper().startswith("PAS")
+                    else ""),
+            "rec": (c.get("recording") or "").strip(),
             "rel": c.get("relance"),
             "r2": c.get("r2"),
             "relEst": relance_estimee(c.get("commentaire"), c.get("date")),

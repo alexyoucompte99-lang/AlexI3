@@ -105,6 +105,9 @@ COL_MAP = {
     "telephone": "phone",
     "mail": "mail",
     "commentaires closing": "commentaire",
+    "prospect 250k": "cash250",           # « Prospect +250k cash à placer » (le + saute au norm)
+    "prospect a vu video": "video",       # « Prospect à vu vidéo préchauffe ? »
+    "enregistrement appel": "recording",
     "objection/peur principale": "objection",
     "date de relance a faire": "relance",
     "date r2": "r2",
@@ -205,6 +208,10 @@ def main(xlsx_path, out_path):
                     continue
                 show_up = norm_show_up(cell_str(g("show_up")))
                 vente = norm_vente(cell_str(g("vente")))
+                # règle Alex 28/08 : un résultat rempli (vente, follow-up, non pitché...)
+                # implique que le lead était présent, même si SHOW UP est resté vide
+                if not show_up and vente in ("OUI", "NON", "FOLLOW_UP", "NON_PITCHE", "REMBOURSEMENT"):
+                    show_up = "OUI"
                 booking = parse_date(g("booking_date"))
                 relance = parse_date(g("relance"))
                 r2 = parse_date(g("r2"))
@@ -227,6 +234,10 @@ def main(xlsx_path, out_path):
                     "mail": cell_str(g("mail"))[:80],
                     "commentaire": cell_str(g("commentaire"))[:600],
                     "objection": cell_str(g("objection"))[:300],
+                    "mensualites": cell_str(g("mensualites"))[:40],
+                    "cash250": cell_str(g("cash250"))[:20],
+                    "video": cell_str(g("video"))[:20],
+                    "recording": cell_str(g("recording"))[:200],
                     "relance": f"{relance[0]:04d}-{relance[1]:02d}-{relance[2]:02d}" if relance else None,
                     "r2": f"{r2[0]:04d}-{r2[1]:02d}-{r2[2]:02d}" if r2 else None,
                     "relance_faite": cell_str(g("relance_faite"))[:30],
