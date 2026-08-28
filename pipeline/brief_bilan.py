@@ -130,14 +130,14 @@ def ventes_detail(ventes):
 
 
 # ---------- blocs ----------
-def pitch_line(s, qual):
-    """Décomposition des présents en buckets disjoints + qualif."""
+def pitch_line(s):
+    """Décomposition des présents en buckets disjoints."""
     seg = (f"Sur les présents : {len(s['pitched'])} pitché(s)"
            f" + {len(s['fu'])} follow-up(s) + {len(s['nonpitch'])} non pitché(s)")
     autres = len(s["shows"]) - len(s["pitched"]) - len(s["fu"]) - len(s["nonpitch"])
     if autres:
         seg += f" + {autres} sans statut"
-    return seg + (" · " + qual if qual else "")
+    return seg
 
 
 def day_block(calls, ads, day, title, with_ads=True, pending_is_noshow=True):
@@ -163,9 +163,9 @@ def day_block(calls, ads, day, title, with_ads=True, pending_is_noshow=True):
             segs.append(f"reprog./annulés {len(s['reprog'])}")
         lines.append(" · ".join(segs))
         if s["shows"]:
-            q = (f"qualifiés (7+) {s['qualifies']} sur {len(s['notes'])} notés" if s["notes"]
-                 else "qualif : pas de note")
-            lines.append(pitch_line(s, q))
+            lines.append(pitch_line(s))
+            lines.append(f"Qualifiés (7+) : {s['qualifies']} sur {len(s['notes'])} notés" if s["notes"]
+                         else "Qualif : pas de note")
         if s["ventes"]:
             lines.append(f"✅ Ventes {len(s['ventes'])} · CA {b(e(s['ca']))} : {ventes_detail(s['ventes'])}")
         else:
@@ -191,25 +191,30 @@ def period_block(calls, ads, first, last, title, today=None):
     pend_today = len(s["pending"]) - len(pend_past)
     ns = len(s["noshow"]) + len(pend_past)
     lines = [f"📈 {b(title)} ({first:%d/%m} → {last:%d/%m})"]
-    l1 = (f"Calls prévus {s['n']} · présents {len(s['shows'])}"
-          f" · show-up {bpct(len(s['shows']), len(s['shows']) + ns)}"
-          + (f" · no-show {ns}" + (f" (dont {len(pend_past)} à renseigner)" if pend_past else "") if ns else "")
-          + (f" · {pend_today} aujourd'hui à renseigner" if pend_today else ""))
-    lines.append(l1)
-    qmoy = ("qualif moy. " + f"{sum(s['notes']) / len(s['notes']):.1f}".replace(".", ",") + "/10"
-            if s["notes"] else "")
+    lines.append(f"Calls prévus {s['n']} · présents {len(s['shows'])}"
+                 f" · show-up {bpct(len(s['shows']), len(s['shows']) + ns)}")
+    if ns or pend_today:
+        segs = []
+        if ns:
+            segs.append(f"No-show {ns}" + (f" (dont {len(pend_past)} à renseigner)" if pend_past else ""))
+        if pend_today:
+            segs.append(f"{pend_today} aujourd'hui à renseigner")
+        lines.append(" · ".join(segs))
     if s["shows"]:
-        lines.append(pitch_line(s, qmoy))
+        lines.append(pitch_line(s))
+        if s["notes"]:
+            lines.append("Qualif moy. " + f"{sum(s['notes']) / len(s['notes']):.1f}".replace(".", ",") + "/10")
     if s["ventes"]:
-        lines.append(f"✅ Ventes {len(s['ventes'])} · CA {b(e(s['ca']))} · closing {pct(len(s['ventes']), len(s['shows']))} des présents"
+        lines.append(f"✅ Ventes {len(s['ventes'])} · CA {b(e(s['ca']))}")
+        lines.append(f"Closing {pct(len(s['ventes']), len(s['shows']))} des présents"
                      f" · CA/présent {ratio(s['ca'], len(s['shows']))}")
     else:
         lines.append("Ventes 0")
     ads_line = (f"Ads {e(spend)} · {booked} bookés · {ratio(spend, booked)}/booké"
                 f" · {ratio(spend, len(s['shows']))}/présent")
-    if s["ventes"]:
-        ads_line += f" · {cost_client(spend, s['ventes'])} · ROAS {b(roas(s['ca'], spend))}"
     lines.append(ads_line)
+    if s["ventes"]:
+        lines.append(f"{cost_client(spend, s['ventes'])}" + (f" · ROAS {b(roas(s['ca'], spend))}" if spend else ""))
     return "\n".join(lines)
 
 
@@ -219,21 +224,20 @@ def month_block(calls, ads, today):
     rows = [c for c in calls if c["year"] == today.year and c["month"] == today.month
             and (not c.get("date") or c["date"] <= today.isoformat())]
     s = stats(calls, rows)
-    total_2026 = sum(sale_amount(c) for c in calls if c["year"] == today.year and is_sale(c))
     spend = spend_between(ads, first, today)
     booked = booked_between(calls, first, today)
-    panier = f" · panier moyen {ratio(s['ca'], len(s['ventes']))}" if s["ventes"] else ""
     lines = [f"💰 {b(MOIS[today.month - 1].upper() + ' (mois en cours)')}"]
-    lines.append(f"CA signé {b(e(s['ca']))} · {len(s['ventes'])} ventes{panier} · total {today.year} : {e(total_2026)}")
-    lines.append(f"Calls bookés {booked} · présents {len(s['shows'])}"
-                 f" · show-up {pct(len(s['shows']), len(s['shows']) + len(s['noshow']))}"
+    lines.append(f"CA signé {b(e(s['ca']))} · {len(s['ventes'])} vente{'s' if len(s['ventes']) > 1 else ''}")
+    lines.append(f"Calls bookés {booked}")
+    lines.append(f"Présents {len(s['shows'])} · show-up {pct(len(s['shows']), len(s['shows']) + len(s['noshow']))}"
                  f" · closing {pct(len(s['ventes']), len(s['shows']))} des présents")
     lines.append(f"CA/booké {ratio(s['ca'], booked)} · CA/présent {ratio(s['ca'], len(s['shows']))}")
-    ads_line = (f"Ads {e(spend)} · {ratio(spend, booked)}/booké · {ratio(spend, len(s['shows']))}/présent"
-                f" · {cost_client(spend, s['ventes'])}")
+    lines.append(f"Ads {e(spend)} · {ratio(spend, booked)}/booké"
+                 f" · {ratio(spend, len(s['shows']))}/présent · {cost_client(spend, s['ventes'])}")
     if s["ventes"]:
-        ads_line += f" · ROAS {b(roas(s['ca'], spend))}"
-    lines.append(ads_line)
+        lines.append(f"Prix moyen de vente {ratio(s['ca'], len(s['ventes']))}")
+        if spend:
+            lines.append(f"ROAS {b(roas(s['ca'], spend))}")
     return "\n".join(lines)
 
 

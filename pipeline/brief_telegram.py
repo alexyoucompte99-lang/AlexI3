@@ -42,11 +42,6 @@ def ca_mois(data, today):
                if c["year"] == today.year and c["month"] == today.month and is_sale(c))
 
 
-def ca_total(data):
-    return sum(sale_amount(c) for c in data["calls"]
-               if c["year"] == 2026 and is_sale(c))
-
-
 def spend_range(ads, first, last):
     """Spend ads sur [first, last], semaines proratisées au jour."""
     spend = 0.0
@@ -98,7 +93,7 @@ def build_brief(data, ads, days, today):
         f"No-show : {noshow} · reprogrammés/annulés : {reprog}",
         f"Sur les présents : {n_pitche_seul} pitché(s) + {fu} follow-up(s) + {non_pitche} non pitché(s)", "",
         f"Ventes : {len(ventes)} · CA signé sur la période : *{fmt_e(ca)}*",
-        f"CA signé mois en cours : *{fmt_e(ca_mois(data, today))}* · total 2026 : *{fmt_e(ca_total(data))}*",
+        f"CA signé mois en cours : *{fmt_e(ca_mois(data, today))}*",
         f"Taux de closing : *{fmt_p(100 * len(ventes) / len(shows) if shows else None)}* des présents"
         f" · *{fmt_p(100 * len(ventes) / len(pitched) if pitched else None)}* des pitchés",
         f"CA par call présent : {fmt_e(ca / len(shows)) if shows else '·'}"
