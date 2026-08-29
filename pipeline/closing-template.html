@@ -1012,6 +1012,7 @@ const TY_OBJ_TOI = {
   "Protéger les miens, et transmettre quelque chose de solide": "protéger les tiens et transmettre quelque chose de solide",
   "Être libre de mes choix : mon temps, mon travail, mon lieu de vie": "être libre de tes choix : ton temps, ton travail, ton lieu de vie",
   "Arrêter de regarder mon argent perdre de la valeur en attendant": "arrêter de regarder ton argent perdre de la valeur",
+  "Ne plus laisser mon capital dormir et perdre de la valeur": "ne plus laisser ton capital dormir et perdre de la valeur",
 };
 const tyCfg = { tpl(k) { return localStorage.getItem("ty-tpl" + k) || TY_DEFAULT_TPLS[k]; } };
 let tyFilter = "todo", tySource = "";
@@ -1036,8 +1037,10 @@ function tyStop(t) {
 function tyMsg(t) {
   const st2 = tyState(t);
   const closer = st2 && st2.closer ? st2.closer.split(" ")[0] : "l'équipe";
-  const obj = ((t.a || {}).vOLP4D || "").trim();
-  const objectif = TY_OBJ_TOI[obj] || (obj ? obj.charAt(0).toLowerCase() + obj.slice(1) : "avancer sur ton patrimoine");
+  /* Q1 est multi-choix depuis le 29/08 (réponses jointes par « · ») : on reformule la 1re cochée,
+     et jamais de texte brut à la 1re personne dans le message */
+  const obj = ((t.a || {}).vOLP4D || "").split("·")[0].trim();
+  const objectif = TY_OBJ_TOI[obj] || "avancer sur ton patrimoine";
   return tyCfg.tpl(t.done ? (t.profil || "B") : "P")
     .replace(/{prenom}/g, (t.prenom || "").trim().split(" ")[0])
     .replace(/{closer}/g, closer)
