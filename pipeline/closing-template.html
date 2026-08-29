@@ -76,7 +76,7 @@
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 
   /* onglets */
-  .tabs { display: flex; gap: 8px; margin: 14px 0 4px; border-bottom: 1px solid var(--border); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; border-bottom: 1px solid var(--border); }
   .tab {
     font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-2); background: none;
     border: none; border-bottom: 3px solid transparent; padding: 9px 14px 10px; cursor: pointer;
@@ -126,7 +126,16 @@
   .fill-card .send { min-height: 47px; font-size: 15px; margin-top: 2px; }
   .fill-card.sent { opacity: .72; }
   .fill-card .okline { color: #2c7a3f; font-weight: 600; font-size: 13.5px; }
+  .fill-card textarea.raison { min-height: 92px; border-color: var(--accent); }
   @media (max-width: 520px) { .seg { grid-template-columns: repeat(2, 1fr); } .seg.qn { grid-template-columns: repeat(5, 1fr); } .seg button { font-size: 14px; min-height: 46px; } .seg.qn button { min-height: 42px; } }
+  /* téléphone : champs à 16px (sinon iOS zoome au focus), onglets plus compacts, cartes bord à bord */
+  @media (max-width: 640px) {
+    .wrap { padding: 16px 12px 90px; }
+    .tab { font-size: 13px; padding: 7px 9px 8px; }
+    .filterbar { margin: 0 -12px 10px; padding: 10px 12px; }
+    .fill-card textarea, .fill-card input[type=number], .fill-card input[type=text], .fill-card input[type=url], .fill-card input[type=date] { font-size: 16px; }
+    .fill-card { padding: 13px; }
+  }
   .fsep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
   .fcustom { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
   .fcustom input {
@@ -428,7 +437,9 @@
       <h2>À remplir</h2>
       <p class="lede">Tes derniers calls pas encore renseignés, avec toutes les infos du tracking : show-up, résultat, note /10, +250k cash,
         vidéo préchauffe, prix, mensualités, enregistrement, recap. Ce qui est déjà dans le Sheet est pré-rempli : tu complètes juste ce qui manque,
-        et seul ce qui change est envoyé. Tu peux aussi remplir le Sheet comme d'habitude, la console se met à jour toute seule.</p>
+        et seul ce qui change est envoyé. Tu peux aussi remplir le Sheet comme d'habitude, la console se met à jour toute seule.
+        <b>Si le call n'a pas closé en R1 (pas de vente, follow-up, non pitché), la raison du non close est obligatoire :
+        détaille et prends du recul sur le call, pas juste un mot.</b></p>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:6px"><span class="eyebrow" style="min-width:62px">Closer</span><span id="fillCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="fillFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       <div id="fillList" class="fill-list"></div>
@@ -1771,7 +1782,8 @@ function fillCard(c) {
   const quand = frDateFull(c.d) + (c.hh ? " à " + c.hh : "");
   const orig = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", mens: c.mens || "",
                  c250: c.c250 || "", vid: c.vid || "", rec: c.rec || "", rel: c.rel || "" };
-  const state = Object.assign({}, orig, { com: "", obj: "" });
+  const state = Object.assign({}, orig, { com: "", obj: "", raison: "" });
+  const nonClose = () => ["NON", "FOLLOW_UP", "NON_PITCHE"].includes(state.v);
   const seg = (label, opts, cur, onPick, cls) => {
     const wrap = document.createElement("div");
     wrap.innerHTML = `<div class="flabel">${label}</div>`;
@@ -1844,7 +1856,19 @@ function fillCard(c) {
       oldO.innerHTML = `<b>Objection déjà notée</b>`;
       oldO.appendChild(document.createTextNode(c.obj));
       card.appendChild(oldO);
-    } else {
+    }
+    if (nonClose()) {
+      /* pas de vente en R1 -> la raison est OBLIGATOIRE : le closer détaille et prend du recul */
+      const w = document.createElement("div");
+      w.innerHTML = `<div class="flabel" style="color:var(--accent)">Raison du non close en R1 (obligatoire)</div>`;
+      const ra = document.createElement("textarea");
+      ra.className = "raison";
+      ra.placeholder = "Prends du recul sur le call : pourquoi ça n'a pas closé ? Objection / peur principale, contexte du prospect, et ce que tu tenterais différemment. Quelques phrases, pas 3 mots.";
+      ra.value = state.raison;
+      ra.addEventListener("input", () => state.raison = ra.value);
+      w.appendChild(ra);
+      card.appendChild(w);
+    } else if (!c.obj) {
       const ob = document.createElement("input");
       ob.type = "text"; ob.placeholder = "Objection / peur principale (optionnel)"; ob.value = state.obj || "";
       ob.addEventListener("input", () => state.obj = ob.value);
@@ -1876,7 +1900,15 @@ async function fillSend(c, orig, state, btn) {
     fields.relance = `${d}/${m}/${y}`;
   }
   if (state.com.trim()) fields.commentaire = state.com.trim();
-  if (state.obj.trim() && !c.obj) fields.objection = state.obj.trim();
+  const nonClose = ["NON", "FOLLOW_UP", "NON_PITCHE"].includes(state.v);
+  if (nonClose) {
+    /* raison du non close en R1 : OBLIGATOIRE et détaillée (règle Thomas/Alex) */
+    if (state.raison.trim().length < 30) {
+      toast("⛔ La raison du non close en R1 est obligatoire : détaille et prends du recul (au moins une vraie phrase)");
+      return;
+    }
+    fields.objection = "Raison non close R1 : " + state.raison.trim();
+  } else if (state.obj.trim() && !c.obj) fields.objection = state.obj.trim();
   if (!state.s && !state.v) { toast("Renseigne au moins le show-up (ou le résultat)"); return; }
   if (!Object.keys(fields).length) { toast("Rien de nouveau à envoyer : tout est déjà dans le Sheet ✓"); return; }
   if (btn.dataset.busy) return;
@@ -1900,11 +1932,11 @@ async function fillSend(c, orig, state, btn) {
   if (fields.recording) c.rec = state.rec.trim();
   if (fields.relance) c.rel = state.rel;
   if (fields.commentaire) c.com = c.com ? c.com + "\n" + state.com.trim() : state.com.trim();
-  if (fields.objection) c.obj = state.obj.trim();
+  if (fields.objection) c.obj = c.obj ? c.obj + "\n" + fields.objection : fields.objection;
   c._fillSent = Date.now();
   localStorage.setItem(fillKey(c), JSON.stringify({ when: c._fillSent,
     f: { s: c.s, v: c.v, q: c.q, pp: c.pp, mens: c.mens, c250: c.c250, vid: c.vid, rec: c.rec,
-         rel: c.rel, com: state.com.trim(), obj: state.obj.trim() } }));
+         rel: c.rel, com: state.com.trim(), obj: fields.objection || state.obj.trim() } }));
   toast("✅ C'est dans le Sheet, tié un tigre 🐯");
   renderFill();
 }
