@@ -273,6 +273,7 @@
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
+    <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
@@ -384,6 +385,54 @@
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px" id="icFilterPills"></div>
       <div class="card full"><div class="tscroll"><table id="icTable"></table></div></div>
       <p class="lede" id="icMore" style="margin-top:8px"></p>
+    </section>
+  </div>
+
+  <!-- ================== SCAN PATRIMOINE (Tally) ================== -->
+  <div id="panelScan" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Lead magnet · quiz Tally</span>
+      <h2>Le Scan Patrimoine</h2>
+      <p class="lede">Tous ceux qui ont commencé le quiz, même sans aller au bout. Coche ta case pour dire « c'est moi qui relance » (noté pour toute l'équipe),
+        puis clique le numéro : WhatsApp s'ouvre avec un message écrit à partir de ses réponses (profil, objectif) ; s'il s'est arrêté en route, le message l'invite à finir.
+        Le lien Instagram ouvre son profil, le message est copié en même temps.</p>
+
+      <div class="kpis" id="tyKpis" style="margin-bottom:14px"></div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr));gap:12px;margin-bottom:14px">
+        <div class="card"><h3 style="margin-top:0">D'où viennent les leads</h3>
+          <p class="lede" style="margin-bottom:8px">Selon le lien utilisé (bio, YouTube, CTA audit, prospection...).</p>
+          <div class="tscroll"><table id="tySources"></table></div></div>
+        <div class="card"><h3 style="margin-top:0">Où ça décroche</h3>
+          <p class="lede" style="margin-bottom:8px">Question par question : ceux qui voient, ceux qui répondent.</p>
+          <div id="tyDrop"></div></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="tyFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Source</span><span id="tySourcePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <button class="btn ghost" id="tySettingsBtn">⚙️ Messages de relance</button></div>
+      </div>
+
+      <div class="card" id="tySettings" style="display:none;margin-bottom:14px">
+        <h3 style="margin-top:0">Les messages WhatsApp de relance</h3>
+        <p class="lede" style="margin-bottom:10px">Un message par profil, plus un pour ceux qui n'ont pas fini le quiz. Variables : <code>{prenom}</code>, <code>{closer}</code>, <code>{objectif}</code> (sa réponse Q1, en minuscule), <code>{lien}</code> (le lien du quiz). Gardé sur ce navigateur.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:10px">
+          <div class="field"><label for="tyTplP">Quiz pas fini</label><textarea id="tyTplP" style="min-height:120px"></textarea></div>
+          <div class="field"><label for="tyTplA">Profil Fondations (A)</label><textarea id="tyTplA" style="min-height:120px"></textarea></div>
+          <div class="field"><label for="tyTplB">Profil Bâtisseur (B)</label><textarea id="tyTplB" style="min-height:120px"></textarea></div>
+          <div class="field"><label for="tyTplC">Profil Stratège (C)</label><textarea id="tyTplC" style="min-height:120px"></textarea></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
+          <button class="btn" id="tySave">Enregistrer</button>
+          <button class="btn ghost" id="tyReset">Remettre les messages d'origine</button>
+          <span id="tySaveOk" style="font-size:12.5px;color:var(--good-text);display:none">Enregistré ✓</span>
+        </div>
+      </div>
+
+      <div class="card full"><div class="tscroll"><table id="tyTable"></table></div></div>
+      <p class="lede" id="tyMore" style="margin-top:8px"></p>
     </section>
   </div>
 
@@ -943,6 +992,212 @@ function renderRelances() {
       renderRelances();
     });
   });
+}
+
+/* ================= Scan Patrimoine (Tally) ================= */
+const TY = DATA.tally || {};
+const TY_LINK = "https://tally.so/r/Np12zj";
+const TY_SOURCES = { bio: "Lien en bio", youtube: "YouTube", cta_audit: "CTA Audit", prospection_abonne: "Prospection abonnés", dm_likes: "DM likes", "": "Direct / autre" };
+const TY_PROFILS = { A: "Fondations", B: "Bâtisseur", C: "Stratège" };
+const TY_DEFAULT_TPLS = {
+  P: "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! J'ai vu que tu avais commencé le Scan Patrimoine sans aller au bout. Il te reste moins de 2 minutes pour avoir ta lecture personnalisée : {lien}\n\nEt si une question t'a bloqué, dis-le-moi ici, j'y réponds directement.",
+  A: "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Bien reçu ton Scan Patrimoine : profil Fondations. À ton étape, la priorité c'est de poser des bases solides, et c'est exactement ce que couvre le contenu de ta page de résultat. Tu l'as bien reçu ? Si tu as une question, pose-la-moi ici, j'y réponds directement.",
+  B: "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Bien reçu ton Scan Patrimoine. D'après tes réponses, tu veux {objectif}, et ce qui manque surtout c'est une vraie stratégie d'ensemble. C'est exactement ce qu'on pose à plat dans l'appel bilan : tu veux qu'on cale un créneau cette semaine ?",
+  C: "Salut {prenom}, c'est {closer} d'Investisseurs 3.0 ! Bien reçu ton Scan Patrimoine. Vu ton patrimoine et ta volonté de déléguer, le plus pertinent pour toi c'est l'audit avec notre gestion privée : tu veux qu'on cale un créneau cette semaine ?",
+};
+/* réponses Q1 (à la 1re personne dans le form) reformulées en « tu » pour {objectif} */
+const TY_OBJ_TOI = {
+  "Construire un patrimoine qui travaille pour moi, même quand je ne travaille pas": "construire un patrimoine qui travaille pour toi, même quand tu ne travailles pas",
+  "Ne plus jamais dépendre du système pour ma retraite": "ne plus jamais dépendre du système pour ta retraite",
+  "Protéger les miens, et transmettre quelque chose de solide": "protéger les tiens et transmettre quelque chose de solide",
+  "Être libre de mes choix : mon temps, mon travail, mon lieu de vie": "être libre de tes choix : ton temps, ton travail, ton lieu de vie",
+  "Arrêter de regarder mon argent perdre de la valeur en attendant": "arrêter de regarder ton argent perdre de la valeur",
+};
+const tyCfg = { tpl(k) { return localStorage.getItem("ty-tpl" + k) || TY_DEFAULT_TPLS[k]; } };
+let tyFilter = "todo", tySource = "";
+const tyKey = (t) => "ty-claim:" + (t.email || t.id);
+function tyState(t) {
+  if (t.cl) return { closer: t.cl, d: t.cld || "" };
+  const loc = localStorage.getItem(tyKey(t));
+  if (loc) { const [c, d] = loc.split("|"); return { closer: c, d: d || "" }; }
+  return null;
+}
+const tyContact = (t) => !!(t.tel || t.insta || t.email);
+/* dates de claim : le Sheet renvoie « 2026-08-29 14:03 », la coche locale « 29/08/2026 » */
+const tyFrD = (d) => { const x = (d || "").split(" ")[0]; return /^\d{4}-/.test(x) ? frDateFull(x) : (x || "·"); };
+const tySrcLabel = (t) => TY_SOURCES[t.source] || t.source || "Direct / autre";
+function tyStop(t) {
+  if (t.done) return "";
+  const qs = TY.questions || [];
+  const nx = t.last + 1;
+  if (nx >= 10) return "aux coordonnées";
+  return "à « " + ((qs[nx] || {}).label || "?") + " »";
+}
+function tyMsg(t) {
+  const st2 = tyState(t);
+  const closer = st2 && st2.closer ? st2.closer.split(" ")[0] : "l'équipe";
+  const obj = ((t.a || {}).vOLP4D || "").trim();
+  const objectif = TY_OBJ_TOI[obj] || (obj ? obj.charAt(0).toLowerCase() + obj.slice(1) : "avancer sur ton patrimoine");
+  return tyCfg.tpl(t.done ? (t.profil || "B") : "P")
+    .replace(/{prenom}/g, (t.prenom || "").trim().split(" ")[0])
+    .replace(/{closer}/g, closer)
+    .replace(/{objectif}/g, objectif)
+    .replace(/{lien}/g, TY_LINK)
+    .replace(/\s+,/g, ",").replace(/ {2,}/g, " ");
+}
+const tyWhen = (at) => {
+  if (!at) return "·";
+  const d2 = new Date(at);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return `${p2(d2.getDate())}/${p2(d2.getMonth() + 1)} ${p2(d2.getHours())}h${p2(d2.getMinutes())}`;
+};
+const tyDays = (at, n) => at && (Date.now() - new Date(at)) < n * 864e5;
+function tyProfilChip(t) {
+  if (!t.done) return `<span class="miss">quiz pas fini</span>`;
+  const name = TY_PROFILS[t.profil] || "?";
+  const col = t.profil === "C" ? "var(--accent)" : "var(--ink-2)";
+  return `<span style="font-size:11.5px;border:1px solid var(--border);border-radius:6px;padding:1px 7px;color:${col};white-space:nowrap">${t.profil} · ${name}</span>`;
+}
+function tyInit() {
+  const fill = () => { $("tyTplP").value = tyCfg.tpl("P"); $("tyTplA").value = tyCfg.tpl("A"); $("tyTplB").value = tyCfg.tpl("B"); $("tyTplC").value = tyCfg.tpl("C"); };
+  fill();
+  $("tySettingsBtn").addEventListener("click", () => {
+    const el = $("tySettings");
+    el.style.display = el.style.display === "none" ? "" : "none";
+  });
+  $("tySave").addEventListener("click", () => {
+    for (const k of ["P", "A", "B", "C"]) {
+      const v = $("tyTpl" + k).value.trim();
+      if (v && v !== TY_DEFAULT_TPLS[k]) localStorage.setItem("ty-tpl" + k, v);
+      else localStorage.removeItem("ty-tpl" + k);
+    }
+    $("tySaveOk").style.display = "inline"; setTimeout(() => $("tySaveOk").style.display = "none", 2500);
+    renderScan();
+  });
+  $("tyReset").addEventListener("click", () => { ["P", "A", "B", "C"].forEach(k => localStorage.removeItem("ty-tpl" + k)); fill(); renderScan(); });
+}
+function renderScan() {
+  const subs = TY.subs || [];
+  const todo = subs.filter(t => tyContact(t) && !tyState(t));
+  $("tyBadge").textContent = todo.length || "";
+  if (!TY.fetched_at) {
+    $("tyKpis").innerHTML = "";
+    $("tySources").innerHTML = ""; $("tyDrop").innerHTML = ""; $("tyTable").innerHTML = "";
+    $("tyMore").textContent = "Pas encore de données Tally : elles arrivent à la prochaine mise à jour de la console.";
+    return;
+  }
+  const st = TY.stats || {};
+  const done = subs.filter(t => t.done), part = subs.filter(t => !t.done);
+  const prios = done.map(t => +((t.a || {}).XMY4EY)).filter(n => n > 0);
+  const prioMoy = prios.length ? (prios.reduce((x, y) => x + y, 0) / prios.length) : null;
+  const nP = (p) => done.filter(t => t.profil === p).length;
+  $("tyKpis").innerHTML = [
+    kpiTile("Ont ouvert le quiz", fmtN(st.visitors || 0), "visiteurs sur la page Tally"),
+    kpiTile("Ont commencé", fmtN(st.starts || 0), st.visitors ? Math.round(100 * (st.starts || 0) / st.visitors) + " % des visiteurs" : ""),
+    kpiTile("Ont fini", fmtN(done.length), st.starts ? Math.round(100 * done.length / st.starts) + " % de ceux qui commencent" : ""),
+    kpiTile("En route", fmtN(part.length), `dont ${fmtN(part.filter(tyContact).length)} joignable(s)`),
+    kpiTile("7 derniers jours", fmtN(subs.filter(t => tyDays(t.at, 7)).length), "réponses reçues"),
+    kpiTile("Priorité moyenne", prioMoy == null ? "·" : prioMoy.toFixed(1).replace(".", ",") + "/10", "« régler ça dans les 3 mois »"),
+    kpiTile("Profils", `${nP("A")} · ${nP("B")} · ${nP("C")}`, "Fondations · Bâtisseur · Stratège"),
+    kpiTile("À relancer", fmtN(todo.length), "avec un contact, personne dessus"),
+  ].join("");
+
+  /* sources */
+  const srcs = [...new Set(subs.map(t => t.source))];
+  for (const k of ["bio", "youtube", "cta_audit", "prospection_abonne"]) if (!srcs.includes(k)) srcs.push(k);
+  $("tySources").innerHTML = "<thead><tr><th>Source</th><th class='num'>Commencé</th><th class='num'>Fini</th><th class='num'>Taux</th><th class='num'>7 j</th></tr></thead><tbody>" +
+    srcs.map(k => {
+      const rows = subs.filter(t => t.source === k);
+      const dn = rows.filter(t => t.done).length;
+      return `<tr><td>${esc(TY_SOURCES[k] || k)}</td><td class="num">${fmtN(rows.length)}</td><td class="num">${fmtN(dn)}</td>
+        <td class="num">${rows.length ? Math.round(100 * dn / rows.length) + " %" : "·"}</td>
+        <td class="num">${fmtN(rows.filter(t => tyDays(t.at, 7)).length)}</td></tr>`;
+    }).join("") + "</tbody>";
+
+  /* drop-off */
+  const dr = TY.dropoff || [];
+  const maxV = Math.max(1, ...dr.map(x => x.views));
+  $("tyDrop").innerHTML = dr.length ? dr.map(x => {
+    const pct = x.views ? Math.round(100 * x.answers / x.views) : 0;
+    return `<div style="margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--ink-2)">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.t)}</span>
+        <span style="white-space:nowrap">${fmtN(x.answers)}/${fmtN(x.views)}${x.drops ? ` · <b style="color:var(--critical)">-${fmtN(x.drops)}</b>` : ""}</span></div>
+      <div style="height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:2px">
+        <div style="height:100%;width:${Math.round(100 * x.views / maxV * pct / 100)}%;background:var(--s1)"></div></div>
+    </div>`;
+  }).join("") : `<p class="lede">Rien pour l'instant.</p>`;
+
+  /* filtres + table */
+  pillRow("tyFilterPills", [
+    { k: "todo", label: `À relancer (${todo.length})` },
+    { k: "done", label: `Relancés (${subs.filter(t => tyState(t)).length})` },
+    { k: "complet", label: `Ont fini (${done.length})` },
+    { k: "partiel", label: `En route (${part.length})` },
+    { k: "all", label: `Tous (${subs.length})` },
+  ], tyFilter, k => tyFilter = k, renderScan);
+  const inSrc = srcs.filter(k => subs.some(t => t.source === k));
+  pillRow("tySourcePills", [{ k: "", label: "Toutes" }, ...inSrc.map(k => ({ k: "s:" + k, label: TY_SOURCES[k] || k }))],
+    tySource, k => tySource = k, renderScan);
+  let list = subs.filter(t => tySource === "" ? true : t.source === tySource.slice(2));
+  list = list.filter(t => tyFilter === "all" ? true
+    : tyFilter === "todo" ? (tyContact(t) && !tyState(t))
+    : tyFilter === "done" ? !!tyState(t)
+    : tyFilter === "complet" ? t.done : !t.done);
+
+  $("tyTable").innerHTML = "<thead><tr><th>Qui relance ?</th><th>Reçu</th><th>Prospect</th><th>WhatsApp</th><th>Instagram</th><th>Email</th><th>Source</th><th>Où il en est</th><th></th></tr></thead><tbody>" +
+    list.map((t, i) => {
+      const st2 = tyState(t);
+      const boxes = tyContact(t) ? TOP3.map(n => {
+        const checked = st2 && st2.closer === n;
+        return `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;cursor:pointer;font-size:12.5px${st2 && !checked ? ";opacity:.35" : ""}">
+          <input type="checkbox" data-ty="${i}" data-closer="${esc(n)}" ${checked ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">${n.split(" ")[0]}</label>`;
+      }).join("") : `<span class="miss">pas de contact</span>`;
+      const insta = (t.insta || t.pseudo || "").replace(/^@/, "").trim();
+      const detail = (TY.questions || []).filter(q => (t.a || {})[q.id])
+        .map(q => `<div style="margin-top:5px"><b>${esc(q.label)}</b> : ${esc(t.a[q.id])}</div>`).join("");
+      return `<tr${st2 ? ' style="opacity:.55"' : ""}>
+        <td style="white-space:nowrap">${boxes}${st2 ? `<div class="sub" style="font-size:11px;margin-top:2px">relancé le ${esc(tyFrD(st2.d))}</div>` : ""}</td>
+        <td style="white-space:nowrap">${tyWhen(t.at)}</td>
+        <td><b>${esc(t.prenom) || "·"}</b><br>${tyProfilChip(t)}</td>
+        <td>${t.tel ? `<a class="tel" href="https://wa.me/${esc(String(t.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(tyMsg(t)).replace(/'/g, "%27")}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message écrit à partir de ses réponses">${esc(t.tel)}</a>` : "·"}</td>
+        <td>${insta ? `<a class="tel" data-tymsg="${i}" href="https://instagram.com/${encodeURIComponent(insta)}" target="_blank" rel="noopener" title="Copie le message et ouvre son profil Instagram">@${esc(insta)}</a>` : "·"}</td>
+        <td style="max-width:20ch;overflow-wrap:anywhere">${esc(t.email) || "·"}</td>
+        <td style="font-size:12px">${esc(tySrcLabel(t))}${t.pseudo ? `<div class="sub" style="font-size:11px">@${esc(t.pseudo)}</div>` : ""}</td>
+        <td style="font-size:12px">${t.done ? `<span style="color:var(--good-text)">Complet ✓</span>` : `<span style="color:var(--critical)">S'est arrêté ${esc(tyStop(t))}</span>`}</td>
+        <td>${detail ? `<button class="btn ghost" data-tysee="${i}" style="font-size:11.5px;padding:3px 9px">Réponses</button>` : "·"}</td>
+      </tr>
+      ${detail ? `<tr hidden data-tydetail="${i}"><td colspan="9" style="font-size:12.5px;color:var(--ink-2);background:var(--plane)">${detail}</td></tr>` : ""}`;
+    }).join("") + "</tbody>";
+  $("tyMore").textContent = list.length ? "" : (tyFilter === "todo" ? "Personne à relancer ici pour l'instant." : "Rien ici pour l'instant.");
+
+  $("tyTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const t = list[+cb.dataset.ty];
+      const closer = cb.dataset.closer;
+      const lead = "TALLY|" + (t.email || t.id);
+      if (cb.checked) {
+        localStorage.setItem(tyKey(t), closer + "|" + frDateFull(TODAY_ISO));
+        t.cl = closer; t.cld = TODAY_ISO;
+        bridgePost({ what: "iclosed_claim", lead, closer, value: "RELANCE" })
+          .then(ok => toast(ok ? "Noté pour toute l'équipe ✓" : "Enregistré sur ce navigateur (Sheet injoignable)"));
+      } else {
+        localStorage.removeItem(tyKey(t));
+        delete t.cl; delete t.cld;
+        bridgePost({ what: "iclosed_claim", lead, closer, value: "ANNULE" })
+          .then(ok => toast(ok ? "Coche retirée ✓" : "Retirée sur ce navigateur"));
+      }
+      renderScan();
+    });
+  });
+  $("tyTable").querySelectorAll("[data-tysee]").forEach(b => b.addEventListener("click", () => {
+    const row = $("tyTable").querySelector(`[data-tydetail="${b.dataset.tysee}"]`);
+    if (row) row.hidden = !row.hidden;
+  }));
+  $("tyTable").querySelectorAll("[data-tymsg]").forEach(a => a.addEventListener("click", () => {
+    copyText(tyMsg(list[+a.dataset.tymsg]));
+    toast("Message copié : colle-le dans le DM Instagram 📋");
+  }));
 }
 
 /* ================= rappels calls à venir ================= */
@@ -2402,6 +2657,9 @@ $("tabPilotage").addEventListener("click", () => {
 });
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
+$("tabScan").addEventListener("click", renderScan);
+tyInit();
+renderScan();
 rpSettingsInit();
 renderRappels();
 $("tabFill").addEventListener("click", renderFill);

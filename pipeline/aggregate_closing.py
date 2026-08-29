@@ -272,8 +272,28 @@ def main(data_path, out_path, updated_at):
     # rattachées aux calls par e-mail, sinon par nom ; le reste = orphelines
     wa_orphans = attach_wa_confirms(calls, d.get("wa_confirms", []))
 
+    # Tally « Le Scan Patrimoine » : tally.json écrit par tally_fetch.py.
+    # Relances partagées : mêmes lignes « Relances iClosed » que l'onglet À
+    # relancer, avec un lead préfixé TALLY| (email, sinon id de soumission).
+    tally = {}
+    try:
+        import os
+        tally_path = os.path.join(os.path.dirname(os.path.abspath(out_path)) or ".", "tally.json")
+        tally = json.load(open(tally_path))
+        ty_claim = {}
+        for cl in d.get("iclosed_claims", []):
+            if (cl.get("lead") or "").startswith("TALLY|"):
+                ty_claim[cl["lead"][6:]] = cl
+        for s in tally.get("subs", []):
+            cl = ty_claim.get(s.get("email") or s["id"])
+            if cl and cl.get("statut") != "ANNULE":
+                s["cl"] = cl.get("closer") or ""
+                s["cld"] = cl.get("d") or ""
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
-           "iclosed": iclosed, "wa_orphans": wa_orphans,
+           "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)

@@ -51,13 +51,15 @@ jobs:
           BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
           BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
           PAGE_CODE: ${{ secrets.PAGE_CODE }}
+          TALLY_API_KEY: ${{ secrets.TALLY_API_KEY }}
         working-directory: pipeline
         run: |
           python parse_xlsx.py investisseurs30.xlsx data.json
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
+          python tally_fetch.py || true
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
-          HASH=$(cat data.json ads.json | sha256sum | cut -d" " -f1)
+          HASH=$(cat data.json ads.json tally.json 2>/dev/null | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
           if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then
             echo "donnees inchangees, pas de rebuild"
