@@ -79,7 +79,10 @@ jobs:
               grep -q "var RELEVE" data-block.js && break
             done
             grep -q "var RELEVE" data-block.js
-            python fetch_sources.py || echo "sources funnel KO : on garde celles du bloc precedent"
+            # le classeur closing vient d'etre telecharge et parse juste au-dessus :
+            # on reutilise data.json au lieu de refaire un aller-retour de 3 Mo par le pont
+            mkdir -p sources && cp ../data.json sources/data_closing.json
+            python fetch_sources.py --no-closing || echo "sources funnel KO : on garde celles du bloc precedent"
             python gen_data.py --prev=data-block.js
             openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -salt -base64 -A \
               -pass env:DATA_KEY -in data-block.js -out ../../funnel-data.enc
