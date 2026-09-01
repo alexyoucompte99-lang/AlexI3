@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TZ: Europe/Paris   # bornes de dates (jour en cours) en heure de Paris
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +53,10 @@ jobs:
           BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
           BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
           PAGE_CODE: ${{ secrets.PAGE_CODE }}
+          FUNNEL_CODE: ${{ secrets.FUNNEL_CODE }}
           TALLY_API_KEY: ${{ secrets.TALLY_API_KEY }}
+          DATA_KEY: ${{ secrets.DATA_KEY }}
+          PARSE_XLSX: ${{ github.workspace }}/pipeline/parse_xlsx.py
         working-directory: pipeline
         run: |
           python parse_xlsx.py investisseurs30.xlsx data.json
@@ -60,8 +65,31 @@ jobs:
           python meta_fetch.py
           python tally_fetch.py || true
           python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count || true
+          # Onglet Funnel : on repart du bloc chiffre de console-suivi-i3 (c'est la
+          # que se fait le releve pixel manuel), a defaut de notre propre copie, puis
+          # closing et ads sont rafraichis ici comme le reste de la console.
+          ( set -e
+            cd funnel
+            curl -sfL --retry 3 --retry-delay 4 -o upstream.enc \
+              https://raw.githubusercontent.com/alexyoucompte99-lang/console-suivi-i3/main/data-block.enc || true
+            for f in upstream.enc ../../funnel-data.enc; do
+              [ -s "$f" ] || continue
+              openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -base64 -A \
+                -pass env:DATA_KEY -in "$f" -out data-block.js 2>/dev/null || continue
+              grep -q "var RELEVE" data-block.js && break
+            done
+            grep -q "var RELEVE" data-block.js
+            python fetch_sources.py || echo "sources funnel KO : on garde celles du bloc precedent"
+            python gen_data.py --prev=data-block.js
+            openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -salt -base64 -A \
+              -pass env:DATA_KEY -in data-block.js -out ../../funnel-data.enc
+            python funnel_fragment.py funnel-template.html data-block.js \
+              ../funnel-fragment.css ../funnel-fragment.html
+          ) || echo "PIPELINE FUNNEL KO : onglet Funnel indisponible sur cette MAJ"
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
-          HASH=$(cat data.json ads.json tally.json 2>/dev/null | sha256sum | cut -d" " -f1)
+          # SOURCES_AT change a chaque run : exclu du hash, sinon plus aucun court-circuit
+          HASH=$( { cat data.json ads.json tally.json 2>/dev/null; \
+                    grep -v "^var SOURCES_AT" funnel/data-block.js 2>/dev/null; } | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
           if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then
             echo "donnees inchangees, pas de rebuild"
@@ -85,6 +113,6 @@ jobs:
           git config user.name "console-bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html closing/index.html .data-hash
-          git add .sales-ledger.json 2>/dev/null || true
+          git add .sales-ledger.json funnel-data.enc 2>/dev/null || true
           git add .eow-count .eod-count 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)

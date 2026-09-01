@@ -9,7 +9,7 @@ import json
 import os
 import sys
 
-PRIVATE_KEYS = ["ALEX_CODE", "PILOTAGE_CODE", "WA_THOMAS", "WA_ALEX",
+PRIVATE_KEYS = ["ALEX_CODE", "PILOTAGE_CODE", "FUNNEL_CODE", "WA_THOMAS", "WA_ALEX",
                 "BRIDGE_URL", "BRIDGE_KEY"]
 
 data_path = sys.argv[1] if len(sys.argv) > 1 else "dashboard-data.json"
@@ -26,6 +26,20 @@ out = tpl.replace("__DATA_JSON__", blob)
 assert "__DATA_JSON__" not in out
 
 here = os.path.dirname(os.path.abspath(__file__))
+
+# onglet Funnel : fragments produits par funnel_fragment.py (CSS limité à #fxRoot,
+# markup + JS de la console funnel). Absents = onglet vide plutôt qu'un build cassé.
+for ph, fname in (("__FUNNEL_CSS__", "funnel-fragment.css"),
+                  ("__FUNNEL_HTML__", "funnel-fragment.html")):
+    if ph not in out:
+        continue
+    path = os.path.join(here, fname)
+    try:
+        frag = open(path, encoding="utf-8").read()
+    except OSError:
+        frag = ""
+        print(f"ATTENTION : {fname} absent, onglet Funnel vide", file=sys.stderr)
+    out = out.replace(ph, frag)
 try:
     private = json.load(open(os.path.join(here, "private.json")))
 except Exception:

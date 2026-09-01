@@ -15,6 +15,9 @@
     --good: #0ca30c; --good-text: #1d6b1d; --warning: #b07a00; --critical: #c03a30;
     --callout-bg: #fbe7de;
     --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    /* barres de l'onglet Funnel */
+    --bar: #b8966a; --bar-ctx: #d9cdb8;
+    --sans: "Avenir Next", -apple-system, "Segoe UI", system-ui, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -30,6 +33,7 @@
       --best: rgba(105, 165, 70, 0.30);
       --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
       --callout-bg: #362119;
+      --bar: #a88657; --bar-ctx: #4a4233;
     }
   }
   :root[data-theme="dark"] {
@@ -44,6 +48,7 @@
     --best: rgba(105, 165, 70, 0.30);
     --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
     --callout-bg: #362119;
+    --bar: #a88657; --bar-ctx: #4a4233;
   }
   :root[data-theme="light"] {
     color-scheme: light;
@@ -251,6 +256,10 @@
   footer { margin-top: 60px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--grid); padding-top: 14px; }
   td.best { background: var(--best); font-weight: 700; }
   @media (max-width: 640px) { .kpi .val { font-size: 24px; } }
+
+/* ===== onglet Funnel : styles de la console funnel, tous limités à #fxRoot
+   (générés par funnel_fragment.py depuis funnel-template.html) ===== */
+__FUNNEL_CSS__
 </style>
 
 <div class="wrap">
@@ -278,6 +287,7 @@
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
+    <button class="tab" role="tab" id="tabFunnel" aria-selected="false" data-panel="panelFunnel">Funnel 🔒</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
     <button class="tab" role="tab" id="tabPilotage" aria-selected="false" data-panel="panelPilotage">Pilotage 🔒</button>
   </div>
@@ -601,6 +611,34 @@
   </div>
 
   <!-- ================== ALEX ================== -->
+  <!-- ================== FUNNEL ================== -->
+  <div id="panelFunnel" role="tabpanel" hidden>
+    <section style="margin-top:16px" id="funnelLock">
+      <span class="eyebrow">Accès restreint</span>
+      <h2>Onglet Funnel</h2>
+      <p class="lede">Le funnel complet, des pubs à la vente : budget Meta, arrivées sur la page, vidéo, RDV,
+        puis calls et ventes. Entre le code pour l'ouvrir.</p>
+      <div class="card" style="max-width:380px;display:flex;gap:10px;align-items:center">
+        <input type="password" id="funnelCode" placeholder="Code d'accès" autocomplete="off" style="flex:1">
+        <button class="btn" id="funnelGo">Ouvrir</button>
+      </div>
+      <p class="lede" id="funnelErr" style="color:var(--critical);display:none;margin-top:8px">Mauvais code.</p>
+    </section>
+
+    <div id="funnelContent" style="display:none">
+      <section style="margin-top:16px">
+        <span class="eyebrow">Pilotage du funnel</span>
+        <h2>Des pubs à la vente</h2>
+        <p class="lede">Pubs Meta → page → vidéo → RDV → call → vente, sur les deux tunnels.
+          Choisis le tunnel juste en dessous : l'ancien, la
+          <a href="https://thomas-mayol.com/strategie-privee/" target="_blank" rel="noopener">nouvelle LP VSL</a>,
+          ou les deux avec le comparatif étape par étape.</p>
+      </section>
+      <!-- console funnel intégrée : markup + JS générés par funnel_fragment.py -->
+      <div id="fxRoot">__FUNNEL_HTML__</div>
+    </div>
+  </div>
+
   <div id="panelAlex" role="tabpanel" hidden>
     <section style="margin-top:16px" id="alexLock">
       <span class="eyebrow">Espace privé</span>
@@ -2767,6 +2805,26 @@ function initPilotage() {
   $("pilotCode").addEventListener("keydown", e => { if (e.key === "Enter") tryCode(); });
 }
 
+/* ================= verrou de l'onglet Funnel ================= */
+/* La console funnel elle-même est déjà dans la page (rendue au chargement) :
+   le verrou ne fait qu'afficher son conteneur, il n'y a rien à recalculer. */
+const FUNNEL_CODE = "__FUNNEL_CODE__";
+function initFunnel() {
+  const unlock = () => {
+    $("funnelLock").style.display = "none";
+    $("funnelContent").style.display = "";
+    $("tabFunnel").textContent = "Funnel";
+  };
+  if (sessionStorage.getItem("funnel-ok") === "1") unlock();
+  const tryCode = () => {
+    if ($("funnelCode").value.trim().toLowerCase() === FUNNEL_CODE) {
+      sessionStorage.setItem("funnel-ok", "1"); unlock();
+    } else { $("funnelErr").style.display = "block"; }
+  };
+  $("funnelGo").addEventListener("click", tryCode);
+  $("funnelCode").addEventListener("keydown", e => { if (e.key === "Enter") tryCode(); });
+}
+
 $("updatedAt").textContent = DATA.updated_at;
 /* bouton Actualiser : sur GitHub Pages il déclenche la vraie MAJ serveur via le
    pont Apps Script ; ailleurs (artifact claude.ai) il garde l'ouverture de Claude */
@@ -2837,6 +2895,7 @@ function setupRefresh(btn, note) {
 }
 setupRefresh($("btnRefresh"), document.querySelector(".updated"));
 initPilotage();
+initFunnel();
 $("tabClosers").addEventListener("click", renderClosersTab);
 /* Pilotage n'est plus l'onglet par défaut : re-rendre ses graphes quand il devient visible */
 $("tabPilotage").addEventListener("click", () => {

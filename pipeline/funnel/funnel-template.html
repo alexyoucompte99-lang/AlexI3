@@ -1,0 +1,990 @@
+<title>Console funnel : LP VSL Investisseurs 3.0</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f7efe4; --card: #fdfbf6; --border: #e9ddc9;
+    --ink: #262019; --ink-2: #5d5344; --muted: #8f8471;
+    --grid: #ece2d2; --baseline: #d4c7b2;
+    --accent: #a34524; --accent-soft: #fdeae1;
+    --pill-bg: #241d15; --pill-ink: #f7efe4;
+    --wash: rgba(163, 69, 36, 0.09);
+    --bar: #b8966a; --bar-ctx: #d9cdb8;
+    --best: #e9f1dd;
+    --good-text: #1d6b1d; --warning: #b07a00; --critical: #c03a30;
+    --callout-bg: #fbe7de;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: "Avenir Next", -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane: #171209; --card: #211a11; --border: #3a3226;
+      --ink: #f5eee1; --ink-2: #cbbfa8; --muted: #94897a;
+      --grid: #2e281e; --baseline: #4a4233;
+      --accent: #de8253; --accent-soft: #3a251c;
+      --pill-bg: #f5eee1; --pill-ink: #241d15;
+      --wash: rgba(222, 130, 83, 0.14);
+      --bar: #a88657; --bar-ctx: #4a4233;
+      --best: rgba(105, 165, 70, 0.30);
+      --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
+      --callout-bg: #362119;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane: #171209; --card: #211a11; --border: #3a3226;
+    --ink: #f5eee1; --ink-2: #cbbfa8; --muted: #94897a;
+    --grid: #2e281e; --baseline: #4a4233;
+    --accent: #de8253; --accent-soft: #3a251c;
+    --pill-bg: #f5eee1; --pill-ink: #241d15;
+    --wash: rgba(222, 130, 83, 0.14);
+    --bar: #a88657; --bar-ctx: #4a4233;
+    --best: rgba(105, 165, 70, 0.30);
+    --good-text: #4cc24c; --warning: #d9a53c; --critical: #e66a60;
+    --callout-bg: #362119;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--plane); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 26px 22px 90px; }
+  a { color: var(--accent); }
+
+  header.top { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 18px; margin-bottom: 6px; }
+  .refresh-btn { display: inline-block; align-self: flex-start; margin-top: 8px; padding: 8px 14px; border-radius: 9px;
+    background: var(--accent); color: var(--card); font-weight: 700; font-size: 0.85rem; text-decoration: none; cursor: pointer; }
+  .refresh-btn:hover { filter: brightness(1.08); }
+  .refresh-btn[data-busy] { opacity: 0.75; cursor: wait; }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--serif); font-size: 30px; font-weight: 700; text-wrap: balance; margin-top: 2px; }
+  .lede-top { color: var(--ink-2); font-size: 13.5px; margin-top: 4px; max-width: 70ch; }
+  .top-right { margin-left: auto; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+  .top-right b { color: var(--ink); font-weight: 600; }
+  .stamp { display: inline-block; background: var(--pill-bg); color: var(--pill-ink); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 4px 12px; }
+
+  /* onglets */
+  .tabs { display: flex; gap: 4px; margin: 16px 0 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tab { font: inherit; font-size: 14.5px; font-weight: 600; color: var(--ink-2); background: none; border: none; border-bottom: 3px solid transparent; padding: 10px 14px 11px; cursor: pointer; text-align: left; }
+  .tab small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .tab:hover { color: var(--ink); }
+  .tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tab .badge { display: inline-block; margin-left: 6px; background: var(--accent-soft); color: var(--accent); font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
+  .tabintro { color: var(--ink-2); font-size: 13.5px; margin: 12px 0 10px; max-width: 90ch; }
+  .tabintro strong { color: var(--ink); }
+  [data-only] { display: none; }
+  [data-only].show { display: block; }
+
+  /* filtres */
+  .filterbar { position: sticky; top: 0; z-index: 30; background: var(--plane); border-bottom: 1px solid var(--border); margin: 0 -22px 12px; padding: 10px 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+  .fpill { font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; padding: 6px 13px; border-radius: 999px; border: 1px solid transparent; background: none; font-family: inherit; }
+  .fpill:hover { border-color: var(--baseline); color: var(--ink); }
+  .fpill.on { background: var(--pill-bg); color: var(--pill-ink); border-color: var(--pill-bg); }
+  .fpill:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .fsep { width: 1px; height: 20px; background: var(--border); margin: 0 3px; }
+  .fcustom { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+  .fcustom input { font: inherit; font-size: 12.5px; color: var(--ink); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; max-width: 140px; }
+  .fcustom button { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+  .fnote { font-size: 12.5px; color: var(--ink-2); margin: 0 0 6px; }
+  details.weeks { font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; }
+  details.weeks summary { cursor: pointer; font-weight: 600; color: var(--ink-2); }
+  .weekboxes { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+  .wk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: var(--ink); font-size: 12.5px; }
+  .wk input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+  .wk small { color: var(--muted); font-size: 11px; }
+
+  /* notes */
+  .note { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--baseline); border-radius: 12px; padding: 11px 15px; font-size: 13.5px; color: var(--ink-2); margin-top: 12px; }
+  .note strong { color: var(--ink); }
+  .note.warn { border-left-color: var(--accent); background: var(--callout-bg); }
+  .note.top { margin: 0 0 8px; }
+
+  section { margin-top: 34px; }
+  h2 { font-family: var(--serif); font-size: 21px; font-weight: 700; text-wrap: balance; margin-bottom: 4px; }
+  .lede { color: var(--ink-2); font-size: 13.5px; margin: 0 0 14px; max-width: 80ch; }
+  .src { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: middle; }
+
+  /* KPI */
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px 12px; }
+  .kpi .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  .kpi .val { font-family: var(--serif); font-size: 29px; font-weight: 700; margin-top: 4px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .kpi.hot .val { color: var(--accent); }
+  .kpi .sub { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+  .delta { font-size: 12.5px; font-weight: 700; }
+  .delta.up { color: var(--good-text); }
+  .delta.down { color: var(--critical); }
+  .delta.na, .delta.flat { color: var(--muted); font-weight: 600; }
+
+  /* blocs funnel */
+  .bf { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 12px; }
+  .bf h3 { font-size: 14.5px; font-weight: 700; margin-bottom: 2px; }
+  .bf .bf-note { color: var(--ink-2); font-size: 12.5px; margin-bottom: 10px; }
+  .bf + .bf { margin-top: 14px; }
+  .bf-row { display: grid; grid-template-columns: 210px 1fr 160px; gap: 12px; align-items: center; padding: 6px 0; }
+  .bf-label { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .bf-label small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .bf-barwrap { background: var(--grid); border-radius: 5px; height: 22px; overflow: hidden; }
+  .bf-bar { display: block; height: 100%; background: var(--bar); border-radius: 5px 3px 3px 5px; min-width: 4px; }
+  .bf-row.hot .bf-bar { background: var(--accent); }
+  .bf-row.ctx .bf-bar { background: var(--bar-ctx); }
+  .bf-nums { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; line-height: 1.3; }
+  .bf-nums b { font-family: var(--serif); font-weight: 700; font-size: 16px; }
+  .bf-nums span { color: var(--ink-2); display: block; font-size: 11.5px; }
+  .bf-leak { padding: 1px 0 1px 222px; color: var(--accent); font-size: 12px; font-weight: 600; }
+  .bf-leak::before { content: "\2193  "; }
+  .bf-sep { border-top: 1px dashed var(--border); margin: 8px 0; }
+  .bf-empty { color: var(--ink-2); font-size: 13.5px; padding: 6px 0; }
+
+  /* mini-tuiles (pubs, closing) */
+  .mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 10px; margin-top: 12px; }
+  .mini .m { background: var(--plane); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+  .mini .m .lbl { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .mini .m .val { font-family: var(--serif); font-size: 20px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .mini .m .sub { font-size: 11.5px; color: var(--ink-2); }
+
+  /* fuites */
+  .lk { display: grid; grid-template-columns: 30px 1fr auto; gap: 14px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .lk:last-child { border-bottom: 0; }
+  .lk .lk-rank { font-family: var(--serif); font-weight: 700; font-size: 18px; color: var(--accent); }
+  .lk .lk-txt { font-size: 13.5px; }
+  .lk .lk-txt b { font-weight: 700; }
+  .lk .lk-txt small { display: block; color: var(--ink-2); font-size: 12px; }
+  .lk .lk-loss { font-family: var(--serif); font-weight: 700; font-size: 16px; color: var(--accent); white-space: nowrap; }
+
+  /* tableaux */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); background: var(--plane); padding: 9px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th.num, td.num { text-align: right; }
+  td { padding: 9px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td .stepname { font-weight: 600; }
+  td .stepdef { display: block; color: var(--muted); font-size: 11.5px; }
+  td.num { font-variant-numeric: tabular-nums; }
+  td.num b { font-family: var(--serif); font-weight: 700; font-size: 15.5px; }
+  td.num span { display: block; color: var(--ink-2); font-size: 11.5px; }
+  td.muted { color: var(--muted); font-size: 12.5px; }
+  tr.verdict td { background: var(--wash); }
+  td.best b { color: var(--good-text); }
+  tr.sec td { background: var(--plane); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  /* charts */
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 10px; position: relative; }
+  .chart-card svg { display: block; width: 100%; height: auto; }
+  .metricbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .mbtn { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--plane); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+  .mbtn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tooltip { position: absolute; pointer-events: none; background: var(--pill-bg); color: var(--pill-ink); font-size: 12.5px; border-radius: 8px; padding: 7px 11px; opacity: 0; transition: opacity 0.12s ease; white-space: nowrap; z-index: 5; transform: translate(-50%, -110%); }
+  .tooltip b { font-family: var(--serif); font-weight: 700; }
+  .chartnote { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  .srcrow { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .srcrow a { font-size: 12.5px; font-weight: 600; color: var(--pill-ink); background: var(--pill-bg); border-radius: 8px; padding: 7px 14px; text-decoration: none; }
+  .methodo { font-size: 12.5px; color: var(--ink-2); }
+  .methodo li { margin-left: 18px; margin-top: 4px; }
+
+  @media (max-width: 820px) {
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .bf-row { grid-template-columns: 1fr; gap: 4px; }
+    .bf-nums { text-align: left; }
+    .bf-leak { padding-left: 0; }
+    .tab small { display: none; }
+    .filterbar { position: static; margin: 0 0 12px; padding: 0; border: 0; }
+    .top-right { margin-left: 0; text-align: left; align-items: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Investisseurs 3.0 · Pilotage du funnel</p>
+      <h1>Console funnel : des pubs à la vente</h1>
+      <p class="lede-top">Pubs Meta → page → vidéo → RDV → call → vente. Ancien tunnel (pixel « Investisseurs 3.0 Tunnel ») et <a href="https://thomas-mayol.com/strategie-privee/" target="_blank" rel="noopener">nouvelle LP VSL</a> (pixel dédié), Sheet closing, Meta Ads.</p>
+    </div>
+    <div class="top-right">
+      <span class="stamp" id="headStamp">Relevé</span>
+      <span id="headSources"></span>
+      <a class="refresh-btn" id="btnRefresh" href="#" target="_blank" rel="noopener">Actualiser</a>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Choix du funnel">
+    <button class="tab on" data-tab="old">Ancien funnel<small>Tunnel actuel · pixel 686377034173439</small></button>
+    <button class="tab" data-tab="new">Nouveau funnel<span class="badge" id="newTag" hidden>trafic de test</span><small>LP VSL Stratégie privée · pixel 1625394888920444</small></button>
+    <button class="tab" data-tab="both">Les 2<small>Cumul + comparatif étape par étape</small></button>
+  </nav>
+  <p class="tabintro" id="tabIntro"></p>
+
+  <div class="filterbar" id="presets">
+    <button class="fpill" data-days="7">7 derniers jours</button>
+    <button class="fpill on" data-days="14">14 derniers jours</button>
+    <button class="fpill" data-days="28">28 derniers jours</button>
+    <span class="fsep"></span>
+    <button class="fpill" data-days="30">1 mois</button>
+    <button class="fpill" data-days="60">2 mois</button>
+    <button class="fpill" data-days="90">3 mois</button>
+    <button class="fpill" data-days="180">6 mois</button>
+    <span class="fsep"></span>
+    <button class="fpill" data-days="mtd">Mois en cours</button>
+    <button class="fpill" data-days="ytd">Année en cours</button>
+    <span class="fsep"></span>
+    <span class="fcustom">du <input type="date" id="dFrom"> au <input type="date" id="dTo"> <button id="dApply">Appliquer</button></span>
+  </div>
+  <p class="fnote" id="selNote"></p>
+  <details class="weeks"><summary>Composer la période semaine par semaine</summary><div class="weekboxes" id="weekboxes"></div></details>
+
+  <div class="note warn top" id="newEmpty" hidden></div>
+  <div class="note top" id="covNote" hidden></div>
+
+  <section>
+    <h2>Chiffres clés de la période</h2>
+    <p class="lede" id="kpiSub"></p>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <section>
+    <h2>Des pubs à la page <span class="src">Meta Ads</span></h2>
+    <p class="lede" id="adsSub"></p>
+    <div class="bf" id="ads"></div>
+    <p class="note" id="adsNote" hidden></p>
+  </section>
+
+  <section>
+    <h2>Sur la page : vidéo et prise de RDV <span class="src">Pixel</span></h2>
+    <p class="lede" id="funnelSub"></p>
+    <div class="bf" id="funnel"></div>
+  </section>
+
+  <section>
+    <h2>Après le RDV : calls et ventes <span class="src">Sheet closing</span></h2>
+    <p class="lede" id="clSub"></p>
+    <div class="bf" id="closing"></div>
+  </section>
+
+  <section>
+    <h2>Où agir en premier</h2>
+    <p class="lede">Les pertes de la période, classées par volume. C'est l'ordre de priorité pour optimiser.</p>
+    <div class="bf" id="leaks"></div>
+  </section>
+
+  <section data-only="both">
+    <h2>Ancien funnel contre nouveau funnel</h2>
+    <p class="lede">Étape par étape, sur la période sélectionnée. Les bases communes de comparaison : « RDV pour 100 lancements vidéo » et « ventes pour 100 calls bookés ». La meilleure valeur de chaque ligne est en vert.</p>
+    <div class="card"><table id="cmpTable"></table></div>
+    <p class="note" id="cmpNote"></p>
+  </section>
+
+  <section data-only="new">
+    <h2>Ce qu'ils font sur la nouvelle LP</h2>
+    <p class="lede">Évènements dédiés de la page (déployés le 17 août) : jusqu'où ils descendent, ce qu'ils regardent, où ils cliquent. Période sélectionnée, jours couverts par le pixel.</p>
+    <div class="bf" id="behRead"></div>
+    <div class="bf" id="behSections"></div>
+    <div class="card" style="margin-top:14px"><table id="behClicks"></table></div>
+    <p class="note" id="behNote"></p>
+  </section>
+
+  <section>
+    <h2>Rétention de la VSL <span class="src">Pixel</span></h2>
+    <p class="lede">Part des lancements encore en lecture à chaque étape de la vidéo (16 min 33), sur la période sélectionnée.</p>
+    <div class="chart-card" id="retCard">
+      <svg id="retChart" viewBox="0 0 960 250" role="img" aria-label="Courbe de retention de la video"></svg>
+      <div class="tooltip" id="retTip"></div>
+    </div>
+    <p class="note" id="retNote"></p>
+  </section>
+
+  <section>
+    <h2>Jour par jour</h2>
+    <p class="lede">Choisissez la métrique. Survolez la courbe pour le détail.</p>
+    <div class="chart-card" id="dailyCard">
+      <div class="metricbar" id="metricbar">
+        <button class="mbtn on" data-m="rdv">RDV confirmés</button>
+        <button class="mbtn" data-m="v0">Lancements vidéo</button>
+        <button class="mbtn" data-m="pot">Formulaires ouverts</button>
+        <button class="mbtn" data-m="arr" id="mbtnArr">Arrivées sur la page</button>
+        <button class="mbtn" data-m="booked">Calls bookés</button>
+        <button class="mbtn" data-m="present">Présents</button>
+        <button class="mbtn" data-m="vente">Ventes</button>
+        <button class="mbtn" data-m="spend">Dépenses pub</button>
+      </div>
+      <svg id="dailyChart" viewBox="0 0 960 250" role="img" aria-label="Metrique par jour"></svg>
+      <div class="tooltip" id="dailyTip"></div>
+      <p class="chartnote" id="dailyNote"></p>
+    </div>
+    <div class="card" style="margin-top:14px"><table id="weeklyTable"></table></div>
+    <p class="lede" style="margin-top:8px">Semaine par semaine, indépendamment du filtre de période (sur les 16 dernières semaines, pour le funnel de l'onglet) : c'est la tendance de fond. Un point « · » = pas de donnée pixel cette semaine-là.</p>
+  </section>
+
+  <section>
+    <h2>Sources et méthode</h2>
+    <div class="srcrow">
+      <a href="https://business.facebook.com/events_manager2/list/dataset/686377034173439/overview?business_id=1527446281363868" target="_blank" rel="noopener">Events Manager · ancien pixel</a>
+      <a href="https://business.facebook.com/events_manager2/list/dataset/1625394888920444/overview?business_id=1527446281363868" target="_blank" rel="noopener">Events Manager · nouveau pixel</a>
+      <a href="https://docs.google.com/spreadsheets/d/1F3f-0c9VA-RjtcPNEFd_VH4x2fap9eMDc4VgeZTwAvY/edit" target="_blank" rel="noopener">Sheet closing</a>
+      <a href="https://app.vturb.com/folders" target="_blank" rel="noopener">VTurb</a>
+      <a href="https://app.iclosed.io/app/ai-scheduler/scheduled-events" target="_blank" rel="noopener">iClosed</a>
+    </div>
+    <ul class="methodo">
+      <li><strong>Meta Ads</strong> (API Insights, par jour depuis le 1er janvier) : dépenses, clics sur le lien et « arrivées réelles sur la page » = landing page views Meta (la page a fini de charger après le clic). Ancien funnel = toutes les campagnes hors webinaires (VSL + retargeting) ; nouveau funnel = campagnes dédiées à la LP Stratégie privée (aucune pour l'instant). Les campagnes Webinaire (janvier, avril) sont hors périmètre.</li>
+      <li><strong>Pixel</strong> (Events Manager, par jour) : Meta ne remonte que 30 jours glissants, la console garde l'historique relevé (depuis le 20 juillet) et l'allonge à chaque relevé. Ancien funnel = pixel « Investisseurs 3.0 Tunnel » (PageView couvre tout le site, donc on prend les arrivées Meta Ads comme base) ; nouveau funnel = pixel dédié (PageView = la LP seule), branché le 19 août à midi sur la page, le player VTurb et le calendrier iClosed « Appel Diagnostic - Club Investisseurs 3.0 ». Paliers vidéo VTurb additionnés sous leurs deux noms (View5% et View5%25). Formulaires, qualifiés et RDV = évènements iClosed (Potential, Qualified, Disqualified, invitee_meeting_scheduled).</li>
+      <li><strong>Sheet closing</strong> (onglets « Suivi Closing » mensuels, hors onglets webinaire) : calls bookés = lignes à la date du call (une ligne datée d'un mois antérieur à son onglet compte au 1er du mois de l'onglet, règle « onglet du mois » de la console closing), présents = SHOW UP = OUI, show-up = présents ÷ calls renseignés (OUI + NON + reprogrammé + annulé), vente = VENTE = OUI ou virement coché, CA = prix confirmé sinon proposé. Nouveau funnel = calendrier iClosed « Appel Diagnostic - Club ».</li>
+      <li>Les pourcentages du bloc « Sur la page » sont calculés sur les jours couverts par le pixel pour rester cohérents ; les blocs pubs et closing couvrent toute la période. Le dernier jour est une journée incomplète.</li>
+      <li>Pour mettre à jour : demander un relevé à Alex (pixel) ; pubs et closing se rafraîchissent avec le relevé.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+__DATA__
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var MOIS = ['janv', 'fevr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+  var N = DAYS.length;
+  var LASTDAY_PARTIAL = true;
+  var fmt = function (v) { return Math.round(v || 0).toLocaleString('fr-FR'); };
+  var fmtEur = function (v) { return Math.round(v || 0).toLocaleString('fr-FR') + ' €'; };
+  var fmtEurP = function (v) { v = v || 0; return (v < 100 ? v.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : Math.round(v).toLocaleString('fr-FR')) + ' €'; };
+  var pct = function (a, b, dec) { if (!b) return null; var p = a / b * 100; return p.toFixed(dec === undefined ? 0 : dec).replace('.', ',') + ' %'; };
+  var pct1 = function (a, b) { return b ? (a / b * 100).toFixed(1).replace('.', ',') + ' %' : '—'; };
+  function dLabel(iso) { var d = new Date(iso + 'T12:00:00'); return d.getDate() + ' ' + MOIS[d.getMonth()]; }
+  function el(name, attrs, parent) { var e = document.createElementNS(NS, name); for (var k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function nulls() { var a = []; for (var i = 0; i < N; i++) a.push(null); return a; }
+  function zeros() { var a = []; for (var i = 0; i < N; i++) a.push(0); return a; }
+  function addArr(a, b) { var o = []; for (var i = 0; i < N; i++) { var x = a ? a[i] : null, y = b ? b[i] : null; o.push(x === null && y === null ? null : (x || 0) + (y || 0)); } return o; }
+
+  // ---- Sources : ancien pixel, nouveau pixel, cumul
+  var PCTS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95];
+  var BEH_KEYS = ['t30', 't1', 't2', 't3', 't5', 't10', 'play', 'v60', 'pitch', 'fs', 'cta', 'ctaF', 'ctaB', 's25', 's50', 's75', 's90', 'secThomas', 'secEtapes', 'secCtaF', 'secProof', 'secTemoin', 'tvClick', 'tGhislain', 'tLouis', 'tKim', 'tSophie', 'tLodois', 'exit', 'footer', 'merci'];
+  var ADS_KEYS = ['spend', 'clicks', 'link', 'lpv', 'vv'];
+  // booked = a la date du call ; resa = au jour ou le call a ete reserve (comparable au pixel)
+  var CL_KEYS = ['booked', 'present', 'noshow', 'reprog', 'annule', 'vente', 'ca', 'followup', 'rel', 'resa'];
+  function normalize(src) {
+    var o = { pv: src.pv || nulls(), pot: src.pot || nulls(), qual: src.qual || nulls(), disq: src.disq || nulls(), rdv: src.rdv || nulls(), sched: src.sched || nulls(), v: {}, beh: {}, ads: {}, cl: {} };
+    PCTS.forEach(function (p) { o.v[p] = (src.v && src.v[p]) || nulls(); });
+    BEH_KEYS.forEach(function (k) { o.beh[k] = (src.beh && src.beh[k]) || nulls(); });
+    ADS_KEYS.forEach(function (k) { o.ads[k] = (src.ads && src.ads[k]) || zeros(); });
+    CL_KEYS.forEach(function (k) { o.cl[k] = (src.cl && src.cl[k]) || zeros(); });
+    return o;
+  }
+  var S_OLD = normalize(OLD), S_NEW = normalize(NEW);
+  var S_BOTH = { pv: addArr(S_OLD.pv, S_NEW.pv), pot: addArr(S_OLD.pot, S_NEW.pot), qual: addArr(S_OLD.qual, S_NEW.qual), disq: addArr(S_OLD.disq, S_NEW.disq), rdv: addArr(S_OLD.rdv, S_NEW.rdv), sched: addArr(S_OLD.sched, S_NEW.sched), v: {}, beh: S_NEW.beh, ads: {}, cl: {} };
+  PCTS.forEach(function (p) { S_BOTH.v[p] = addArr(S_OLD.v[p], S_NEW.v[p]); });
+  ADS_KEYS.forEach(function (k) { S_BOTH.ads[k] = addArr(S_OLD.ads[k], S_NEW.ads[k]); });
+  CL_KEYS.forEach(function (k) { S_BOTH.cl[k] = addArr(S_OLD.cl[k], S_NEW.cl[k]); });
+  var SRC = { old: S_OLD, 'new': S_NEW, both: S_BOTH };
+  var PIXCOV = S_OLD.pv.map(function (v) { return v !== null; });
+  var PIX_FIRST = PIXCOV.indexOf(true);
+
+  var TABS = {
+    old: { hash: 'ancien', intro: '<strong>Ancien funnel</strong> : tunnel actuel. Pubs = campagnes VSL, page = pixel « Investisseurs 3.0 Tunnel » + VTurb + iClosed, calls = Sheet closing (hors webinaires). C\'est la référence à battre.', arrLabel: 'Arrivées réelles sur la page', arrSmall: 'landing page views Meta, pubs VSL', arrSrc: 'pubs' },
+    'new': { hash: 'nouveau', intro: '<strong>Nouveau funnel</strong> : LP VSL « Stratégie privée ». Pixel dédié depuis le 19 août à midi (page, player VTurb, calendrier iClosed « Appel Diagnostic - Club »), évènements de comportement depuis le 17 août, calls du calendrier Club dans le Sheet closing. Campagne dédiée « NEW VSL Funnel » en dépense depuis le 23 août.', arrLabel: 'Vues de la page', arrSmall: 'PageView pixel : rechargements, retours, nos visites et calendrier iClosed inclus · arrivées uniques pubs dans le bloc pubs', arrSrc: 'pixel' },
+    both: { hash: 'les2', intro: '<strong>Les 2 funnels cumulés</strong> sur la période (somme des deux pixels, des campagnes et des calendriers), puis le comparatif étape par étape ancien contre nouveau.', arrLabel: 'Arrivées réelles sur la page', arrSmall: 'landing page views Meta, toutes campagnes VSL', arrSrc: 'pubs' }
+  };
+  var curTab = 'old';
+  (function () {
+    var h = (location.hash || '').replace('#', '');
+    for (var k in TABS) if (TABS[k].hash === h) curTab = k;
+    if (!h) { try { var s = sessionStorage.getItem('i3-funnel-tab'); if (s && TABS[s]) curTab = s; } catch (e) {} }
+  })();
+  function cur() { return SRC[curTab]; }
+  document.querySelectorAll('.tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      curTab = b.dataset.tab;
+      try { sessionStorage.setItem('i3-funnel-tab', curTab); } catch (e) {}
+      if (history.replaceState) history.replaceState(null, '', '#' + TABS[curTab].hash);
+      renderAll();
+    });
+  });
+
+  // ---- Selection de jours
+  var sel = [];
+  function lastN(n) { var a = []; for (var i = Math.max(0, N - n); i < N; i++) a.push(i); return a; }
+  function allIdx() { return lastN(N); }
+  function mtdIdx() { var m = DAYS[N - 1].slice(0, 7); var a = []; for (var i = 0; i < N; i++) if (DAYS[i].slice(0, 7) === m) a.push(i); return a; }
+
+  var weeks = [];
+  (function () {
+    var c = null;
+    for (var i = 0; i < N; i++) {
+      var d = new Date(DAYS[i] + 'T12:00:00');
+      var monday = (d.getDay() + 6) % 7 === 0;
+      if (!c || monday) { c = { idx: [], label: '' }; weeks.push(c); }
+      c.idx.push(i);
+    }
+    weeks.forEach(function (w) {
+      var a = new Date(DAYS[w.idx[0]] + 'T12:00:00');
+      var b = new Date(DAYS[w.idx[w.idx.length - 1]] + 'T12:00:00');
+      if (w.idx.length === 1) w.label = dLabel(DAYS[w.idx[0]]);
+      else if (a.getMonth() === b.getMonth()) w.label = a.getDate() + ' au ' + b.getDate() + ' ' + MOIS[a.getMonth()];
+      else w.label = dLabel(DAYS[w.idx[0]]) + ' au ' + dLabel(DAYS[w.idx[w.idx.length - 1]]);
+    });
+  })();
+  var wb = document.getElementById('weekboxes');
+  weeks.forEach(function (w, wi) {
+    var lab = document.createElement('label'); lab.className = 'wk';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.wi = wi;
+    cb.addEventListener('change', function () {
+      w.idx.forEach(function (i) { var at = sel.indexOf(i); if (cb.checked && at === -1) sel.push(i); if (!cb.checked && at !== -1) sel.splice(at, 1); });
+      sel.sort(function (a, b) { return a - b; });
+      clearPresets(); renderAll();
+    });
+    lab.appendChild(cb);
+    var txt = document.createElement('span'); txt.textContent = w.label; lab.appendChild(txt);
+    if (w.idx.indexOf(N - 1) !== -1) { var sm = document.createElement('small'); sm.textContent = '(en cours)'; lab.appendChild(sm); }
+    wb.appendChild(lab);
+  });
+  function syncWeekboxes() {
+    document.querySelectorAll('#weekboxes input').forEach(function (cb) {
+      var w = weeks[+cb.dataset.wi];
+      var inSel = w.idx.filter(function (i) { return sel.indexOf(i) !== -1; }).length;
+      cb.checked = inSel === w.idx.length; cb.indeterminate = inSel > 0 && inSel < w.idx.length;
+    });
+  }
+  function clearPresets() { document.querySelectorAll('.fpill').forEach(function (b) { b.classList.remove('on'); }); }
+  document.querySelectorAll('.fpill').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var d = btn.dataset.days;
+      sel = d === 'ytd' ? allIdx() : (d === 'mtd' ? mtdIdx() : lastN(+d));
+      clearPresets(); btn.classList.add('on'); renderAll();
+    });
+  });
+  var dFrom = document.getElementById('dFrom'), dTo = document.getElementById('dTo');
+  dFrom.min = DAYS[0]; dFrom.max = DAYS[N - 1]; dTo.min = DAYS[0]; dTo.max = DAYS[N - 1];
+  document.getElementById('dApply').addEventListener('click', function () {
+    var a = dFrom.value || DAYS[0], b = dTo.value || DAYS[N - 1];
+    if (a > b) { var t = a; a = b; b = t; }
+    sel = []; for (var i = 0; i < N; i++) if (DAYS[i] >= a && DAYS[i] <= b) sel.push(i);
+    if (!sel.length) sel = lastN(14);
+    clearPresets(); renderAll();
+  });
+
+  // ---- Sommes (null = pas de donnee, ignore)
+  function S(arr, idx) { var t = 0; idx.forEach(function (i) { if (arr[i] !== null && arr[i] !== undefined) t += arr[i]; }); return t; }
+  function C(arr, idx) { var t = 0; idx.forEach(function (i) { if (arr[i] !== null && arr[i] !== undefined) t += 1; }); return t; }
+  function sumsOf(src, idx) {
+    var o = { n: idx.length, cov: C(src.pv, idx), pv: S(src.pv, idx), pot: S(src.pot, idx), qual: S(src.qual, idx), disq: S(src.disq, idx), rdv: S(src.rdv, idx), sched: S(src.sched, idx), v: {}, beh: {}, ads: {}, cl: {} };
+    PCTS.forEach(function (p) { o.v[p] = S(src.v[p], idx); });
+    BEH_KEYS.forEach(function (k) { o.beh[k] = S(src.beh[k], idx); });
+    ADS_KEYS.forEach(function (k) { o.ads[k] = S(src.ads[k], idx); });
+    CL_KEYS.forEach(function (k) { o.cl[k] = S(src.cl[k], idx); });
+    o.arr = arrivals(o);
+    return o;
+  }
+  function arrivals(o) { return curTab === 'new' ? o.pv : o.ads.lpv; }
+  // Nouveau funnel : on compte les calls au jour de leur RESERVATION (colonne du Sheet), le seul
+  // repere comparable au pixel, qui envoie son evenement au moment ou le creneau est pris. Un call
+  // reserve le 28 pour le 4 du mois suivant comptait sinon hors periode. Ancien funnel : la colonne
+  // n'est remplie que sur une partie des lignes -> on garde la date du call.
+  function bookedOf(o) { return curTab === 'new' ? o.cl.resa : o.cl.booked; }
+  function bookedArr(src) { return curTab === 'new' ? src.cl.resa : src.cl.booked; }
+  var BOOKED_SUB = function () { return curTab === 'new' ? 'lignes du Sheet à la date de réservation' : 'lignes du Sheet à la date du call'; };
+  function sums(idx) { return sumsOf(cur(), idx); }
+  function prevIdx(idx) {
+    var n = idx.length, first = idx[0];
+    if (first - n < 0) return null;
+    var out = []; for (var i = first - n; i < first; i++) out.push(i);
+    return out;
+  }
+  function pixIdx(idx) { return idx.filter(function (i) { return PIXCOV[i]; }); }
+
+  function deltaHtml(c, p, isRate, unit, okPrev) {
+    if (p === null || p === undefined || okPrev === false) return '<span class="delta na">pas d\'historique pour comparer</span>';
+    var diff, txt;
+    if (isRate) { diff = c - p; txt = (diff >= 0 ? '+' : '') + diff.toFixed(1).replace('.', ',') + (unit === undefined ? ' pt' : unit); }
+    else { if (!p) return '<span class="delta na">rien sur la période d\'avant</span>'; diff = (c - p) / p * 100; txt = (diff >= 0 ? '+' : '') + Math.round(diff) + ' %'; }
+    var cls = Math.abs(diff) < (isRate ? 0.5 : 3) ? 'flat' : (diff > 0 ? 'up' : 'down');
+    var arrow = cls === 'flat' ? '→' : (diff > 0 ? '↑' : '↓');
+    return '<span class="delta ' + cls + '">' + arrow + ' ' + txt + ' vs période précédente</span>';
+  }
+
+  // ---- Etat : couverture pixel, trafic de test
+  function renderState(s) {
+    var all = sumsOf(S_NEW, allIdx());
+    var tag = document.getElementById('newTag');
+    /* depense totale des campagnes du nouveau funnel (toute l'annee) + premiere date */
+    var adsFrom = null, adsTot = 0;
+    for (var ai = 0; ai < N; ai++) { var sp = NEW.ads.spend[ai] || 0; if (sp) { adsTot += sp; if (!adsFrom) adsFrom = ai; } }
+    var adsOn = adsTot > 10;
+    var test = all.pv < 300 && !adsOn;
+    tag.hidden = !test;
+    var box = document.getElementById('newEmpty');
+    if (curTab === 'new' && all.pv < 300) {
+      box.hidden = false;
+      if (adsOn) {
+        box.innerHTML = '<strong>Les pubs tournent, le relevé pixel n\'a pas encore suivi</strong> : ' + fmtEur(adsTot) + ' dépensés sur les campagnes du nouveau funnel depuis le ' + dLabel(DAYS[adsFrom]) + ', mais les chiffres pixel de cet onglet (arrivées, vidéo, formulaires) s\'arrêtent au relevé manuel du ' + RELEVE + '. Les arrivées réelles et les coûts côté pubs sont déjà à jour dans le bloc « Des pubs à la page » ; le reste se met à niveau au prochain relevé pixel.';
+      } else {
+        box.innerHTML = '<strong>Le nouveau pixel ne reçoit que du trafic de test pour l\'instant</strong> : ' + fmt(all.pv) + ' arrivées sur la LP depuis le 19 août à midi (nos vérifications, pas de campagne). Le tracking est en place de bout en bout (page, VTurb, iClosed) : dès que les pubs envoient vers la nouvelle LP, cet onglet se remplit au relevé suivant.';
+      }
+    } else box.hidden = true;
+    var cov = document.getElementById('covNote');
+    if (s.cov < s.n) {
+      cov.hidden = false;
+      cov.innerHTML = '<strong>Données pixel sur ' + s.cov + ' jour' + (s.cov > 1 ? 's' : '') + ' sur ' + s.n + '</strong> (relevées depuis le ' + (PIX_FIRST >= 0 ? dLabel(DAYS[PIX_FIRST]) : '—') + ', Meta ne remonte que 30 jours glissants). Vidéo, formulaires et RDV sont calculés sur ces jours-là ; pubs et closing couvrent toute la période.' + (s.cov === 0 ? ' Aucun jour couvert : choisissez une période plus récente pour le bloc vidéo.' : '');
+    } else cov.hidden = true;
+  }
+
+  // ---- KPIs
+  function renderKpis(s, p, sf) {
+    var pOk = !!p, pPix = !!p && p.cov === p.n && p.cov > 0;
+    var covTxt = s.cov < s.n ? ' · sur ' + s.cov + ' j couverts' : '';
+    var showup = s.cl.present + s.cl.noshow + s.cl.reprog + s.cl.annule;
+    var pShow = p ? p.cl.present + p.cl.noshow + p.cl.reprog + p.cl.annule : 0;
+    var arrSrc = curTab === 'new' ? 'pixel' : 'pubs';
+    var arrCov = curTab === 'new' ? covTxt : '';
+    var tiles = [
+      { l: TABS[curTab].arrLabel, src: arrSrc, n: fmt(s.arr), sub: (curTab === 'new' ? 'PageView du pixel dédié' : 'landing page views Meta') + arrCov, d: deltaHtml(s.arr, p ? p.arr : null, false, '', curTab === 'new' ? pPix : pOk) },
+      { l: 'Lancements vidéo', src: 'pixel', n: fmt(sf.v[0]), sub: (pct(sf.v[5], sf.v[0]) || '—') + ' passent la 1re minute' + covTxt, d: deltaHtml(sf.v[0], p ? p.v[0] : null, false, '', pPix) },
+      { l: 'RDV confirmés', src: 'pixel', n: fmt(sf.rdv), sub: (sf.v[0] ? pct1(sf.rdv, sf.v[0]) : '—') + ' des lancements (vidéo → RDV)' + covTxt, d: deltaHtml(sf.rdv, p ? p.rdv : null, false, '', pPix), hot: true },
+      { l: 'Calls bookés', src: 'closing', n: fmt(bookedOf(s)), sub: BOOKED_SUB(), d: deltaHtml(bookedOf(s), p ? bookedOf(p) : null, false, '', pOk) },
+      { l: 'Présents', src: 'closing', n: fmt(s.cl.present), sub: (pct(s.cl.present, showup) || '—') + ' de show-up sur ' + fmt(showup) + ' renseignés', d: deltaHtml(s.cl.present, p ? p.cl.present : null, false, '', pOk) },
+      { l: 'Ventes', src: 'closing', n: fmt(s.cl.vente), sub: fmtEur(s.cl.ca) + ' de CA · ' + (pct(s.cl.vente, s.cl.present) || '—') + ' des présents', d: deltaHtml(s.cl.vente, p ? p.cl.vente : null, false, '', pOk), hot: true }
+    ];
+    document.getElementById('kpis').innerHTML = tiles.map(function (t) {
+      return '<div class="kpi' + (t.hot ? ' hot' : '') + '"><div class="lbl">' + t.l + '<span class="src">' + t.src + '</span></div><div class="val">' + t.n + '</div><div class="sub">' + t.sub + '</div><div class="sub">' + t.d + '</div></div>';
+    }).join('');
+    var a = dLabel(DAYS[sel[0]]), b = dLabel(DAYS[sel[sel.length - 1]]);
+    document.getElementById('kpiSub').textContent = sel.length + ' jours sélectionnés, du ' + a + ' au ' + b + '. Les flèches comparent aux ' + sel.length + ' jours précédents (quand les données existent).';
+    document.getElementById('selNote').textContent = 'Période : du ' + a + ' au ' + b + ' (' + sel.length + ' jours). La période reste la même quand vous changez d\'onglet.';
+  }
+
+  // ---- Lignes de funnel
+  function frow(label, small, val, base, opts) {
+    opts = opts || {};
+    var w = base ? Math.max(0.5, val / base * 100) : 0.5;
+    var sub;
+    if (opts.ctx) sub = opts.ctxLabel || 'contexte';
+    else if (opts.sub) sub = opts.sub;
+    else if (base) sub = pct(val, base) + ' ' + (opts.baseLabel || 'des lancements');
+    else sub = 'pas de base sur la période';
+    return '<div class="bf-row' + (opts.hot ? ' hot' : '') + (opts.ctx ? ' ctx' : '') + '">' +
+      '<span class="bf-label">' + label + (small ? '<small>' + small + '</small>' : '') + '</span>' +
+      '<span class="bf-barwrap"><span class="bf-bar" style="width:' + Math.min(100, opts.ctx ? 100 : w) + '%"></span></span>' +
+      '<span class="bf-nums"><b>' + (opts.money ? fmtEur(val) : fmt(val)) + '</b><span>' + sub + '</span></span></div>';
+  }
+  function leakLine(txt) { return '<div class="bf-leak">' + txt + '</div>'; }
+  function mini(items) { return '<div class="mini">' + items.map(function (m) { return '<div class="m"><div class="lbl">' + m.l + '</div><div class="val">' + m.v + '</div>' + (m.s ? '<div class="sub">' + m.s + '</div>' : '') + '</div>'; }).join('') + '</div>'; }
+
+  // ---- Bloc A : pubs
+  function renderAds(s, p) {
+    var a = s.ads, o = { baseLabel: 'des clics sur le lien' };
+    var sub = document.getElementById('adsSub');
+    sub.textContent = curTab === 'new' ? 'Campagnes dédiées à la nouvelle LP (aucune pour l\'instant : les chiffres ci-dessous restent à zéro tant que les pubs n\'envoient pas vers la page).' : 'Toutes les campagnes du compte Meta hors webinaires (VSL + retargeting), toute la période sélectionnée. « Arrivées réelles » = la page a fini de charger après le clic (landing page view).';
+    var html = '';
+    html += frow('Dépenses publicitaires', curTab === 'new' ? 'campagnes LP Stratégie privée' : 'campagnes VSL + retargeting, hors webinaires', a.spend, 0, { ctx: true, money: true, ctxLabel: a.spend && a.lpv ? fmtEurP(a.spend / a.lpv) + ' par arrivée' : 'période' });
+    html += '<div class="bf-sep"></div>';
+    html += frow('Clics sur la pub', 'tous clics, y compris réactions', a.clicks, a.clicks, { baseLabel: 'des clics' });
+    html += frow('Clics sur le lien', 'vers la page', a.link, a.clicks, { baseLabel: 'des clics' });
+    html += leakLine(fmt(Math.max(0, a.link - a.lpv)) + ' cliquent mais n\'arrivent jamais sur la page (' + (pct(Math.max(0, a.link - a.lpv), a.link) || '—') + ') : chargement, retour arrière');
+    html += frow('Arrivées réelles sur la page', 'landing page views', a.lpv, a.clicks, { sub: (pct(a.lpv, a.link) || '—') + ' des clics sur le lien · ' + (pct(a.lpv, a.clicks) || '—') + ' des clics', hot: true });
+    document.getElementById('ads').innerHTML = html + mini([
+      { l: 'Coût par clic lien', v: a.link ? fmtEurP(a.spend / a.link) : '—' },
+      { l: 'Coût par arrivée', v: a.lpv ? fmtEurP(a.spend / a.lpv) : '—', s: p && p.ads.lpv ? 'avant : ' + fmtEurP(p.ads.spend / p.ads.lpv) : '' },
+      { l: 'Coût par call booké', v: bookedOf(s) ? fmtEurP(a.spend / bookedOf(s)) : '—', s: 'dépenses ÷ ' + BOOKED_SUB().replace('lignes du Sheet ', 'calls du Sheet ') + (s.rdv && s.cov === s.n ? ' · ' + fmtEurP(a.spend / s.rdv) + ' par RDV pris (pixel)' : '') + (p && bookedOf(p) ? ' · avant : ' + fmtEurP(p.ads.spend / bookedOf(p)) : '') },
+      { l: 'Coût par présent', v: s.cl.present ? fmtEurP(a.spend / s.cl.present) : '—', s: p && p.cl.present ? 'avant : ' + fmtEurP(p.ads.spend / p.cl.present) : '' },
+      { l: 'Coût par vente', v: s.cl.vente ? fmtEurP(a.spend / s.cl.vente) : '—', s: s.cl.ca ? 'CA ' + fmtEur(s.cl.ca) + ' · ROAS ' + (a.spend ? (s.cl.ca / a.spend).toFixed(1).replace('.', ',') : '—') : '' }
+    ]);
+    var note = document.getElementById('adsNote');
+    if (curTab === 'new' && !a.spend) { note.hidden = false; note.className = 'note warn'; note.innerHTML = '<strong>Aucune dépense sur la période pour les campagnes du nouveau funnel</strong> (noms contenant « Stratégie privée », « nouvelle LP », « LP V2 », « club » ou « NEW VSL »). Choisissez une période plus récente ou vérifiez le nom de la campagne.'; }
+    else note.hidden = true;
+  }
+
+  // ---- Bloc B : page, video, RDV (pixel ; jours couverts)
+  function renderFunnel(sf) {
+    var html = '';
+    var sub = document.getElementById('funnelSub');
+    if (!sf.cov) { sub.textContent = 'Aucun jour de la période n\'est couvert par le pixel.'; document.getElementById('funnel').innerHTML = '<p class="bf-empty">Choisissez une période plus récente (données pixel depuis le ' + dLabel(DAYS[PIX_FIRST]) + ').</p>'; return; }
+    var covTxt = sf.cov < sf.n ? ' Calculé sur les ' + sf.cov + ' jours couverts par le pixel.' : '';
+    if (curTab === 'new') {
+      sub.textContent = 'Base 100 % = arrivées sur la LP (PageView du pixel dédié, tout trafic). Lancements = VTurb (autoplay muet), « vraiment lancée » = activation du son.' + covTxt;
+      var A = sf.pv, b = sf.beh, o = { baseLabel: 'des arrivées' };
+      html += frow('Arrivées sur la LP', 'PageView du pixel dédié' + (sf.ads.lpv ? ' · dont ' + fmt(sf.ads.lpv) + ' via les pubs' : ''), A, A, o);
+      html += leakLine(fmt(Math.max(0, A - b.t30)) + ' partent avant 30 secondes (' + (pct(Math.max(0, A - b.t30), A) || '—') + ')');
+      html += frow('Restent 30 s', 'Time_30s', b.t30, A, o);
+      html += '<div class="bf-sep"></div>';
+      html += frow('Démarrages vidéo', 'VTurb View0%, autoplay muet inclus', sf.v[0], A, o);
+      html += frow('Lancent vraiment la vidéo', 'activent le son (VSL_PlayClick)', b.play, A, { baseLabel: 'des arrivées', hot: true });
+      html += leakLine(fmt(Math.max(0, sf.v[0] - sf.v[5])) + ' partent dans la première minute (' + (pct(Math.max(0, sf.v[0] - sf.v[5]), sf.v[0]) || '—') + ' des démarrages)');
+      html += frow('Passent la 1re minute', '5 % de la vidéo, ~50 s', sf.v[5], A, o);
+      html += frow('4 minutes', '25 % de la vidéo', sf.v[25], A, o);
+      html += frow('Mi-vidéo', '8 min 15', sf.v[50], A, o);
+      html += frow('Trois quarts', '12 min 25', sf.v[75], A, o);
+      html += frow('Fin de vidéo', '95 %, pitch inclus', sf.v[95], A, o);
+      html += '<div class="bf-sep"></div>';
+      html += frow('Cliquent sur Réserver', 'CTA_BookingClick, bloc 60 s + CTA final', b.cta, A, o);
+      html += frow('Formulaire ouvert', 'iClosed', sf.pot, A, o);
+      html += leakLine(fmt(Math.max(0, sf.pot - sf.qual - sf.disq)) + ' ne terminent pas le formulaire, ' + fmt(sf.disq) + ' disqualifiés');
+      html += frow('Qualifiés', '', sf.qual, A, o);
+      html += leakLine(fmt(Math.max(0, sf.qual - sf.rdv)) + ' qualifiés ne prennent pas de créneau');
+      html += frow('RDV confirmés', 'iClosed, calendrier Club' + (sf.sched ? ' · ' + fmt(sf.sched) + ' Schedule envoyés par la page merci' : ''), sf.rdv, A, { baseLabel: 'des arrivées', hot: true });
+    } else {
+      var L = sf.arr, oL = { baseLabel: 'des arrivées' };
+      sub.textContent = 'Base 100 % = arrivées réelles sur la page (landing page views des pubs VSL). Les pages vues du pixel couvrent tout le site, elles restent en contexte. « Vraiment lancée » = passent 50 s, l\'ancien player n\'a pas d\'évènement son.' + covTxt;
+      html += frow('Pages vues', curTab === 'both' ? 'ancien pixel tout le site + nouvelle LP' : 'pixel entier, tout le site', sf.pv, 0, { ctx: true, ctxLabel: 'contexte, toutes pages' });
+      html += '<div class="bf-sep"></div>';
+      html += frow(TABS[curTab].arrLabel, TABS[curTab].arrSmall, L, L, oL);
+      html += frow('Démarrages vidéo', 'VTurb View0%, autoplay muet inclus' + (curTab === 'both' ? ', tous players' : ', les 2 players'), sf.v[0], L, oL);
+      html += leakLine(fmt(Math.max(0, sf.v[0] - sf.v[5])) + ' partent dans la première minute (' + (pct(Math.max(0, sf.v[0] - sf.v[5]), sf.v[0]) || '—') + ' des démarrages)');
+      html += frow('Lancent vraiment la vidéo', 'passent la 1re minute (5 %, ~50 s)', sf.v[5], L, { baseLabel: 'des arrivées', hot: true });
+      html += leakLine(fmt(Math.max(0, sf.v[5] - sf.v[25])) + ' partent entre 1 et 4 min');
+      html += frow('4 minutes', '25 % de la vidéo', sf.v[25], L, oL);
+      html += leakLine(fmt(Math.max(0, sf.v[25] - sf.v[50])) + ' partent entre 4 et 8 min');
+      html += frow('Mi-vidéo', '8 min 15', sf.v[50], L, oL);
+      html += leakLine(fmt(Math.max(0, sf.v[50] - sf.v[75])) + ' partent entre 8 et 12 min');
+      html += frow('Trois quarts', '12 min 25', sf.v[75], L, oL);
+      html += leakLine(fmt(Math.max(0, sf.v[75] - sf.v[95])) + ' partent dans le dernier quart');
+      html += frow('Fin de vidéo', '95 %, pitch inclus', sf.v[95], L, oL);
+      html += '<div class="bf-sep"></div>';
+      html += frow('Formulaire ouvert', 'iClosed, le CTA travaille avant la fin', sf.pot, L, oL);
+      html += leakLine(fmt(Math.max(0, sf.pot - sf.qual - sf.disq)) + ' ne terminent pas le formulaire, ' + fmt(sf.disq) + ' disqualifiés seulement');
+      html += frow('Qualifiés', '', sf.qual, L, oL);
+      html += leakLine(fmt(Math.max(0, sf.qual - sf.rdv)) + ' qualifiés ne prennent pas de créneau');
+      html += frow('RDV confirmés', 'iClosed', sf.rdv, L, { baseLabel: 'des arrivées', hot: true });
+    }
+    html += mini([
+      { l: 'Vidéo → RDV', v: sf.v[0] ? pct1(sf.rdv, sf.v[0]) : '—', s: 'RDV pour 100 démarrages : ' + (sf.v[0] ? (sf.rdv / sf.v[0] * 100).toFixed(1).replace('.', ',') : '—') },
+      { l: 'Arrivée → RDV', v: sf.arr ? pct1(sf.rdv, sf.arr) : '—', s: 'RDV pour 100 arrivées' },
+      { l: 'Vont au bout de la vidéo', v: pct(sf.v[95], sf.v[0]) || '—', s: 'des démarrages' },
+      { l: 'Formulaire → RDV', v: pct(sf.rdv, sf.pot) || '—', s: fmt(sf.pot) + ' formulaires ouverts' }
+    ]);
+    document.getElementById('funnel').innerHTML = html;
+  }
+
+  // ---- Bloc C : closing (Sheet)
+  function renderClosing(s, p) {
+    var c = s.cl, B = c.booked;
+    var showupBase = c.present + c.noshow + c.reprog + c.annule;
+    var unknown = Math.max(0, B - showupBase);
+    var sub = document.getElementById('clSub');
+    sub.textContent = (curTab === 'new' ? 'Calls du calendrier iClosed « Appel Diagnostic - Club » dans le Sheet closing (aucun pour l\'instant). ' : 'Onglets « Suivi Closing » mensuels (hors webinaires), à la date du call ; une ligne datée d\'un mois antérieur à son onglet (relance closée ce mois-ci) compte au 1er du mois de l\'onglet, comme dans la console closing. ') + 'Show-up = présents ÷ calls renseignés, closing = ventes ÷ présents, vente = VENTE OUI ou virement coché.';
+    var html = '';
+    if (curTab === 'new' && c.resa !== B) html += leakLine(fmt(c.resa) + ' call' + (c.resa > 1 ? 's' : '') + ' réservé' + (c.resa > 1 ? 's' : '') + ' sur la période (c\'est ce chiffre-là qui se compare au pixel) ; ci-dessous, les calls dont la DATE tombe dans la période');
+    html += frow('Calls bookés', 'lignes du Sheet à la date du call' + (c.rel ? ', dont ' + fmt(c.rel) + ' relance' + (c.rel > 1 ? 's' : '') + ' de mois précédents comptée' + (c.rel > 1 ? 's' : '') + ' au 1er du mois' : ''), B, B, { baseLabel: 'des calls' });
+    html += leakLine(fmt(c.noshow) + ' no-show, ' + fmt(c.reprog) + ' reprogrammés, ' + fmt(c.annule) + ' annulés' + (unknown ? ', ' + fmt(unknown) + ' non renseignés (à venir ou à corriger)' : ''));
+    html += frow('Présents', 'SHOW UP = OUI', c.present, B, { sub: (pct(c.present, showupBase) || '—') + ' de show-up sur ' + fmt(showupBase) + ' renseignés', hot: true });
+    html += leakLine(fmt(Math.max(0, c.present - c.vente - c.followup)) + ' présents sans vente ni follow-up, ' + fmt(c.followup) + ' en follow-up');
+    html += frow('Ventes', 'VENTE = OUI ou virement', c.vente, B, { sub: (pct(c.vente, c.present) || '—') + ' de closing sur présents · ' + (pct(c.vente, B) || '—') + ' des bookés', hot: true });
+    html += mini([
+      { l: 'CA signé', v: fmtEur(c.ca), s: p ? 'avant : ' + fmtEur(p.cl.ca) : '' },
+      { l: 'Panier moyen', v: c.vente ? fmtEur(c.ca / c.vente) : '—' },
+      { l: 'Show-up', v: pct(c.present, showupBase) || '—', s: p ? 'avant : ' + (pct(p.cl.present, p.cl.present + p.cl.noshow + p.cl.reprog + p.cl.annule) || '—') : '' },
+      { l: 'Closing sur présents', v: pct(c.vente, c.present) || '—', s: p ? 'avant : ' + (pct(p.cl.vente, p.cl.present) || '—') : '' },
+      { l: 'Follow-ups en cours', v: fmt(c.followup) },
+      { l: 'CA par call booké', v: B ? fmtEur(c.ca / B) : '—' }
+    ]);
+    document.getElementById('closing').innerHTML = B ? html : '<p class="bf-empty">Aucun call dans le Sheet sur cette période pour ce funnel.</p>';
+  }
+
+  // ---- Fuites
+  function renderLeaks(sf, s) {
+    var items = [
+      { loss: Math.max(0, sf.v[0] - sf.v[5]), t: '<b>La première minute de la vidéo.</b> Le hook d\'ouverture est le levier n°1 : chaque point gagné ici se répercute sur tout le reste.', st: 'Levier : hook, promesse, preuve dans les 30 premières secondes.' },
+      { loss: Math.max(0, sf.pot - sf.qual - sf.disq), t: '<b>Le formulaire iClosed.</b> ' + (pct(Math.max(0, sf.pot - sf.qual - sf.disq), sf.pot) || '0 %') + ' de ceux qui l\'ouvrent ne le terminent pas, et seulement ' + fmt(sf.disq) + ' sont disqualifiés : c\'est la friction qui coûte, pas le tri.', st: 'Levier : raccourcir le formulaire, réduire les champs sensibles.' },
+      { loss: Math.max(0, sf.v[50] - sf.v[75]), t: '<b>Le milieu de vidéo, de 8 à 12 min.</b> Deuxième zone d\'érosion : le spectateur décroche avant le pitch.', st: 'Levier : teaser l\'offre plus tôt, resserrer le passage.' },
+      { loss: Math.max(0, sf.qual - sf.rdv), t: '<b>Qualifiés sans créneau.</b> Ils ont passé le tri mais ne réservent pas.', st: 'Levier : relance rapide, plus de créneaux visibles.' },
+      { loss: Math.max(0, s.ads.link - s.ads.lpv), t: '<b>Clics perdus avant la page.</b> Ils cliquent sur la pub mais la page n\'a jamais fini de charger chez eux.', st: 'Levier : vitesse de la page, poids des images et de la vidéo, réseau mobile.' },
+      { loss: s.cl.noshow, t: '<b>No-show aux calls.</b> Booké, mais absent au rendez-vous.', st: 'Levier : rappels SMS/WhatsApp, confirmation la veille, créneau plus proche.' },
+      { loss: Math.max(0, s.cl.present - s.cl.vente - s.cl.followup), t: '<b>Présents non closés.</b> Le call a eu lieu, pas de vente ni de follow-up ouvert.', st: 'Levier : qualification amont, pitch, gestion des objections.' }
+    ];
+    if (curTab === 'new') {
+      items.push({ loss: Math.max(0, sf.pv - sf.beh.t30), t: '<b>Partent avant 30 secondes.</b> Ils arrivent sur la page et repartent avant que la vidéo ait pu accrocher.', st: 'Levier : titre, promesse au-dessus de la ligne de flottaison, vitesse de chargement, cohérence avec la pub.' });
+      items.push({ loss: Math.max(0, sf.beh.v60 - sf.beh.cta), t: '<b>Voient le CTA sans cliquer.</b> Ils sont encore là quand le bloc de réservation apparaît (60 s) mais ne cliquent pas sur Réserver.', st: 'Levier : formulation du CTA, preuve à côté du bouton, moment d\'apparition.' });
+    }
+    items.sort(function (a, b) { return b.loss - a.loss; });
+    var total = items.reduce(function (t, it) { return t + it.loss; }, 0);
+    if (!total) { document.getElementById('leaks').innerHTML = '<p class="bf-empty">Pas encore assez de volume sur la période pour classer les pertes.</p>'; return; }
+    document.getElementById('leaks').innerHTML = items.filter(function (it) { return it.loss > 0; }).map(function (it, i) {
+      return '<div class="lk"><span class="lk-rank">' + (i + 1) + '</span><span class="lk-txt">' + it.t + '<small>' + it.st + '</small></span><span class="lk-loss">' + fmt(it.loss) + ' perdus</span></div>';
+    }).join('');
+  }
+
+  // ---- Comparatif (onglet Les 2)
+  function cell(n, sub, best) { return '<td class="num' + (best ? ' best' : '') + '"><b>' + n + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</td>'; }
+  function cellMuted(txt) { return '<td class="num muted">' + txt + '</td>'; }
+  function secRow(t) { return '<tr class="sec"><td colspan="3">' + t + '</td></tr>'; }
+  function renderCmp() {
+    var pi = pixIdx(sel);
+    var o = sumsOf(S_OLD, sel), n = sumsOf(S_NEW, sel), of = sumsOf(S_OLD, pi), nf = sumsOf(S_NEW, pi);
+    var Lo = of.v[0], Ln = nf.v[0];
+    var vo = Lo ? of.rdv / Lo * 100 : null, vn = Ln ? nf.rdv / Ln * 100 : null;
+    var so = o.cl.present + o.cl.noshow + o.cl.reprog + o.cl.annule, sn = n.cl.present + n.cl.noshow + n.cl.reprog + n.cl.annule;
+    var rows = '<tr><th>Étape</th><th class="num">Ancien funnel</th><th class="num">Nouveau funnel</th></tr>';
+    rows += secRow('Pubs (Meta Ads, toute la période)');
+    rows += '<tr><td><span class="stepname">Dépenses</span></td>' + cell(fmtEur(o.ads.spend)) + cell(fmtEur(n.ads.spend), n.ads.spend ? '' : 'pas de campagne dédiée') + '</tr>';
+    rows += '<tr><td><span class="stepname">Arrivées réelles sur la page</span><span class="stepdef">landing page views · coût par arrivée</span></td>' + cell(fmt(o.ads.lpv), o.ads.lpv ? fmtEurP(o.ads.spend / o.ads.lpv) + ' par arrivée' : '') + cell(fmt(n.ads.lpv), n.ads.lpv ? fmtEurP(n.ads.spend / n.ads.lpv) + ' par arrivée' : '') + '</tr>';
+    rows += secRow('Page et vidéo (pixel, ' + pi.length + ' jour' + (pi.length > 1 ? 's' : '') + ' couvert' + (pi.length > 1 ? 's' : '') + ')');
+    rows += '<tr><td><span class="stepname">Arrivées mesurées par le pixel</span><span class="stepdef">ancien : tout le site, non isolable · nouveau : LP seule</span></td>' + cellMuted(fmt(of.pv) + ' pages vues, tout le site') + cell(fmt(nf.pv), 'arrivées sur la LP') + '</tr>';
+    rows += '<tr><td><span class="stepname">Restent 30 s sur la page</span><span class="stepdef">nouvelle LP : Time_30s</span></td>' + cellMuted('pas d\'évènement dédié') + cell(fmt(nf.beh.t30), nf.pv ? pct(nf.beh.t30, nf.pv) + ' des arrivées' : '') + '</tr>';
+    rows += '<tr><td><span class="stepname">Démarrages vidéo</span><span class="stepdef">VTurb View0%, base 100 % des lignes vidéo</span></td>' + cell(fmt(Lo), 'base 100 %') + cell(fmt(Ln), 'base 100 %' + (nf.beh.play ? ' · ' + fmt(nf.beh.play) + ' activent le son' : '')) + '</tr>';
+    rows += '<tr><td><span class="stepname">Lancent vraiment la vidéo</span><span class="stepdef">passent la 1re minute (5 %)</span></td>' + cell(fmt(of.v[5]), (pct(of.v[5], Lo) || '—') + ' des démarrages', Lo && Ln && of.v[5] / Lo > nf.v[5] / Ln) + cell(fmt(nf.v[5]), (pct(nf.v[5], Ln) || '—') + ' des démarrages', Lo && Ln && nf.v[5] / Ln > of.v[5] / Lo) + '</tr>';
+    rows += '<tr><td><span class="stepname">Atteignent la fin</span><span class="stepdef">95 % de la vidéo, pitch inclus</span></td>' + cell(fmt(of.v[95]), (pct(of.v[95], Lo) || '—') + ' des démarrages', Lo && Ln && of.v[95] / Lo > nf.v[95] / Ln) + cell(fmt(nf.v[95]), (pct(nf.v[95], Ln) || '—') + ' des démarrages', Lo && Ln && nf.v[95] / Ln > of.v[95] / Lo) + '</tr>';
+    rows += '<tr><td><span class="stepname">Cliquent sur Réserver</span><span class="stepdef">nouvelle LP seulement : CTA_BookingClick</span></td>' + cellMuted('pas d\'évènement dédié') + cell(fmt(nf.beh.cta), Ln ? pct(nf.beh.cta, Ln) + ' des démarrages' : '') + '</tr>';
+    rows += '<tr><td><span class="stepname">Formulaire ouvert → RDV</span><span class="stepdef">iClosed, chaque pixel suit son calendrier</span></td>' + cell(fmt(of.pot) + ' → ' + fmt(of.rdv), (pct(of.rdv, of.pot) || '—') + ' de conversion') + cell(fmt(nf.pot) + ' → ' + fmt(nf.rdv), (pct(nf.rdv, nf.pot) || '—') + ' de conversion') + '</tr>';
+    rows += '<tr class="verdict"><td><span class="stepname">Verdict page : RDV pour 100 démarrages vidéo</span><span class="stepdef">la base commune</span></td>' + cell(vo === null ? '—' : vo.toFixed(1).replace('.', ','), 'référence à battre', vo !== null && vn !== null && vo > vn) + cell(vn === null ? '—' : vn.toFixed(1).replace('.', ','), vn === null ? 'pas de démarrage sur la période' : (vo !== null && vn > vo ? 'bat l\'ancien' : 'sous l\'ancien'), vo !== null && vn !== null && vn > vo) + '</tr>';
+    rows += secRow('Calls et ventes (Sheet closing, toute la période)');
+    rows += '<tr><td><span class="stepname">Calls bookés</span><span class="stepdef">ancien : à la date du call · nouveau : à la date de réservation</span></td>' + cell(fmt(o.cl.booked)) + cell(fmt(n.cl.resa), n.cl.resa ? fmt(n.cl.booked) + ' à la date du call' : 'aucun call Club') + '</tr>';
+    rows += '<tr><td><span class="stepname">Présents</span><span class="stepdef">show-up sur calls renseignés</span></td>' + cell(fmt(o.cl.present), (pct(o.cl.present, so) || '—') + ' de show-up', so && sn && o.cl.present / so > n.cl.present / sn) + cell(fmt(n.cl.present), (pct(n.cl.present, sn) || '—') + ' de show-up', so && sn && n.cl.present / sn > o.cl.present / so) + '</tr>';
+    rows += '<tr><td><span class="stepname">Ventes</span><span class="stepdef">closing sur présents · CA</span></td>' + cell(fmt(o.cl.vente), (pct(o.cl.vente, o.cl.present) || '—') + ' · ' + fmtEur(o.cl.ca), o.cl.present && n.cl.present && o.cl.vente / o.cl.present > n.cl.vente / n.cl.present) + cell(fmt(n.cl.vente), (pct(n.cl.vente, n.cl.present) || '—') + ' · ' + fmtEur(n.cl.ca), o.cl.present && n.cl.present && n.cl.vente / n.cl.present > o.cl.vente / o.cl.present) + '</tr>';
+    var wo = o.cl.booked ? o.cl.vente / o.cl.booked * 100 : null, wn = n.cl.booked ? n.cl.vente / n.cl.booked * 100 : null;
+    rows += '<tr class="verdict"><td><span class="stepname">Verdict closing : ventes pour 100 calls bookés</span></td>' + cell(wo === null ? '—' : wo.toFixed(1).replace('.', ','), 'référence', wo !== null && wn !== null && wo > wn) + cell(wn === null ? '—' : wn.toFixed(1).replace('.', ','), wn === null ? 'pas de call sur la période' : '', wo !== null && wn !== null && wn > wo) + '</tr>';
+    document.getElementById('cmpTable').innerHTML = rows;
+    var noteEl = document.getElementById('cmpNote');
+    if (n.pv < 200 && !n.ads.lpv) {
+      noteEl.className = 'note warn';
+      noteEl.innerHTML = '<strong>Le nouveau funnel n\'a reçu que du trafic de test sur la période</strong> (' + fmt(n.pv) + ' arrivées sur la LP, essentiellement nos vérifications). Les campagnes n\'envoient pas encore vers la nouvelle page : dès qu\'elles tournent, cette colonne devient parlante et les verdicts se comparent.';
+    } else {
+      noteEl.className = 'note';
+      noteEl.innerHTML = '<strong>Les deux funnels reçoivent du trafic.</strong> Comparez les verdicts : RDV pour 100 démarrages vidéo (la page) et ventes pour 100 calls bookés (le closing).';
+    }
+  }
+
+  // ---- Line chart generique
+  function lineChart(opts) {
+    var svg = document.getElementById(opts.svgId);
+    var tip = document.getElementById(opts.tipId);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var W = 960, H = 250, padL = 56, padR = 16, padT = 14, padB = 34;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var data = opts.data;
+    var cs = getComputedStyle(document.documentElement);
+    var ACC = (cs.getPropertyValue('--accent') || '#a34524').trim(), MUT = (cs.getPropertyValue('--muted') || '#8f8471').trim(), CARD = (cs.getPropertyValue('--card') || '#fff').trim();
+    if (data.length < 2) { var t0 = el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', 'font-size': 14, fill: MUT }, svg); t0.textContent = opts.emptyMsg || 'Sélectionnez au moins 2 jours'; return; }
+    var maxV = Math.max.apply(null, data.map(function (d) { return d.v; }));
+    var step = opts.step || Math.max(1, Math.pow(10, Math.floor(Math.log10(Math.max(1, maxV)))) / 2);
+    var niceMax = Math.max(step, Math.ceil(maxV / step) * step);
+    function x(i) { return padL + (i / (data.length - 1)) * iw; }
+    function y(v) { return padT + ih - (v / niceMax) * ih; }
+    for (var g = 0; g <= 4; g++) {
+      var gv = niceMax * g / 4;
+      el('line', { x1: padL, x2: W - padR, y1: y(gv), y2: y(gv), stroke: MUT, 'stroke-opacity': 0.18, 'stroke-width': 1 }, svg);
+      var t = el('text', { x: padL - 8, y: y(gv) + 4, 'text-anchor': 'end', 'font-size': 11, fill: MUT }, svg);
+      t.textContent = opts.fmtY(gv);
+    }
+    var tickEvery = Math.max(1, Math.round(data.length / 7));
+    data.forEach(function (d, i) {
+      var show = opts.explicitTicks ? !!d.xlabel : (i % tickEvery === 0 || i === data.length - 1);
+      if (show) { var t2 = el('text', { x: x(i), y: H - 10, 'text-anchor': 'middle', 'font-size': 11, fill: MUT }, svg); t2.textContent = d.xlabel; }
+    });
+    var pts = data.map(function (d, i) { return x(i) + ',' + y(d.v); });
+    el('polygon', { points: padL + ',' + (padT + ih) + ' ' + pts.join(' ') + ' ' + (W - padR) + ',' + (padT + ih), fill: ACC, 'fill-opacity': 0.12 }, svg);
+    el('polyline', { points: pts.join(' '), fill: 'none', stroke: ACC, 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+    el('circle', { cx: x(data.length - 1), cy: y(data[data.length - 1].v), r: 4, fill: ACC, stroke: CARD, 'stroke-width': 2 }, svg);
+    var cross = el('line', { y1: padT, y2: padT + ih, stroke: MUT, 'stroke-width': 1, opacity: 0 }, svg);
+    var dot = el('circle', { r: 5, fill: ACC, stroke: CARD, 'stroke-width': 2, opacity: 0 }, svg);
+    svg.onmousemove = function (ev) {
+      var r = svg.getBoundingClientRect();
+      var mx = (ev.clientX - r.left) / r.width * W;
+      var i = Math.round((mx - padL) / iw * (data.length - 1));
+      if (i < 0 || i > data.length - 1) return;
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('opacity', 1);
+      dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(data[i].v)); dot.setAttribute('opacity', 1);
+      tip.innerHTML = data[i].label + ' : <b>' + opts.fmtTip(data[i].v) + '</b>';
+      tip.style.left = (x(i) / W * 100) + '%'; tip.style.top = (y(data[i].v) / H * 100) + '%'; tip.style.opacity = 1;
+    };
+    svg.onmouseleave = function () { cross.setAttribute('opacity', 0); dot.setAttribute('opacity', 0); tip.style.opacity = 0; };
+  }
+
+  // ---- Retention
+  function renderRet(sf) {
+    var L = sf.v[0];
+    var DUR = 993;
+    var data = PCTS.map(function (p) {
+      var sec = Math.round(p / 100 * DUR);
+      var mm = Math.floor(sec / 60), ss = ('0' + sec % 60).slice(-2);
+      return { v: L ? Math.round(sf.v[p] / L * 100) : 0, label: mm + ':' + ss + ' (' + p + ' % de la vidéo)', xlabel: p === 0 ? 'Début' : (p % 25 === 0 ? mm + ' min' : (p === 95 ? 'Fin' : '')) };
+    });
+    if (!L) data = [];
+    lineChart({ svgId: 'retChart', tipId: 'retTip', data: data, step: 25, explicitTicks: true, emptyMsg: 'Pas de lancement vidéo mesuré sur la période', fmtY: function (v) { return v + ' %'; }, fmtTip: function (v) { return v + ' % encore en lecture'; } });
+    var note = document.getElementById('retNote');
+    if (!L) { note.className = 'note warn'; note.innerHTML = '<strong>Pas de lancement vidéo sur les jours couverts</strong> pour cette source : la courbe apparaîtra dès que le player VTurb enverra ses paliers à ce pixel.'; return; }
+    note.className = 'note';
+    note.innerHTML = '<strong>Lecture :</strong> sur ' + fmt(L) + ' démarrages' + (sf.cov < sf.n ? ' (' + sf.cov + ' jours couverts)' : '') + ', ' + (pct(sf.v[5], L) || '0 %') + ' passent la première minute et ' + (pct(sf.v[95], L) || '0 %') + ' vont au bout. Le gros du tri se fait dans les 30 premières secondes : le hook est le levier n°1.';
+  }
+
+  // ---- Jour par jour
+  var METRICS = {
+    rdv: { arr: function () { return cur().rdv; }, tip: 'RDV confirmés', pix: true },
+    v0: { arr: function () { return cur().v[0]; }, tip: 'lancements vidéo', pix: true },
+    pot: { arr: function () { return cur().pot; }, tip: 'formulaires ouverts', pix: true },
+    arr: { arr: function () { return curTab === 'new' ? cur().pv : cur().ads.lpv; }, tip: 'arrivées sur la page', pix: false },
+    booked: { arr: function () { return bookedArr(cur()); }, tip: function () { return curTab === 'new' ? 'calls réservés' : 'calls bookés'; }, pix: false },
+    present: { arr: function () { return cur().cl.present; }, tip: 'présents', pix: false },
+    vente: { arr: function () { return cur().cl.vente; }, tip: 'ventes', pix: false },
+    spend: { arr: function () { return cur().ads.spend; }, tip: '€ de dépenses pub', pix: false, money: true }
+  };
+  var curMetric = 'rdv';
+  document.querySelectorAll('.mbtn').forEach(function (b) {
+    b.addEventListener('click', function () { curMetric = b.dataset.m; document.querySelectorAll('.mbtn').forEach(function (x) { x.classList.toggle('on', x === b); }); renderDaily(); });
+  });
+  function renderDaily() {
+    var m = METRICS[curMetric], arr = m.arr();
+    document.getElementById('mbtnArr').textContent = curTab === 'new' ? 'Arrivées sur la LP' : 'Arrivées sur la page';
+    var idx = (m.pix || (curMetric === 'arr' && curTab === 'new')) ? pixIdx(sel) : sel;
+    var data = idx.map(function (i) { return { v: arr[i] || 0, label: dLabel(DAYS[i]) + (i === N - 1 && LASTDAY_PARTIAL ? ' (journée en cours)' : ''), xlabel: dLabel(DAYS[i]) }; });
+    lineChart({ svgId: 'dailyChart', tipId: 'dailyTip', data: data, emptyMsg: 'Pas de donnée sur la période', fmtY: function (v) { return v >= 1000 ? (v / 1000).toFixed(1).replace('.0', '').replace('.', ',') + ' K' : Math.round(v); }, fmtTip: function (v) { return (m.money ? fmtEur(v) : fmt(v)) + ' ' + (m.money ? 'de dépenses pub' : (typeof m.tip === 'function' ? m.tip() : m.tip)); } });
+    document.getElementById('dailyNote').textContent = idx.length < sel.length ? 'Métrique pixel : ' + idx.length + ' jours couverts sur ' + sel.length + ' sélectionnés (données pixel depuis le ' + dLabel(DAYS[PIX_FIRST]) + ').' : '';
+  }
+
+  // ---- Comportement nouvelle LP
+  function behRow(label, small, val, base, hot) {
+    var w = base ? Math.max(1, val / base * 100) : 1;
+    return '<div class="bf-row' + (hot ? ' hot' : '') + '"><span class="bf-label">' + label + (small ? '<small>' + small + '</small>' : '') + '</span><span class="bf-barwrap"><span class="bf-bar" style="width:' + Math.min(100, w) + '%"></span></span><span class="bf-nums"><b>' + fmt(val) + '</b></span></div>';
+  }
+  function renderBeh(sf) {
+    var nl = sf.beh;
+    var baseRead = Math.max(nl.s25, nl.t30, sf.pv, 1);
+    var html = '<h3>Jusqu\'où ils lisent la page</h3><p class="bf-note">Profondeur de scroll et temps passé, rapportés aux arrivées sur la LP. Le CTA de réservation apparaît à 60 s.</p>';
+    html += behRow('Arrivées sur la LP', 'PageView', sf.pv, baseRead);
+    html += behRow('Descendent à 25 %', 'Scroll_25', nl.s25, baseRead);
+    html += behRow('Descendent à 50 %', 'Scroll_50', nl.s50, baseRead);
+    html += behRow('Descendent à 75 %', 'Scroll_75', nl.s75, baseRead);
+    html += behRow('Vont en bas de page', 'Scroll_90', nl.s90, baseRead);
+    html += '<div class="bf-sep"></div>';
+    html += behRow('Restent 30 s', 'Time_30s', nl.t30, baseRead);
+    html += behRow('Restent 1 min', 'Time_1min', nl.t1, baseRead);
+    html += behRow('Voient le CTA (60 s)', 'VSL_60s', nl.v60, baseRead, true);
+    html += behRow('Restent 3 min', 'Time_3min', nl.t3, baseRead);
+    html += behRow('Restent 5 min', 'Time_5min', nl.t5, baseRead);
+    html += behRow('Restent 10 min', 'Time_10min', nl.t10, baseRead);
+    document.getElementById('behRead').innerHTML = html;
+    var secs = [{ l: 'Preuves et résultats', k: nl.secProof }, { l: 'Qui est Thomas', k: nl.secThomas }, { l: 'Les étapes du programme', k: nl.secEtapes }, { l: 'Témoignages', k: nl.secTemoin }, { l: 'CTA final', k: nl.secCtaF }].sort(function (a, b) { return b.k - a.k; });
+    var baseSec = Math.max(1, secs[0].k);
+    var h2 = '<h3>Les sections qu\'ils regardent</h3><p class="bf-note">Une section compte quand elle reste à l\'écran, classées de la plus vue à la moins vue.</p>';
+    secs.forEach(function (x, i) { h2 += behRow(x.l, '', x.k, baseSec, i === 0); });
+    document.getElementById('behSections').innerHTML = h2;
+    var testis = [['Kim', nl.tKim], ['Sophie', nl.tSophie], ['Lodois', nl.tLodois], ['Louis', nl.tLouis], ['Ghislain (retiré le 19 août)', nl.tGhislain]].filter(function (t) { return t[1] > 0; });
+    var testiDetail = testis.length ? testis.map(function (t) { return t[0] + ' ' + t[1]; }).join(' · ') : 'aucun détail par prénom pour l\'instant';
+    var rows = '<tr><th>Où ils cliquent</th><th class="num">Clics</th><th>Lecture</th></tr>';
+    function crow(label, val, note) { return '<tr><td><span class="stepname">' + label + '</span></td><td class="num"><b>' + fmt(val) + '</b></td><td class="muted">' + note + '</td></tr>'; }
+    rows += crow('Activer le son de la VSL', nl.play, 'le vrai début de l\'engagement vidéo');
+    rows += crow('Plein écran sur la VSL', nl.fs, 'signal d\'attention forte (mobile : plein écran horizontal au premier tap)');
+    rows += crow('Atteindre le pitch', nl.pitch, 'VSL_Pitch envoyé par VTurb à 15 min 50');
+    rows += crow('Lancer un témoignage vidéo', nl.tvClick, testiDetail);
+    rows += crow('Réserver : bloc sous la vidéo (60 s)', nl.ctaB, 'emplacement haut');
+    rows += crow('Réserver : CTA de fin de page', nl.ctaF, 'emplacement bas');
+    rows += crow('Tentative de sortie (exit intent)', nl.exit, 'popup de retenue déclenchée');
+    rows += crow('Liens du footer', nl.footer, 'mentions, CGV');
+    document.getElementById('behClicks').innerHTML = rows;
+    var behTotal = 0; for (var k in nl) behTotal += nl[k];
+    var note = document.getElementById('behNote');
+    if (behTotal < 800) { note.className = 'note warn'; note.innerHTML = '<strong>Volumes encore faibles</strong> (' + fmt(behTotal) + ' évènements de comportement sur la période, tests inclus) : les barres montrent que tout remonte, pas encore des tendances. Dès que les campagnes tournent, cette section devient la carte de chaleur de la page.'; }
+    else { note.className = 'note'; note.innerHTML = '<strong>Comment lire :</strong> si le CTA final est plus cliqué que le bloc 60 s, le bas de page convertit ; si les sorties précèdent la section preuves, remonter les preuves. Comparez avec la rétention vidéo pour choisir quoi bouger en premier.'; }
+  }
+
+  // ---- Tendance semaine par semaine (16 dernieres semaines)
+  function renderWeekly() {
+    var isNew = curTab === 'new';
+    var rows = '<tr><th>Semaine</th><th class="num">Dépenses</th><th class="num">' + (isNew ? 'Arrivées LP' : 'Arrivées') + '</th><th class="num">Lancements vidéo</th><th class="num">Passent 1 min</th><th class="num">RDV</th><th class="num">' + (isNew ? 'Calls réservés' : 'Calls bookés') + '</th><th class="num">Présents</th><th class="num">Ventes</th><th class="num">CA</th></tr>';
+    var dash = '<td class="num muted">·</td>';
+    weeks.slice(-16).forEach(function (w) {
+      var s = sums(w.idx), pixOk = s.cov === w.idx.length;
+      var c = w.idx.indexOf(N - 1) !== -1;
+      rows += '<tr' + (c ? ' class="verdict"' : '') + '><td><span class="stepname">' + w.label + (c ? ' (en cours)' : '') + '</span>' + (s.cov && !pixOk ? '<span class="stepdef">pixel sur ' + s.cov + ' j</span>' : '') + '</td>' +
+        '<td class="num"><b>' + fmtEur(s.ads.spend) + '</b></td>' +
+        (isNew ? (s.cov ? '<td class="num"><b>' + fmt(s.pv) + '</b></td>' : dash) : '<td class="num"><b>' + fmt(s.ads.lpv) + '</b></td>') +
+        (s.cov ? '<td class="num"><b>' + fmt(s.v[0]) + '</b></td><td class="num"><b>' + (pct(s.v[5], s.v[0]) || '—') + '</b></td><td class="num"><b>' + fmt(s.rdv) + '</b></td>' : dash + dash + dash) +
+        '<td class="num"><b>' + fmt(bookedOf(s)) + '</b></td><td class="num"><b>' + fmt(s.cl.present) + '</b></td><td class="num"><b>' + fmt(s.cl.vente) + '</b></td><td class="num"><b>' + fmtEur(s.cl.ca) + '</b></td></tr>';
+    });
+    document.getElementById('weeklyTable').innerHTML = rows;
+  }
+
+  function renderAll() {
+    if (!sel.length) sel = lastN(14);
+    syncWeekboxes();
+    document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === curTab); });
+    document.querySelectorAll('[data-only]').forEach(function (sec) { sec.classList.toggle('show', sec.dataset.only === curTab); });
+    document.getElementById('tabIntro').innerHTML = TABS[curTab].intro;
+    dFrom.value = DAYS[sel[0]]; dTo.value = DAYS[sel[sel.length - 1]];
+    var s = sums(sel);
+    var pIdx = prevIdx(sel);
+    var p = pIdx ? sums(pIdx) : null;
+    var sf = sums(pixIdx(sel));
+    renderState(s);
+    renderKpis(s, p, sf);
+    renderAds(s, p);
+    renderFunnel(sf);
+    renderClosing(s, p);
+    renderLeaks(sf, s);
+    if (curTab === 'both') renderCmp();
+    if (curTab === 'new') renderBeh(sf);
+    renderRet(sf);
+    renderDaily();
+    renderWeekly();
+    document.getElementById('headStamp').textContent = 'Relevé pixel du ' + RELEVE + ' · données du ' + dLabel(DAYS[0]) + ' au ' + dLabel(DAYS[N - 1]);
+    document.getElementById('headSources').innerHTML = 'Pixel depuis le <b>' + (PIX_FIRST >= 0 ? dLabel(DAYS[PIX_FIRST]) : '—') + '</b> · Sheet closing et Meta Ads depuis le <b>1er janv.</b>' + (SOURCES_AT ? ', relevés le <b>' + SOURCES_AT + '</b>' : '');
+  }
+
+  sel = lastN(14);
+  renderAll();
+
+  /* Bouton Actualiser + auto-reload : meme mecanique que la console closing.
+     Sur GitHub Pages : le clic pose le drapeau refresh sur le pont Apps Script -> le workflow
+     refresh.yml de ce repo reconstruit la page (Sheet closing + Meta Ads ; le releve pixel affiche
+     reste le dernier releve manuel) ; on surveille l'ETag de la page et on recharge des que la
+     nouvelle version est en ligne. En permanence : verification de version toutes les 60 s + au
+     retour sur l'onglet. Ailleurs (artifact claude.ai) : lien vers Claude avec le runbook. */
+  var BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
+  (function setupRefresh() {
+    var btn = document.getElementById('btnRefresh');
+    if (!btn) return;
+    if (location.hostname.endsWith('github.io') && BRIDGE.url.indexOf('http') === 0) {
+      btn.textContent = '↻ Mettre à jour maintenant';
+      btn.title = 'Relance la récupération Sheet closing + Meta Ads puis recharge la page automatiquement (environ 2 min). Le relevé pixel reste le dernier relevé manuel.';
+      var etag0 = null;
+      var pageTag = function () {
+        return fetch(location.pathname + '?ping=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function (r) { return r.headers.get('etag') || r.headers.get('last-modified') || ''; })
+          .catch(function () { return null; });
+      };
+      var initTag = function () { pageTag().then(function (t) { etag0 = t; if (!t) setTimeout(initTag, 30000); }); };
+      initTag();
+      var goFresh = function () { location.replace(location.pathname + '?v=' + Date.now()); };
+      var maybeReload = function () {
+        if (btn.dataset.busy || document.hidden || !etag0) return;
+        pageTag().then(function (t) { if (t && t !== etag0) goFresh(); });
+      };
+      setInterval(maybeReload, 60000);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) maybeReload(); });
+      btn.onclick = async function (e) {
+        e.preventDefault();
+        if (btn.dataset.busy) return;
+        btn.dataset.busy = '1';
+        var ok = false;
+        for (var i = 0; i < 3 && !ok; i++) {
+          btn.textContent = i ? 'Pont occupé · nouvel essai...' : 'Demande envoyée...';
+          try {
+            var r = await fetch(BRIDGE.url + '?key=' + encodeURIComponent(BRIDGE.key) + '&what=refresh', { cache: 'no-store' });
+            ok = (await r.text()).indexOf('"ok":true') !== -1;
+          } catch (err) { ok = false; }
+          if (!ok) await new Promise(function (res) { setTimeout(res, 2500); });
+        }
+        if (!ok) {
+          btn.textContent = 'Pont indisponible · reclique dans 1 min';
+          delete btn.dataset.busy;
+          return;
+        }
+        var started = Date.now();
+        var t = setInterval(async function () {
+          var sec = Math.round((Date.now() - started) / 1000);
+          btn.textContent = 'MAJ en cours · ' + sec + ' s';
+          var tag = await pageTag();
+          if (tag && etag0 && tag !== etag0) {
+            clearInterval(t);
+            btn.textContent = 'Nouvelle version en ligne · rechargement...';
+            goFresh();
+          } else if ((!tag || !etag0) && sec >= 170) {
+            clearInterval(t); goFresh();
+          } else if (sec >= 300) {
+            clearInterval(t);
+            btn.textContent = 'Toujours rien après 5 min · reclique';
+            delete btn.dataset.busy;
+          }
+        }, 5000);
+      };
+    } else {
+      btn.textContent = 'Actualiser (via Claude)';
+      btn.href = 'https://claude.ai/new?q=' + encodeURIComponent(
+        "Mets à jour la console funnel I3 : suis le runbook /Users/alex/Alex/console-suivi-i3/README.md (fetch_sources.py + gen_data.py + build.sh + push, republie l'artifact à la même URL).");
+    }
+  })();
+})();
+</script>

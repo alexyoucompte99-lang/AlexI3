@@ -3,3 +3,8 @@
 *.b64
 dashboard.html
 closing.html
+funnel-fragment.css
+funnel-fragment.html
+funnel/data-block.js
+funnel/sources/
+funnel/upstream.enc
