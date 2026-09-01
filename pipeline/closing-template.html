@@ -271,6 +271,7 @@
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabFill" aria-selected="true" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
+    <button class="tab" role="tab" id="tabEod" aria-selected="false" data-panel="panelEod">EOD 🌙</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
@@ -546,6 +547,34 @@
           <button class="btn" id="eowSend">✅ Valider et envoyer à Alex</button>
           <button class="btn ghost" id="eowClear">Effacer</button>
           <span id="eowOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================== EOD ================== -->
+  <div id="panelEod" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">EOD · End of day</span>
+      <h2>Ton ressenti du jour</h2>
+      <p class="lede">Optionnel, mais gros bonus : 30 secondes en fin de journée pour dire comment ça s'est passé.
+        Ça centralise tout au même endroit et ça aide l'équipe à sentir le terrain sans attendre l'EOW.
+        Ton brouillon reste enregistré sur ce navigateur.</p>
+      <div class="card" style="max-width:680px" id="eodCard">
+        <div class="field">
+          <label for="eodCloser">Ton prénom</label>
+          <select id="eodCloser"></select>
+        </div>
+        <div class="field">
+          <label for="eodEnergy">Ton niveau d'énergie aujourd'hui</label>
+          <div class="range-wrap"><input type="range" id="eodEnergy" min="0" max="10" step="1" value="5"><output id="eodEnergyOut">5/10</output></div>
+        </div>
+        <div class="field"><label for="eodMood">Ta journée en deux mots</label><textarea id="eodMood" placeholder="Grosse journée, calls durs, un beau closing, la forme, un coup de mou..."></textarea></div>
+        <div class="field"><label for="eodFlag">Un truc à signaler (optionnel)</label><textarea id="eodFlag" placeholder="Un blocage, une info pour l'équipe, un lead à surveiller..."></textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+          <button class="btn" id="eodSend">✅ Envoyer mon EOD</button>
+          <button class="btn ghost" id="eodClear">Effacer</button>
+          <span id="eodOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
         </div>
       </div>
     </section>
@@ -2029,6 +2058,51 @@ function initEow() {
   });
 }
 
+/* ================= EOD (ressenti du jour, optionnel) ================= */
+const EOD_FIELDS = ["eodCloser", "eodEnergy", "eodMood", "eodFlag"];
+function initEod() {
+  const names = [...new Set(DATA.calls.filter(c => c.d && daysAgo(c.d) < 60 && c.c).map(c => c.c))].sort();
+  $("eodCloser").innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("") + `<option>Autre</option>`;
+  const saved = JSON.parse(localStorage.getItem("eod-draft") || "{}");
+  for (const id of EOD_FIELDS) if (saved[id] != null) $(id).value = saved[id];
+  const sync = () => {
+    $("eodEnergyOut").textContent = $("eodEnergy").value + "/10";
+    localStorage.setItem("eod-draft", JSON.stringify(Object.fromEntries(EOD_FIELDS.map(id => [id, $(id).value]))));
+  };
+  EOD_FIELDS.forEach(id => $(id).addEventListener("input", sync));
+  sync();
+  const eodMsg = (m) => { $("eodOk").textContent = m; $("eodOk").style.display = "inline"; setTimeout(() => $("eodOk").style.display = "none", 5000); };
+  $("eodSend").addEventListener("click", () => {
+    const btn = $("eodSend");
+    if (btn.disabled) return;
+    if (!$("eodMood").value.trim() && !$("eodFlag").value.trim()) { eodMsg("Écris au moins deux mots sur ta journée avant d'envoyer."); return; }
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    bridgePost({
+      what: "eod", closer: $("eodCloser").value, energie: $("eodEnergy").value,
+      mood: $("eodMood").value, flag: $("eodFlag").value,
+    }).then(ok => {
+      if (ok) {
+        localStorage.removeItem("eod-draft");
+        $("eodCard").innerHTML = `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:52px;margin-bottom:14px">🌙</div>
+          <h2 style="margin:0 0 8px">EOD envoyé, merci !</h2>
+          <p class="lede" style="margin:0">C'est centralisé, l'équipe le voit. Bonne soirée, à demain.</p>
+        </div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "✅ Envoyer mon EOD";
+        eodMsg("Envoi impossible pour l'instant : vérifie ta connexion et réessaie dans une minute.");
+      }
+    });
+  });
+  $("eodClear").addEventListener("click", () => {
+    localStorage.removeItem("eod-draft");
+    EOD_FIELDS.forEach(id => { const el = $(id); if (el.tagName === "TEXTAREA") el.value = ""; });
+    $("eodEnergy").value = 5; sync();
+  });
+}
+
 /* ================= onglet À remplir (saisie closers -> Sheet) ================= */
 /* Le Sheet reste la source de vérité : la carte envoie what=call_update au pont
    (écriture par nom de colonne dans l'onglet du mois), la console relit le Sheet
@@ -2782,6 +2856,7 @@ renderFollowups();
 renderLeads();
 $("ldSearch").addEventListener("input", renderLeads);
 initEow();
+initEod();
 initAlex();
 
 const backtop = $("backtop");

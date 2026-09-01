@@ -59,6 +59,7 @@ jobs:
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           python tally_fetch.py || true
+          python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count || true
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
           HASH=$(cat data.json ads.json tally.json 2>/dev/null | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
@@ -67,8 +68,8 @@ jobs:
             cd ..
             git config user.name "console-bot"
             git config user.email "actions@users.noreply.github.com"
-            git add .eow-count 2>/dev/null || true
-            git diff --cached --quiet || (git commit -m "EOW notifies" && git push)
+            git add .eow-count .eod-count 2>/dev/null || true
+            git diff --cached --quiet || (git commit -m "EOW/EOD notifies" && git push)
             exit 0
           fi
           echo "$HASH" > ../.data-hash
@@ -85,5 +86,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add index.html closing/index.html .data-hash
           git add .sales-ledger.json 2>/dev/null || true
-          git add .eow-count 2>/dev/null || true
+          git add .eow-count .eod-count 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)
