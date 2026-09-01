@@ -1,0 +1,107 @@
+name: Mails closers
+
+# Deux mails automatiques aux closers, envoyés par le pont Apps Script
+# (what=send_mail, boîte Gmail d'Alex) :
+#   - eow  : lundi ~8h Paris, relance ceux qui n'ont pas rempli leur EOW
+#   - fill : chaque soir ~20h30 Paris, recap des calls non remplis par closer
+# Doubles crons été/hiver + garde sur l'heure de Paris + marqueur anti-doublon
+# (même mécanique que brief.yml). Adresses closers dans le secret CLOSER_EMAILS.
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Quel mail envoyer"
+        type: choice
+        options: [eow, fill]
+        required: true
+      dry_run:
+        description: "Afficher les mails dans le log sans les envoyer"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 6 * * 1"    # EOW : 8h Paris en été (7h en hiver -> saute)
+    - cron: "0 7 * * 1"    # EOW : 8h Paris en hiver (9h en été -> anti-doublon)
+    - cron: "30 18 * * *"  # fill : 20h30 Paris en été
+    - cron: "30 19 * * *"  # fill : 20h30 Paris en hiver
+
+concurrency:
+  group: mails-closers
+  cancel-in-progress: false
+
+jobs:
+  mails:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Quel job, faut-il envoyer ?
+        id: go
+        run: |
+          TODAY=$(TZ=Europe/Paris date '+%Y-%m-%d')
+          HOUR=$(TZ=Europe/Paris date '+%H')
+          DOW=$(TZ=Europe/Paris date '+%u')
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "job=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+            echo "send=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # déclenché par cron : le matin du lundi = eow, le soir = fill
+          if [ "$HOUR" -lt 12 ]; then JOB=eow; MARK=.mail-eow-sent; else JOB=fill; MARK=.mail-fill-sent; fi
+          echo "job=$JOB" >> "$GITHUB_OUTPUT"
+          echo "mark=$MARK" >> "$GITHUB_OUTPUT"
+          if [ "$JOB" = "eow" ] && [ "$DOW" != "1" ]; then echo "pas lundi"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$JOB" = "eow" ] && [ "$HOUR" -lt 8 ]; then echo "trop tot ($HOUR h Paris)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$JOB" = "fill" ] && [ "$HOUR" -lt 20 ]; then echo "trop tot ($HOUR h Paris)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ "$(cat $MARK 2>/dev/null || echo none)" = "$TODAY" ]; then echo "deja envoye"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "send=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.send == 'yes'
+        with:
+          python-version: "3.12"
+
+      - name: Dependances
+        if: steps.go.outputs.send == 'yes'
+        run: pip install --quiet openpyxl
+
+      - name: Recuperer les donnees (pont Apps Script)
+        if: steps.go.outputs.send == 'yes'
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+        working-directory: pipeline
+        run: |
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
+          base64 -d closing.b64 > investisseurs30.xlsx
+          python parse_xlsx.py investisseurs30.xlsx data.json
+
+      - name: Mails
+        if: steps.go.outputs.send == 'yes'
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+          CLOSER_EMAILS: ${{ secrets.CLOSER_EMAILS }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        working-directory: pipeline
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            python mail_reports.py ${{ steps.go.outputs.job }} --dry-run
+          else
+            python mail_reports.py ${{ steps.go.outputs.job }}
+          fi
+
+      - name: Marquer comme envoye
+        if: steps.go.outputs.send == 'yes' && github.event_name == 'schedule'
+        run: |
+          echo "${{ steps.go.outputs.today }}" > ${{ steps.go.outputs.mark }}
+          git config user.name "console-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add ${{ steps.go.outputs.mark }}
+          git diff --cached --quiet && exit 0
+          git commit -m "Mail closers envoye (${{ steps.go.outputs.job }})"
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 10; done

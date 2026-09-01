@@ -270,11 +270,11 @@
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabFill" aria-selected="true" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
-    <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
+    <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
@@ -764,6 +764,9 @@ const inRange = (dateIso, r) => dateIso != null && dateIso >= r.from && dateIso 
    aujourd'hui) pour couvrir le pilotage ET le brief. */
 const isMtdRange = (r) => r.to === TODAY_ISO && r.from === TODAY_ISO.slice(0, 8) + "01" && r.from !== r.to;
 const plannedIn = (r) => {
+  /* période « mois » (pills de l'onglet Closers) : règle onglet du mois complet,
+     relances comprises, comme les récaps du Sheet */
+  if (r.tm) return DATA.calls.filter(c => c.tm === r.tm && (!c.d || c.d <= TODAY_ISO));
   if (isMtdRange(r)) {
     const m = TODAY_ISO.slice(0, 7);
     return DATA.calls.filter(c => c.tm === m && (!c.d || c.d <= TODAY_ISO));
@@ -852,12 +855,24 @@ const CL_PERIODS = [
   { k: "3m", label: "3 mois", range: () => ({ from: iso(new Date(NOW - 90 * DAY)), to: TODAY_ISO }) },
   { k: "ytd", label: "Année en cours", range: () => ({ from: TODAY_ISO.slice(0, 4) + "-01-01", to: TODAY_ISO }) },
 ];
+/* pills « mois » : un par onglet mensuel du Sheet (le plus récent d'abord) */
+const CL_MOIS_LBL = ["", "Janv.", "Févr.", "Mars", "Avril", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
+for (const m of [...new Set(DATA.calls.map(c => c.tm))].filter(m => m && m < TODAY_ISO.slice(0, 7)).sort().reverse()) {
+  CL_PERIODS.push({
+    k: "m:" + m,
+    label: CL_MOIS_LBL[+m.slice(5, 7)] + (m.slice(0, 4) === TODAY_ISO.slice(0, 4) ? "" : " " + m.slice(2, 4)),
+    range: () => ({ tm: m, from: m + "-01", to: m + "-31" }),
+  });
+}
+const CL_LES3 = "__les3__";
 let clSel = TOP3[0], clPeriodK = "7j";
 const clPc = (v) => v == null ? "·" : String(Math.round(v)) + " %";
 const clEur = (v) => v == null ? "·" : fmtE(Math.round(v));
 function clStats(name, r) {
-  const o = st(plannedIn(r).filter(c => (c.c || "") === name));
-  o.fu = DATA.calls.filter(c => c.c === name && c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026").length;
+  /* name = un closer, ou CL_LES3 = les 3 principaux réunis */
+  const match = (c) => name === CL_LES3 ? TOP3.includes(c.c || "") : (c.c || "") === name;
+  const o = st(plannedIn(r).filter(match));
+  o.fu = DATA.calls.filter(c => match(c) && c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026").length;
   o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
   o.caBooke = o.calls ? o.ca / o.calls : null;
   o.caShow = o.shows ? o.ca / o.shows : null;
@@ -865,10 +880,13 @@ function clStats(name, r) {
   return o;
 }
 function renderClosersTab() {
-  pillRow("clCloserPills", TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), clSel, k => clSel = k, renderClosersTab);
+  pillRow("clCloserPills", [...TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), { k: CL_LES3, label: "Les 3" }], clSel, k => clSel = k, renderClosersTab);
   pillRow("clPeriodPills", CL_PERIODS.map(pp => ({ k: pp.k, label: pp.label })), clPeriodK, k => clPeriodK = k, renderClosersTab);
-  const r = CL_PERIODS.find(pp => pp.k === clPeriodK).range();
-  $("clLede").textContent = clSel + " · " + rangeLabel(r) + (clPeriodK === "mtd" ? " (onglet du mois complet, relances comprises)" : "");
+  const per = CL_PERIODS.find(pp => pp.k === clPeriodK);
+  const r = per.range();
+  $("clLede").textContent = (clSel === CL_LES3 ? "Les 3 closers réunis" : clSel) + " · " +
+    (r.tm ? "mois " + (/^[aeiouéà]/i.test(per.label) ? "d'" : "de ") + per.label + " (onglet complet, relances comprises)"
+          : rangeLabel(r) + (clPeriodK === "mtd" ? " (onglet du mois complet, relances comprises)" : ""));
   const o = clStats(clSel, r);
   $("clKpis").innerHTML = [
     kpiTile("Calls bookés", fmtN(o.calls), "lignes du Sheet sur la période"),
@@ -888,7 +906,8 @@ function renderClosersTab() {
     kpiTile("Follow-ups en cours", fmtN(o.fu), "toutes périodes, encore à relancer"),
   ].join("");
 
-  const stats = TOP3.map(n => clStats(n, r));
+  /* comparatif : les 3 closers + colonne « Les 3 » (agrégat, hors surlignage) */
+  const stats = [...TOP3, CL_LES3].map(n => clStats(n, r));
   const METRICS = [
     ["Calls bookés", oo => oo.calls, fmtN, "max"],
     ["Calls présents", oo => oo.shows, fmtN, "max"],
@@ -908,19 +927,19 @@ function renderClosersTab() {
     ["Follow-ups en cours", oo => oo.fu, fmtN, null],
   ];
   $("clCompare").innerHTML = "<thead><tr><th></th>" +
-    TOP3.map(n => `<th class="num">${esc(n.split(" ")[0])}</th>`).join("") + "</tr></thead><tbody>" +
+    TOP3.map(n => `<th class="num">${esc(n.split(" ")[0])}</th>`).join("") + `<th class="num">Les 3</th>` + "</tr></thead><tbody>" +
     METRICS.map(([lbl, get, fm, dir]) => {
       const vals = stats.map(get);
       let best = null;
       if (dir) {
-        const usable = vals.filter(v => v != null && !(dir === "max" && v <= 0));
+        const usable = vals.slice(0, 3).filter(v => v != null && !(dir === "max" && v <= 0));
         if (usable.length) best = dir === "max" ? Math.max(...usable) : Math.min(...usable);
       }
-      return `<tr><td>${lbl}</td>` + vals.map(v =>
-        `<td class="num${dir != null && v != null && v === best ? " best" : ""}">${fm(v)}</td>`).join("") + "</tr>";
+      return `<tr><td>${lbl}</td>` + vals.map((v, vi) =>
+        `<td class="num${vi < 3 && dir != null && v != null && v === best ? " best" : ""}">${fm(v)}</td>`).join("") + "</tr>";
     }).join("") + "</tbody>";
 
-  const labels = TOP3.map(n => n.split(" ")[0]);
+  const labels = [...TOP3.map(n => n.split(" ")[0]), "Les 3"];
   const one = (id, values, opts) => { const m = $(id); m.innerHTML = ""; barChart(m, labels, [{ name: "", color: "var(--s1)", values }], opts); };
   one("clChartCa", stats.map(x => x.ca), { fmtAxis: v => fmtN(Math.round(v / 100) * 100), height: 205 });
   one("clChartVentes", stats.map(x => x.ventes), { ticks: 3, height: 205 });
@@ -1012,7 +1031,6 @@ const TY_OBJ_TOI = {
   "Protéger les miens, et transmettre quelque chose de solide": "protéger les tiens et transmettre quelque chose de solide",
   "Être libre de mes choix : mon temps, mon travail, mon lieu de vie": "être libre de tes choix : ton temps, ton travail, ton lieu de vie",
   "Arrêter de regarder mon argent perdre de la valeur en attendant": "arrêter de regarder ton argent perdre de la valeur",
-  "Ne plus laisser mon capital dormir et perdre de la valeur": "ne plus laisser ton capital dormir et perdre de la valeur",
 };
 const tyCfg = { tpl(k) { return localStorage.getItem("ty-tpl" + k) || TY_DEFAULT_TPLS[k]; } };
 let tyFilter = "todo", tySource = "";
@@ -1037,10 +1055,8 @@ function tyStop(t) {
 function tyMsg(t) {
   const st2 = tyState(t);
   const closer = st2 && st2.closer ? st2.closer.split(" ")[0] : "l'équipe";
-  /* Q1 est multi-choix depuis le 29/08 (réponses jointes par « · ») : on reformule la 1re cochée,
-     et jamais de texte brut à la 1re personne dans le message */
-  const obj = ((t.a || {}).vOLP4D || "").split("·")[0].trim();
-  const objectif = TY_OBJ_TOI[obj] || "avancer sur ton patrimoine";
+  const obj = ((t.a || {}).vOLP4D || "").trim();
+  const objectif = TY_OBJ_TOI[obj] || (obj ? obj.charAt(0).toLowerCase() + obj.slice(1) : "avancer sur ton patrimoine");
   return tyCfg.tpl(t.done ? (t.profil || "B") : "P")
     .replace(/{prenom}/g, (t.prenom || "").trim().split(" ")[0])
     .replace(/{closer}/g, closer)
@@ -1768,15 +1784,34 @@ function toast(msg) {
 }
 
 /* ---- brouillon WhatsApp selon le contexte du call ---- */
+/* objection principale : colonne Objection du Sheet en priorité, sinon détectée
+   dans le commentaire du call ; reformulée en « tu » (les notes des closers sont
+   à la 3e personne, on ne les cite jamais telles quelles au prospect) */
+const OBJ_CATS = [
+  [/budget|trop cher|financ|argent|fonds|liquidit|épargn|epargn|apport|cash dispo|mensualit|crédit|credit|prêt|pret/i, "la question du budget"],
+  [/conjoint|femme|mari|compagne|copine|parent|associé|associe|en parler à|en parler a|en parler avec/i, "le fait d'en parler d'abord à tes proches"],
+  [/peur|confiance|arnaque|sceptique|méfian|mefian|se faire avoir/i, "le besoin d'être rassuré avant de te lancer"],
+  [/pas le temps|timing|attend|plus tard|dans quelques mois|trop t[oô]t|priorit|deadline/i, "le timing"],
+  [/déjà accompagn|deja accompagn|autre formation|se former seul|tout seul|par lui[- ]m[êe]me|youtube/i, "l'envie d'avancer par tes propres moyens"],
+  [/réfléch|reflech|hésit|hesit|pas s[uû]r|indécis|indecis/i, "le besoin d'y réfléchir encore un peu"],
+];
+function objectionLine(c) {
+  for (const src of [c.obj, c.com]) {
+    const t = (src || "").trim();
+    if (!t) continue;
+    for (const [re2, phrase] of OBJ_CATS) if (re2.test(t)) return ` De mémoire, ce qui te retenait surtout, c'était ${phrase}.`;
+  }
+  const o = (c.obj || "").trim();
+  return o && o.length <= 45 ? ` Tu hésitais encore (${o.toLowerCase()}).` : "";
+}
 function waDraft(c) {
   const p = (c.n || "").trim().split(/\s+/)[0];
   const cl = (c.c || "").trim().split(/\s+/)[0];
   const quand = c.d ? " du " + frDate(c.d) : "";
-  const obj = (c.obj || "").trim();
   if (c.d && c.d > TODAY_ISO && !c.s) return `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Notre call est prévu le ${frDate(c.d)}. Une question d'ici là ? Je suis là. À très vite !`;
   if (c.v === "FOLLOW_UP") {
     let m = `Salut ${p}, c'est ${cl} d'Investisseurs 3.0 ! Je reviens vers toi comme convenu suite à notre échange${quand}.`;
-    if (obj && obj.length <= 45) m += ` Tu hésitais encore (${obj.toLowerCase()}).`;
+    m += objectionLine(c);
     m += ` Tu en es où ? On se cale 10 min cette semaine pour en reparler ?`;
     return m;
   }
@@ -1969,7 +2004,7 @@ function initEow() {
    (écriture par nom de colonne dans l'onglet du mois), la console relit le Sheet
    à chaque MAJ. Overlay localStorage en attendant le prochain refresh ; dès que
    le Sheet a la valeur, l'overlay est purgé. */
-const FILL_SU = { OUI: "Présent", NON: "No-show", REPROGRAMMER: "Call reprogrammé", ANNULE: "Call annulé en amont" };
+const FILL_SU = { OUI: "Présent", NON: "No-show", REPROGRAMMER: "Reprogrammé", ANNULE: "Annulé" };
 const FILL_SU_SHEET = { OUI: "OUI", NON: "NON", REPROGRAMMER: "Reprogrammé", ANNULE: "Annulé" };
 const FILL_V = { OUI: "Vente ✅", NON: "Pas de vente", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché" };
 const FILL_V_SHEET = { OUI: "OUI", NON: "NON", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché" };
