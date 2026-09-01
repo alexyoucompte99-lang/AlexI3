@@ -141,6 +141,8 @@ def norm_show_up(s):
         return "NON"
     if n.startswith("annul"):
         return "ANNULE"
+    if n.startswith("doubl"):
+        return "DOUBLON"
     return "" if not n else "AUTRE"
 
 
@@ -207,6 +209,10 @@ def main(xlsx_path, out_path):
                 if re.search(r"\btests?\b", prospect, re.I):
                     continue
                 show_up = norm_show_up(cell_str(g("show_up")))
+                # ligne marquée DOUBLON (coche console ou saisie manuelle) : ignorée
+                # partout (consoles, stats, briefs, mails), le Sheet garde la trace
+                if show_up == "DOUBLON":
+                    continue
                 vente = norm_vente(cell_str(g("vente")))
                 # règle Alex 28/08 : un résultat rempli (vente, follow-up, non pitché...)
                 # implique que le lead était présent, même si SHOW UP est resté vide

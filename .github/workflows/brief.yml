@@ -75,6 +75,7 @@ jobs:
         working-directory: pipeline
         run: |
           python parse_xlsx.py investisseurs30.xlsx data.json
+          python sales_ledger.py data.json ../.sales-ledger.json
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           if [ "$DRY_RUN" = "true" ]; then

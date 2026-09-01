@@ -55,6 +55,7 @@ jobs:
         working-directory: pipeline
         run: |
           python parse_xlsx.py investisseurs30.xlsx data.json
+          python sales_ledger.py data.json ../.sales-ledger.json
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           python tally_fetch.py || true
@@ -83,5 +84,6 @@ jobs:
           git config user.name "console-bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html closing/index.html .data-hash
+          git add .sales-ledger.json 2>/dev/null || true
           git add .eow-count 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)

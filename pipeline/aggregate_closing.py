@@ -233,6 +233,8 @@ def main(data_path, out_path, updated_at):
             "rec": (c.get("recording") or "").strip(),
             "rel": c.get("relance"),
             "r2": c.get("r2"),
+            # date où la vente a été cochée (registre sales_ledger), sinon absent
+            "sd": c.get("sale_date"),
             "relEst": relance_estimee(c.get("commentaire"), c.get("date")),
             "hasS": bool(c.get("has_show_up_raw")),
             "hasV": bool(c.get("has_vente_raw")),

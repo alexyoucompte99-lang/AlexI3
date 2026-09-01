@@ -96,7 +96,12 @@ def spend_between(ads, first, last):
     return spend_range(ads, first, last)
 
 
-def stats(calls, rows):
+def sale_day(c):
+    """Jour où la vente a été cochée (registre sales_ledger), repli date du call."""
+    return c.get("sale_date") or c.get("date") or ""
+
+
+def stats(calls, rows, f_iso=None, t_iso=None):
     s = {}
     s["n"] = len(rows)
     s["filled"] = [c for c in rows if c["show_up"]]
@@ -108,7 +113,12 @@ def stats(calls, rows):
     s["pitched"] = [c for c in s["shows"] if c["vente"] in ("OUI", "NON", "REMBOURSEMENT")]
     s["fu"] = [c for c in s["shows"] if c["vente"] == "FOLLOW_UP"]
     s["nonpitch"] = [c for c in s["shows"] if c["vente"] == "NON_PITCHE"]
-    s["ventes"] = [c for c in rows if is_sale(c)]
+    # ventes comptées le jour du cochage (règle Alex 01/09) quand une plage est
+    # donnée ; sinon ancienne règle (ventes parmi les lignes)
+    if f_iso:
+        s["ventes"] = [c for c in calls if is_sale(c) and f_iso <= sale_day(c) <= t_iso]
+    else:
+        s["ventes"] = [c for c in rows if is_sale(c)]
     s["ca"] = sum(sale_amount(c) for c in s["ventes"])
     notes = [c["qualif"] for c in s["shows"] if c.get("qualif") is not None]
     s["notes"] = notes
@@ -142,7 +152,7 @@ def pitch_line(s):
 
 def day_block(calls, ads, day, title, with_ads=True, pending_is_noshow=True):
     rows = [c for c in calls if c.get("date") == day.isoformat()]
-    s = stats(calls, rows)
+    s = stats(calls, rows, day.isoformat(), day.isoformat())
     lines = [f"🗓 {b(title + ' ' + dlabel(day))}"]
     if not rows:
         lines.append("Aucun call prévu")
@@ -182,7 +192,7 @@ def day_block(calls, ads, day, title, with_ads=True, pending_is_noshow=True):
 
 def period_block(calls, ads, first, last, title, today=None):
     rows = [c for c in calls if c.get("date") and first.isoformat() <= c["date"] <= last.isoformat()]
-    s = stats(calls, rows)
+    s = stats(calls, rows, first.isoformat(), last.isoformat())
     spend = spend_between(ads, first, last)
     booked = booked_between(calls, first, last)
     # non renseignés des jours passés = no-show ; ceux d'aujourd'hui restent à part
@@ -223,7 +233,7 @@ def month_block(calls, ads, today):
     # règle des consoles : lignes de l'onglet du mois déjà passées (ou sans date)
     rows = [c for c in calls if c["year"] == today.year and c["month"] == today.month
             and (not c.get("date") or c["date"] <= today.isoformat())]
-    s = stats(calls, rows)
+    s = stats(calls, rows, first.isoformat(), today.isoformat())
     spend = spend_between(ads, first, today)
     booked = booked_between(calls, first, today)
     lines = [f"💰 {b(MOIS[today.month - 1].upper() + ' (mois en cours)')}"]

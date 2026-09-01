@@ -37,9 +37,16 @@ def is_sale(c):
     return c.get("vente") == "OUI" or (c.get("virement") and c.get("vente") != "REMBOURSEMENT")
 
 
+def sale_day(c):
+    """Jour où la vente a été cochée (registre sales_ledger), repli date du call."""
+    return c.get("sale_date") or c.get("date") or ""
+
+
 def ca_mois(data, today):
+    # CA attribué au mois du cochage de la vente (règle Alex 01/09)
+    m = today.strftime("%Y-%m")
     return sum(sale_amount(c) for c in data["calls"]
-               if c["year"] == today.year and c["month"] == today.month and is_sale(c))
+               if is_sale(c) and sale_day(c)[:7] == m)
 
 
 def spend_range(ads, first, last):
@@ -71,7 +78,8 @@ def build_brief(data, ads, days, today):
     pitched = pitched_all  # dénominateur du taux de closing (follow-ups compris)
     n_pitche_seul = len(pitched_all) - fu
     non_pitche = sum(1 for c in rows if c["show_up"] == "OUI" and c["vente"] == "NON_PITCHE")
-    ventes = [c for c in rows if is_sale(c)]
+    # ventes comptées le jour du cochage (règle Alex 01/09), pas le jour du call
+    ventes = [c for c in data["calls"] if is_sale(c) and f_iso <= sale_day(c) <= t_iso]
     ca = sum((c.get("prix_confirme") or c.get("prix") or 0) for c in ventes)
     qualifs = [c["qualif"] for c in rows if c["show_up"] == "OUI" and c.get("qualif") is not None]
     booked = sum(1 for c in data["calls"] if c.get("booking_date")

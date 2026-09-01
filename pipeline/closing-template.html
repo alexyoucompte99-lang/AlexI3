@@ -778,7 +778,16 @@ const bookedIn = (r) => DATA.calls.filter(c => inRange(c.b, r));
 /* ================= stats ================= */
 /* vente comptée si validée par le closer (OUI) ou par Justine (virement coché) */
 const isSale = (c) => c.v === "OUI" || (c.vir && c.v !== "REMBOURSEMENT");
-function st(rows) {
+/* date de la vente = jour où elle a été cochée (registre .sales-ledger, champ sd),
+   repli sur la date du call pour les ventes antérieures au registre (règle Alex 01/09) */
+const saleD = (c) => c.sd || c.d || "";
+function salesIn(r, pred) {
+  return DATA.calls.filter(c => isSale(c) && (!pred || pred(c)) &&
+    (r.tm ? saleD(c).slice(0, 7) === r.tm
+          : isMtdRange(r) ? saleD(c).slice(0, 7) === TODAY_ISO.slice(0, 7) && saleD(c) <= TODAY_ISO
+          : inRange(saleD(c), r)));
+}
+function st(rows, r, pred) {
   const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
               pitched: 0, fuShows: 0, nonPitche: 0, ventes: 0, follow: 0, ca: 0, qSum: 0, qN: 0 };
   for (const c of rows) {
@@ -794,10 +803,13 @@ function st(rows) {
       else if (["OUI", "NON", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
       if (c.q != null) { o.qSum += c.q; o.qN++; }
     }
-    /* vente comptée si validée par le closer (OUI) ou par Justine (virement) */
-    if (isSale(c)) { o.ventes++; o.ca += c.p || c.pp || 0; }
+    /* vente comptée si validée par le closer (OUI) ou par Justine (virement) ;
+       si une plage r est fournie, les ventes sont comptées APRÈS la boucle
+       sur leur date de cochage (salesIn), pas sur la date du call */
+    if (!r && isSale(c)) { o.ventes++; o.ca += c.p || c.pp || 0; }
     if (c.v === "FOLLOW_UP" && !c.vir) o.follow++;
   }
+  if (r) for (const c of salesIn(r, pred)) { o.ventes++; o.ca += c.p || c.pp || 0; }
   /* même règle que l'onglet Suivi DATA du Sheet : on ne compte que les calls
      dont le show-up est renseigné ; les non renseignés et les calls à venir
      sont exclus du calcul (et signalés à part) */
@@ -871,7 +883,7 @@ const clEur = (v) => v == null ? "·" : fmtE(Math.round(v));
 function clStats(name, r) {
   /* name = un closer, ou CL_LES3 = les 3 principaux réunis */
   const match = (c) => name === CL_LES3 ? TOP3.includes(c.c || "") : (c.c || "") === name;
-  const o = st(plannedIn(r).filter(match));
+  const o = st(plannedIn(r).filter(match), r, match);
   o.fu = DATA.calls.filter(c => match(c) && c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026").length;
   o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
   o.caBooke = o.calls ? o.ca / o.calls : null;
@@ -1031,10 +1043,6 @@ const TY_OBJ_TOI = {
   "Protéger les miens, et transmettre quelque chose de solide": "protéger les tiens et transmettre quelque chose de solide",
   "Être libre de mes choix : mon temps, mon travail, mon lieu de vie": "être libre de tes choix : ton temps, ton travail, ton lieu de vie",
   "Arrêter de regarder mon argent perdre de la valeur en attendant": "arrêter de regarder ton argent perdre de la valeur",
-  "Construire un patrimoine qui travaille pour moi dans le temps": "construire un patrimoine qui travaille pour toi dans le temps",
-  "Générer des revenus passifs (maintenant ou à terme)": "générer des revenus passifs",
-  "Protéger et/ou anticiper la transmission de mon patrimoine": "protéger ton patrimoine et anticiper sa transmission",
-  "Structurer et organiser (pro et perso) mon patrimoine intelligemment": "structurer et organiser ton patrimoine intelligemment",
 };
 const tyCfg = { tpl(k) { return localStorage.getItem("ty-tpl" + k) || TY_DEFAULT_TPLS[k]; } };
 let tyFilter = "todo", tySource = "";
@@ -1523,12 +1531,12 @@ function deltaTag(cur, prev, lowerIsBetter = false) {
 }
 
 function renderKpis(r, rows) {
-  const s = st(rows);
+  const s = st(rows, r);
   const booked = bookedIn(r).length;
   let ps = null, pbooked = null;
   if (state.compare) {
     const pr = prevRange(r);
-    ps = st(plannedIn(pr));
+    ps = st(plannedIn(pr), pr);
     pbooked = bookedIn(pr).length;
   }
   $("kpiTitle").textContent = "Vue de la période · " + rangeLabel(r) +
@@ -1863,6 +1871,7 @@ function renderFollowups() {
     `Coche « Relancé » quand c'est fait : la ligne passe en bas. Clique un en-tête de colonne pour trier.`;
   const FU_COLS = [
     { k: "done", n: "Relancé ?" },
+    { k: "lost", n: "Perdu ?" },
     { k: "c", n: "Closer", get: c => c.c || "" },
     { k: "n", n: "Prospect", get: c => c.n || "" },
     { k: "tel", n: "Téléphone" },
@@ -1899,6 +1908,7 @@ function renderFollowups() {
       const done = fuDone(c);
       return `<tr${done ? ' style="opacity:.45"' : ""}>
         <td><input type="checkbox" data-fui="${i}" ${done ? "checked" : ""} aria-label="Relance faite pour ${esc(c.n)}" style="width:17px;height:17px;accent-color:var(--accent);cursor:pointer"></td>
+        <td><input type="checkbox" data-fulost="${i}" aria-label="Lead perdu : ${esc(c.n)}" title="Lead perdu : la vente passe en NON dans le Sheet et le follow-up sort de la liste" style="width:17px;height:17px;accent-color:#b3423a;cursor:pointer"></td>
         <td>${esc(c.c) || "·"}</td>
         <td><b${done ? ' style="text-decoration:line-through"' : ""}>${esc(c.n)}</b></td>
         <td>${waLink(c)}</td>
@@ -1911,7 +1921,23 @@ function renderFollowups() {
         <td>${profilCell(c)}</td>
       </tr>`;
     }).join("") + "</tbody>";
-  $("fuTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+  $("fuTable").querySelectorAll("input[data-fulost]").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const c = list[+cb.dataset.fulost];
+      if (!cb.checked) return;
+      /* lead perdu : la vente passe en NON dans le Sheet, le follow-up sort du pipe */
+      if (!window.confirm(`Marquer ${c.n || "ce lead"} comme lead perdu ? La vente passera en « NON » dans le Sheet et le follow-up sortira de la liste.`)) { cb.checked = false; return; }
+      cb.disabled = true;
+      const ok = c.st && c.sr && await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
+        headerRow: (DATA.hrows || {})[c.st] || 1,
+        fields: { vente: "NON", commentaire: `Lead perdu le ${frDate(TODAY_ISO)} (follow-up abandonné, coché depuis la console)` } });
+      if (!ok) { cb.checked = false; cb.disabled = false; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
+      c.v = "NON";
+      toast(`Lead perdu noté dans le Sheet pour ${c.n || "le lead"} ✓`);
+      renderFollowups();
+    });
+  });
+  $("fuTable").querySelectorAll("input[data-fui]").forEach(cb => {
     cb.addEventListener("change", () => {
       const c = list[+cb.dataset.fui];
       if (cb.checked) { localStorage.setItem(fuKey(c), TODAY_ISO); c.rf = "OUI " + frDate(TODAY_ISO); }
@@ -2176,9 +2202,53 @@ function fillCard(c) {
     send.textContent = "Validé"; /* écrit dans le Sheet ET valide la carte dans la console */
     send.addEventListener("click", () => fillSend(c, orig, state, send));
     card.appendChild(send);
+    /* actions spéciales : mauvaise attribution de closer, ou ligne en double */
+    const extra = document.createElement("div");
+    extra.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--grid)";
+    const sel = document.createElement("select");
+    sel.style.cssText = "font-size:13px;padding:6px 8px";
+    sel.innerHTML = `<option value="">À changer de closer…</option>` +
+      TOP3.filter(n => n !== c.c).map(n => `<option value="${esc(n)}">→ ${esc(n.split(" ")[0])}</option>`).join("");
+    sel.addEventListener("change", () => fillReassign(c, sel.value, sel));
+    extra.appendChild(sel);
+    const dbl = document.createElement("button");
+    dbl.type = "button"; dbl.className = "btn";
+    dbl.style.cssText = "font-size:13px;opacity:.8";
+    dbl.textContent = "Doublon 🗑";
+    dbl.title = "Marque la ligne DOUBLON dans le Sheet : elle sort de la console et des stats";
+    dbl.addEventListener("click", () => fillDoublon(c, dbl));
+    extra.appendChild(dbl);
+    card.appendChild(extra);
   };
   redraw();
   return card;
+}
+async function fillReassign(c, newCloser, sel) {
+  /* change le closer de la ligne dans le Sheet : le call passe chez lui partout
+     (console, stats, mail du soir) dès le prochain refresh */
+  if (!newCloser) return;
+  if (!window.confirm(`Passer le call de ${c.n || "ce lead"} chez ${newCloser.split(" ")[0]} ? Le Sheet sera mis à jour.`)) { sel.value = ""; return; }
+  sel.disabled = true;
+  const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { closer: newCloser } });
+  sel.disabled = false;
+  if (!ok) { sel.value = ""; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
+  c.c = newCloser;
+  toast(`✅ Call réattribué à ${newCloser.split(" ")[0]} (Sheet à jour)`);
+  renderFill();
+}
+async function fillDoublon(c, btn) {
+  /* marque DOUBLON dans la colonne show-up du Sheet : parse_xlsx ignore ensuite
+     la ligne partout (console, stats, mails) */
+  if (!window.confirm(`Marquer le call de ${c.n || "ce lead"} comme DOUBLON ? Il disparaît de la console et des stats (le Sheet garde la ligne marquée).`)) return;
+  btn.disabled = true;
+  const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { show_up: "DOUBLON" } });
+  btn.disabled = false;
+  if (!ok) { toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
+  c.s = "DOUBLON"; /* sort de fillTodo tout de suite ; au prochain refresh la ligne est ignorée */
+  toast("✅ Marqué doublon dans le Sheet 🗑");
+  renderFill();
 }
 async function fillSend(c, orig, state, btn) {
   /* n'envoie QUE ce qui a changé ou été ajouté : ce qui est déjà dans le Sheet ne bouge pas */
@@ -2397,7 +2467,7 @@ function buildBrief() {
   const p = BRIEF_PERIODS.find(x => x.k === briefSel);
   const r = p.range();
   const rows = plannedIn(r);
-  const s = st(rows);
+  const s = st(rows, r);
   const booked = bookedIn(r).length;
   const ads = adsIn(r);
   const lines = [];
@@ -2411,8 +2481,9 @@ function buildBrief() {
   lines.push("");
   lines.push(`Ventes : ${s.ventes} · CA signé sur la période : *${fmtE(s.ca)}*`);
   const tmNow = TODAY_ISO.slice(0, 7);
-  const caMois = DATA.calls.filter(c => c.tm === tmNow && isSale(c)).reduce((a, c) => a + (c.p || c.pp || 0), 0);
-  const caTotal = DATA.calls.filter(c => isSale(c) && c.tm >= "2026").reduce((a, c) => a + (c.p || c.pp || 0), 0);
+  /* CA attribué au mois où la vente a été cochée (règle Alex 01/09), plus au mois du call */
+  const caMois = DATA.calls.filter(c => isSale(c) && saleD(c).slice(0, 7) === tmNow).reduce((a, c) => a + (c.p || c.pp || 0), 0);
+  const caTotal = DATA.calls.filter(c => isSale(c) && saleD(c) >= "2026").reduce((a, c) => a + (c.p || c.pp || 0), 0);
   lines.push(`CA signé mois en cours : *${fmtE(caMois)}* · total 2026 : *${fmtE(caTotal)}*`);
   lines.push(`Taux de closing : *${fmtP(s.shows ? 100 * s.ventes / s.shows : null, 0)}* des présents · *${fmtP(s.tClosPitche, 0)}* des pitchés`);
   lines.push(`CA par call présent : ${s.shows ? fmtE(s.ca / s.shows) : "·"} · CA par call booké (présent ou non) : ${s.passes ? fmtE(s.ca / s.passes) : "·"}`);
@@ -2430,11 +2501,11 @@ function buildBrief() {
   if (by.size > 1) {
     lines.push("");
     lines.push("Par closer :");
-    [...by.entries()].map(([n, rs]) => ({ n, s: st(rs) }))
+    [...by.entries()].map(([n, rs]) => ({ n, s: st(rs, r, c => (c.c || "(sans closer)") === n) }))
       .sort((a, b) => b.s.calls - a.s.calls)
       .forEach(x => lines.push(`• ${x.n.split(" ")[0]} : ${x.s.calls} calls, ${x.s.shows} présents (show-up ${fmtP(x.s.tShowPasses, 0)}), ${x.s.ventes} vente(s), ${fmtE(x.s.ca)}`));
   }
-  const ventesRows = rows.filter(isSale);
+  const ventesRows = salesIn(r);
   if (ventesRows.length) {
     lines.push("", "VENTE :");
     ventesRows.forEach(c => lines.push(`• ${c.n} (${(c.c || "").split(" ")[0]}, ${fmtE(c.p || c.pp)})${c.vir ? (c.v === "OUI" ? "" : " · validée Justine, à cocher côté closer") : " · vente faite, en attente de validation"}`));
