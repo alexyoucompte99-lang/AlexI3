@@ -287,6 +287,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
+    <button class="tab" role="tab" id="tabIdea" aria-selected="false" data-panel="panelIdea">Idées 💡</button>
     <button class="tab" role="tab" id="tabFunnel" aria-selected="false" data-panel="panelFunnel">Funnel 🔒</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
     <button class="tab" role="tab" id="tabPilotage" aria-selected="false" data-panel="panelPilotage">Pilotage 🔒</button>
@@ -538,7 +539,8 @@ __FUNNEL_CSS__
       <div class="card" style="max-width:680px" id="eowCard">
         <div class="field">
           <label for="eowCloser">Ton prénom</label>
-          <select id="eowCloser"></select>
+          <div class="seg" id="eowCloserSeg"></div>
+          <input type="hidden" id="eowCloser">
         </div>
         <div class="field">
           <label for="eowEnergy">Ton niveau d'énergie cette semaine</label>
@@ -573,7 +575,8 @@ __FUNNEL_CSS__
       <div class="card" style="max-width:680px" id="eodCard">
         <div class="field">
           <label for="eodCloser">Ton prénom</label>
-          <select id="eodCloser"></select>
+          <div class="seg" id="eodCloserSeg"></div>
+          <input type="hidden" id="eodCloser">
         </div>
         <div class="field">
           <label for="eodEnergy">Ton niveau d'énergie aujourd'hui</label>
@@ -611,6 +614,29 @@ __FUNNEL_CSS__
   </div>
 
   <!-- ================== ALEX ================== -->
+  <!-- ================== IDÉES ================== -->
+  <div id="panelIdea" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Boîte à idées</span>
+      <h2>Une idée pour l'équipe ?</h2>
+      <p class="lede">Un truc à tester dans le script, une objection qui revient, une idée d'offre, un outil qui
+        te ferait gagner du temps : écris-la ici, elle part direct à Alex. Pas besoin que ce soit abouti.</p>
+      <div class="card" style="max-width:680px" id="ideaCard">
+        <div class="field">
+          <label for="ideaCloser">Ton prénom</label>
+          <div class="seg" id="ideaCloserSeg"></div>
+          <input type="hidden" id="ideaCloser">
+        </div>
+        <div class="field"><label for="ideaText">Ton idée</label><textarea id="ideaText" style="min-height:110px" placeholder="Ce que tu proposes, et pourquoi tu penses que ça marcherait."></textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+          <button class="btn" id="ideaSend">💡 Envoyer mon idée</button>
+          <button class="btn ghost" id="ideaClear">Effacer</button>
+          <span id="ideaOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <!-- ================== FUNNEL ================== -->
   <div id="panelFunnel" role="tabpanel" hidden>
     <section style="margin-top:16px" id="funnelLock">
@@ -1114,6 +1140,8 @@ const TY_OBJ_TOI = {
 const tyCfg = { tpl(k) { return localStorage.getItem("ty-tpl" + k) || TY_DEFAULT_TPLS[k]; } };
 let tyFilter = "todo", tySource = "";
 const tyKey = (t) => "ty-claim:" + (t.email || t.id);
+const tyTestKey = (t) => "ty-test:" + (t.email || t.id);
+const tyIsTest = (t) => !!t.test || localStorage.getItem(tyTestKey(t)) === "1";
 function tyState(t) {
   if (t.cl) return { closer: t.cl, d: t.cld || "" };
   const loc = localStorage.getItem(tyKey(t));
@@ -1175,7 +1203,10 @@ function tyInit() {
   $("tyReset").addEventListener("click", () => { ["P", "A", "B", "C"].forEach(k => localStorage.removeItem("ty-tpl" + k)); fill(); renderScan(); });
 }
 function renderScan() {
-  const subs = TY.subs || [];
+  /* les scans de test sont retirés de tout ce qui suit (KPI, sources, relances) */
+  const allSubs = TY.subs || [];
+  const tests = allSubs.filter(tyIsTest);
+  const subs = allSubs.filter(t => !tyIsTest(t));
   const todo = subs.filter(t => tyContact(t) && !tyState(t));
   $("tyBadge").textContent = todo.length || "";
   if (!TY.fetched_at) {
@@ -1233,17 +1264,19 @@ function renderScan() {
     { k: "complet", label: `Ont fini (${done.length})` },
     { k: "partiel", label: `En route (${part.length})` },
     { k: "all", label: `Tous (${subs.length})` },
+    { k: "test", label: `Scans de test (${tests.length})` },
   ], tyFilter, k => tyFilter = k, renderScan);
   const inSrc = srcs.filter(k => subs.some(t => t.source === k));
   pillRow("tySourcePills", [{ k: "", label: "Toutes" }, ...inSrc.map(k => ({ k: "s:" + k, label: TY_SOURCES[k] || k }))],
     tySource, k => tySource = k, renderScan);
-  let list = subs.filter(t => tySource === "" ? true : t.source === tySource.slice(2));
-  list = list.filter(t => tyFilter === "all" ? true
+  let list = (tyFilter === "test" ? tests : subs).filter(t => tySource === "" ? true : t.source === tySource.slice(2));
+  list = list.filter(t => tyFilter === "test" ? true
+    : tyFilter === "all" ? true
     : tyFilter === "todo" ? (tyContact(t) && !tyState(t))
     : tyFilter === "done" ? !!tyState(t)
     : tyFilter === "complet" ? t.done : !t.done);
 
-  $("tyTable").innerHTML = "<thead><tr><th>Qui relance ?</th><th>Reçu</th><th>Prospect</th><th>WhatsApp</th><th>Instagram</th><th>Email</th><th>Source</th><th>Où il en est</th><th></th></tr></thead><tbody>" +
+  $("tyTable").innerHTML = "<thead><tr><th>Qui relance ?</th><th>Test ?</th><th>Reçu</th><th>Prospect</th><th>WhatsApp</th><th>Instagram</th><th>Email</th><th>Source</th><th>Où il en est</th><th></th></tr></thead><tbody>" +
     list.map((t, i) => {
       const st2 = tyState(t);
       const boxes = tyContact(t) ? TOP3.map(n => {
@@ -1256,6 +1289,7 @@ function renderScan() {
         .map(q => `<div style="margin-top:5px"><b>${esc(q.label)}</b> : ${esc(t.a[q.id])}</div>`).join("");
       return `<tr${st2 ? ' style="opacity:.55"' : ""}>
         <td style="white-space:nowrap">${boxes}${st2 ? `<div class="sub" style="font-size:11px;margin-top:2px">relancé le ${esc(tyFrD(st2.d))}</div>` : ""}</td>
+        <td><input type="checkbox" data-tytest="${i}" ${tyIsTest(t) ? "checked" : ""} title="Scan de test : la réponse sort de toutes les statistiques" style="width:16px;height:16px;accent-color:var(--critical);cursor:pointer"></td>
         <td style="white-space:nowrap">${tyWhen(t.at)}</td>
         <td><b>${esc(t.prenom) || "·"}</b><br>${tyProfilChip(t)}</td>
         <td>${t.tel ? `<a class="tel" href="https://wa.me/${esc(String(t.tel).replace(/\D/g, ""))}?text=${encodeURIComponent(tyMsg(t)).replace(/'/g, "%27")}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message écrit à partir de ses réponses">${esc(t.tel)}</a>` : "·"}</td>
@@ -1269,7 +1303,25 @@ function renderScan() {
     }).join("") + "</tbody>";
   $("tyMore").textContent = list.length ? "" : (tyFilter === "todo" ? "Personne à relancer ici pour l'instant." : "Rien ici pour l'instant.");
 
-  $("tyTable").querySelectorAll("input[type=checkbox]").forEach(cb => {
+  /* case « scan de test » : même registre partagé que les relances (statut TEST),
+     la soumission disparaît des stats pour toute l'équipe et reste décochable */
+  $("tyTable").querySelectorAll("input[data-tytest]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const t = list[+cb.dataset.tytest];
+      const lead = "TALLY|" + (t.email || t.id);
+      if (cb.checked) {
+        localStorage.setItem(tyTestKey(t), "1"); t.test = true;
+        bridgePost({ what: "iclosed_claim", lead, closer: "TEST", value: "TEST" })
+          .then(ok => toast(ok ? "Scan de test : sorti des stats pour toute l'équipe ✓" : "Sorti des stats sur ce navigateur (Sheet injoignable)"));
+      } else {
+        localStorage.removeItem(tyTestKey(t)); delete t.test;
+        bridgePost({ what: "iclosed_claim", lead, closer: "TEST", value: "ANNULE" })
+          .then(ok => toast(ok ? "Remis dans les stats ✓" : "Remis sur ce navigateur"));
+      }
+      renderScan();
+    });
+  });
+  $("tyTable").querySelectorAll("input[data-ty]").forEach(cb => {
     cb.addEventListener("change", () => {
       const t = list[+cb.dataset.ty];
       const closer = cb.dataset.closer;
@@ -2037,11 +2089,29 @@ function renderFollowups() {
   $("fuCsv").href = "data:text/csv;charset=utf-8," + encodeURIComponent("﻿" + csv);
 }
 
+/* choix du closer en boutons (EOW/EOD) : la valeur vit dans un input caché,
+   les brouillons et l'envoi ne changent pas */
+function closerSeg(segId, inputId, onPick) {
+  const names = [...new Set(DATA.calls.filter(c => c.d && daysAgo(c.d) < 60 && c.c).map(c => c.c))].sort();
+  const opts = [...names.map(n => [n, n.split(" ")[0]]), ["Autre", "Autre"]];
+  const inp = $(inputId), host = $(segId);
+  if (!opts.some(o => o[0] === inp.value)) inp.value = opts[0][0];
+  const draw = () => {
+    host.innerHTML = "";
+    for (const [k, lbl] of opts) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = lbl;
+      b.setAttribute("aria-pressed", String(inp.value === k));
+      b.addEventListener("click", () => { inp.value = k; draw(); onPick(); });
+      host.appendChild(b);
+    }
+  };
+  draw();
+}
+
 /* ================= EOW ================= */
 const EOW_FIELDS = ["eowCloser", "eowEnergy", "eowLeads", "eowGood", "eowHard", "eowObj", "eowNeed", "eowFree"];
 function initEow() {
-  const names = [...new Set(DATA.calls.filter(c => c.d && daysAgo(c.d) < 60 && c.c).map(c => c.c))].sort();
-  $("eowCloser").innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("") + `<option>Autre</option>`;
   const saved = JSON.parse(localStorage.getItem("eow-draft") || "{}");
   for (const id of EOW_FIELDS) if (saved[id] != null) $(id).value = saved[id];
   const sync = () => {
@@ -2050,6 +2120,7 @@ function initEow() {
     localStorage.setItem("eow-draft", JSON.stringify(Object.fromEntries(EOW_FIELDS.map(id => [id, $(id).value]))));
   };
   EOW_FIELDS.forEach(id => $(id).addEventListener("input", sync));
+  closerSeg("eowCloserSeg", "eowCloser", sync);
   sync();
   const eowText = () => {
     const monday = new Date(NOW - ((NOW.getDay() + 6) % 7) * DAY);
@@ -2099,8 +2170,6 @@ function initEow() {
 /* ================= EOD (ressenti du jour, optionnel) ================= */
 const EOD_FIELDS = ["eodCloser", "eodEnergy", "eodMood", "eodFlag"];
 function initEod() {
-  const names = [...new Set(DATA.calls.filter(c => c.d && daysAgo(c.d) < 60 && c.c).map(c => c.c))].sort();
-  $("eodCloser").innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("") + `<option>Autre</option>`;
   const saved = JSON.parse(localStorage.getItem("eod-draft") || "{}");
   for (const id of EOD_FIELDS) if (saved[id] != null) $(id).value = saved[id];
   const sync = () => {
@@ -2108,6 +2177,7 @@ function initEod() {
     localStorage.setItem("eod-draft", JSON.stringify(Object.fromEntries(EOD_FIELDS.map(id => [id, $(id).value]))));
   };
   EOD_FIELDS.forEach(id => $(id).addEventListener("input", sync));
+  closerSeg("eodCloserSeg", "eodCloser", sync);
   sync();
   const eodMsg = (m) => { $("eodOk").textContent = m; $("eodOk").style.display = "inline"; setTimeout(() => $("eodOk").style.display = "none", 5000); };
   $("eodSend").addEventListener("click", () => {
@@ -2163,9 +2233,11 @@ let fillFilter = "todo";
     try {
       const o = JSON.parse(raw);
       const f = o.f || o; /* compat ancien format */
-      const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v) && (f.q == null || c.q === f.q);
+      const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v) && (f.q == null || c.q === f.q)
+        && (!f.d || c.d === f.d);
       if (caughtUp || Date.now() - (o.when || 0) > 3 * 86400e3) { localStorage.removeItem(fillKey(c)); continue; }
       if (f.s) c.s = f.s;
+      if (f.d) { c.d = f.d; c.hh = f.hh || c.hh; }
       if (f.v) c.v = f.v;
       if (f.q != null) c.q = f.q;
       if (f.pp) c.pp = f.pp;
@@ -2217,7 +2289,7 @@ function fillCard(c) {
   const quand = frDateFull(c.d) + (c.hh ? " à " + c.hh : "");
   const orig = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", mens: c.mens || "",
                  c250: c.c250 || "", vid: c.vid || "", rec: c.rec || "", rel: c.rel || "" };
-  const state = Object.assign({}, orig, { com: "", obj: "", raison: "" });
+  const state = Object.assign({}, orig, { com: "", obj: "", raison: "", replan: "" });
   const nonClose = () => ["NON", "FOLLOW_UP", "NON_PITCHE"].includes(state.v);
   const seg = (label, opts, cur, onPick, cls) => {
     const wrap = document.createElement("div");
@@ -2257,6 +2329,14 @@ function fillCard(c) {
       return;
     }
     card.appendChild(seg("Show-up", Object.entries(FILL_SU), state.s, k => state.s = k));
+    if (state.s === "REPROGRAMMER") {
+      /* le call repart dans « Calls à venir » : on écrit le nouveau créneau dans le Sheet
+         et on vide le show-up, la carte reviendra à remplir après le nouveau rendez-vous */
+      const w = labeledInput("Nouveau créneau (laisse vide s'il n'est pas encore fixé)",
+        "datetime-local", state.replan, "", v => state.replan = v);
+      w.querySelector(".flabel").style.color = "var(--accent)";
+      card.appendChild(w);
+    }
     /* un résultat rempli implique que le lead était présent (règle Alex) */
     card.appendChild(seg("Résultat du call", Object.entries(FILL_V), state.v,
       k => { state.v = k; if (!state.s) state.s = "OUI"; }));
@@ -2366,6 +2446,19 @@ async function fillSend(c, orig, state, btn) {
   /* n'envoie QUE ce qui a changé ou été ajouté : ce qui est déjà dans le Sheet ne bouge pas */
   const fields = {};
   if (state.s && state.s !== orig.s) fields.show_up = FILL_SU_SHEET[state.s];
+  /* reprogrammation avec un créneau : on déplace la date du call dans le Sheet et on
+     remet le show-up à vide (sentinelle __VIDE__ du pont), donc la ligne redevient un
+     call à venir plutôt qu'un call « reprogrammé » figé */
+  const replan = state.s === "REPROGRAMMER" && state.replan ? state.replan : "";
+  if (replan) {
+    const [ymd, hm] = replan.split("T");
+    const [y, m, d] = ymd.split("-");
+    fields.date = `${d}/${m}/${y} ${hm}`;
+    fields.show_up = "__VIDE__";
+    state.com = (state.com ? state.com + "\n" : "") +
+      `Reprogrammé le ${frDate(TODAY_ISO)} : nouveau créneau le ${d}/${m} à ${hm}` +
+      (c.d ? ` (initialement le ${frDate(c.d)}${c.hh ? " à " + c.hh : ""})` : "");
+  }
   if (state.v && state.v !== orig.v) fields.vente = FILL_V_SHEET[state.v];
   if (state.q != null && state.q !== orig.q) fields.qualif = state.q;
   if (state.pp && +state.pp !== +(orig.pp || 0)) fields.prix = +state.pp;
@@ -2402,6 +2495,7 @@ async function fillSend(c, orig, state, btn) {
   }
   /* MAJ optimiste locale, purgée dès que le Sheet renvoie la vraie valeur */
   if (state.s) c.s = state.s;
+  if (replan) { c.s = ""; c.d = replan.split("T")[0]; c.hh = replan.split("T")[1]; }
   if (state.v) c.v = state.v;
   if (state.q != null) c.q = state.q;
   if (fields.prix) { c.pp = +state.pp; if (c.v === "OUI") c.p = +state.pp; }
@@ -2415,7 +2509,8 @@ async function fillSend(c, orig, state, btn) {
   c._fillSent = Date.now();
   localStorage.setItem(fillKey(c), JSON.stringify({ when: c._fillSent,
     f: { s: c.s, v: c.v, q: c.q, pp: c.pp, mens: c.mens, c250: c.c250, vid: c.vid, rec: c.rec,
-         rel: c.rel, com: state.com.trim(), obj: fields.objection || state.obj.trim() } }));
+         rel: c.rel, com: state.com.trim(), obj: fields.objection || state.obj.trim(),
+         d: replan ? c.d : null, hh: replan ? c.hh : null } }));
   toast("✅ C'est dans le Sheet, tié un tigre 🐯");
   renderFill();
 }
@@ -2805,6 +2900,46 @@ function initPilotage() {
   $("pilotCode").addEventListener("keydown", e => { if (e.key === "Enter") tryCode(); });
 }
 
+/* ================= boîte à idées ================= */
+/* Même chemin que l'EOD : la ligne part dans le Sheet (onglet « Idees Console »)
+   et la notification Telegram part à la MAJ suivante (eow_notify). */
+function initIdea() {
+  const draft = () => localStorage.setItem("idea-draft", JSON.stringify({ c: $("ideaCloser").value, t: $("ideaText").value }));
+  try {
+    const d = JSON.parse(localStorage.getItem("idea-draft") || "{}");
+    if (d.c) $("ideaCloser").value = d.c;
+    if (d.t) $("ideaText").value = d.t;
+  } catch (e) { /* brouillon illisible : on repart de zéro */ }
+  $("ideaText").addEventListener("input", draft);
+  closerSeg("ideaCloserSeg", "ideaCloser", draft);
+  const msg = (m) => { $("ideaOk").textContent = m; $("ideaOk").style.display = "inline"; setTimeout(() => $("ideaOk").style.display = "none", 5000); };
+  $("ideaSend").addEventListener("click", () => {
+    const btn = $("ideaSend");
+    if (btn.disabled) return;
+    if ($("ideaText").value.trim().length < 5) { msg("Écris ton idée avant d'envoyer."); return; }
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    bridgePost({ what: "idea", closer: $("ideaCloser").value, idea: $("ideaText").value.trim() }).then(ok => {
+      if (ok) {
+        localStorage.removeItem("idea-draft");
+        $("ideaCard").innerHTML = `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:52px;margin-bottom:14px">💡</div>
+          <h2 style="margin:0 0 8px">Idée envoyée, merci !</h2>
+          <p class="lede" style="margin:0">Alex la reçoit sur Telegram. Reviens quand tu veux en déposer une autre.</p>
+        </div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "💡 Envoyer mon idée";
+        msg("Envoi impossible pour l'instant : vérifie ta connexion et réessaie dans une minute.");
+      }
+    });
+  });
+  $("ideaClear").addEventListener("click", () => {
+    localStorage.removeItem("idea-draft");
+    $("ideaText").value = "";
+  });
+}
+
 /* ================= verrou de l'onglet Funnel ================= */
 /* La console funnel elle-même est déjà dans la page (rendue au chargement) :
    le verrou ne fait qu'afficher son conteneur, il n'y a rien à recalculer. */
@@ -2896,6 +3031,7 @@ function setupRefresh(btn, note) {
 setupRefresh($("btnRefresh"), document.querySelector(".updated"));
 initPilotage();
 initFunnel();
+initIdea();
 $("tabClosers").addEventListener("click", renderClosersTab);
 /* Pilotage n'est plus l'onglet par défaut : re-rendre ses graphes quand il devient visible */
 $("tabPilotage").addEventListener("click", () => {

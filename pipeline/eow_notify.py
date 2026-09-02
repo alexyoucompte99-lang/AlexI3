@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Notifie sur Telegram les nouvelles lignes des onglets « EOW Console » et
-« EOD Console » du classeur closing (remplis par la console via le pont).
+« EOD Console » et « Idees Console » du classeur closing (remplis par la console
+via le pont).
 
-Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count]
+Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count] [../.idea-count]
 Env : TELEGRAM_TOKEN, TELEGRAM_CHAT (sinon ne fait rien).
 Chaque fichier d'état contient le nombre de lignes déjà notifiées (commité par
 le workflow pour persister entre les runs).
@@ -46,6 +47,11 @@ def fmt_eod(vals):
             f"À signaler : {flag or '·'}")
 
 
+def fmt_idea(vals):
+    date, closer, idea = (vals + [""] * 3)[:3]
+    return f"💡 Idée de {closer or '?'}\n\n{idea or '·'}"
+
+
 def notify_tab(wb, token, chat, tab, state_path, fmt, label):
     if tab not in wb.sheetnames:
         print(f"onglet {tab} absent (rien d'envoyé pour l'instant)", file=sys.stderr)
@@ -69,7 +75,7 @@ def notify_tab(wb, token, chat, tab, state_path, fmt, label):
         f.write(str(n))
 
 
-def main(xlsx_path, eow_state, eod_state=None):
+def main(xlsx_path, eow_state, eod_state=None, idea_state=None):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT")
     if not (token and chat):
@@ -79,7 +85,9 @@ def main(xlsx_path, eow_state, eod_state=None):
     notify_tab(wb, token, chat, "EOW Console", eow_state, fmt_eow, "EOW")
     if eod_state:
         notify_tab(wb, token, chat, "EOD Console", eod_state, fmt_eod, "EOD")
+    if idea_state:
+        notify_tab(wb, token, chat, "Idees Console", idea_state, fmt_idea, "Idée")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    main(*sys.argv[1:5])

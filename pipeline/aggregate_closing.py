@@ -288,7 +288,12 @@ def main(data_path, out_path, updated_at):
                 ty_claim[cl["lead"][6:]] = cl
         for s in tally.get("subs", []):
             cl = ty_claim.get(s.get("email") or s["id"])
-            if cl and cl.get("statut") != "ANNULE":
+            if not cl or cl.get("statut") == "ANNULE":
+                continue
+            # scan de test coché dans la console : sorti de toutes les stats
+            if cl.get("statut") == "TEST":
+                s["test"] = True
+            else:
                 s["cl"] = cl.get("closer") or ""
                 s["cld"] = cl.get("d") or ""
     except (FileNotFoundError, json.JSONDecodeError):

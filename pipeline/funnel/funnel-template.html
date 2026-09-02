@@ -218,15 +218,16 @@
   <div class="filterbar" id="presets">
     <button class="fpill" data-days="7">7 derniers jours</button>
     <button class="fpill on" data-days="14">14 derniers jours</button>
-    <button class="fpill" data-days="28">28 derniers jours</button>
+    <button class="fpill" data-days="30">30 derniers jours</button>
     <span class="fsep"></span>
-    <button class="fpill" data-days="30">1 mois</button>
     <button class="fpill" data-days="60">2 mois</button>
     <button class="fpill" data-days="90">3 mois</button>
     <button class="fpill" data-days="180">6 mois</button>
     <span class="fsep"></span>
     <button class="fpill" data-days="mtd">Mois en cours</button>
     <button class="fpill" data-days="ytd">Année en cours</button>
+    <span class="fsep"></span>
+    <span id="monthPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
     <span class="fsep"></span>
     <span class="fcustom">du <input type="date" id="dFrom"> au <input type="date" id="dTo"> <button id="dApply">Appliquer</button></span>
   </div>
@@ -400,6 +401,7 @@ __DATA__
   var sel = [];
   function lastN(n) { var a = []; for (var i = Math.max(0, N - n); i < N; i++) a.push(i); return a; }
   function allIdx() { return lastN(N); }
+  function monthIdx(tm) { var a = []; for (var i = 0; i < N; i++) if (DAYS[i].slice(0, 7) === tm) a.push(i); return a; }
   function mtdIdx() { var m = DAYS[N - 1].slice(0, 7); var a = []; for (var i = 0; i < N; i++) if (DAYS[i].slice(0, 7) === m) a.push(i); return a; }
 
   var weeks = [];
@@ -440,11 +442,21 @@ __DATA__
       cb.checked = inSel === w.idx.length; cb.indeterminate = inSel > 0 && inSel < w.idx.length;
     });
   }
+  // un bouton par mois deja commence, du plus recent au plus ancien (le mois en
+  // cours a deja sa pill « Mois en cours », on ne le repete pas)
+  (function buildMonthPills() {
+    var host = document.getElementById('monthPills'), cur = DAYS[N - 1].slice(0, 7), seen = {}, out = [];
+    for (var i = 0; i < N; i++) { var m = DAYS[i].slice(0, 7); if (!seen[m] && m !== cur) { seen[m] = 1; out.push(m); } }
+    host.innerHTML = out.reverse().map(function (m) {
+      return '<button class="fpill" data-month="' + m + '">' + MOIS[+m.slice(5) - 1] + '</button>';
+    }).join('');
+  })();
   function clearPresets() { document.querySelectorAll('.fpill').forEach(function (b) { b.classList.remove('on'); }); }
   document.querySelectorAll('.fpill').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var d = btn.dataset.days;
-      sel = d === 'ytd' ? allIdx() : (d === 'mtd' ? mtdIdx() : lastN(+d));
+      sel = btn.dataset.month ? monthIdx(btn.dataset.month)
+          : d === 'ytd' ? allIdx() : (d === 'mtd' ? mtdIdx() : lastN(+d));
       clearPresets(); btn.classList.add('on'); renderAll();
     });
   });
@@ -471,6 +483,11 @@ __DATA__
     return o;
   }
   function arrivals(o) { return curTab === 'new' ? o.pv : o.ads.lpv; }
+  // arrivées réelles = landing page views Meta (une par clic qui a fini de charger).
+  // Sur le nouveau funnel les PageView du pixel gonflent x3 (rechargements, retours,
+  // nos visites, iframe iClosed) : inutilisables comme « nombre de personnes ».
+  function realArr(o) { return (curTab === 'new' && o.ads.lpv) ? o.ads.lpv : (curTab === 'new' ? o.pv : o.ads.lpv); }
+  function realArrLabel() { return curTab === 'new' ? 'des arrivées pubs' : 'des arrivées'; }
   // Nouveau funnel : on compte les calls au jour de leur RESERVATION (colonne du Sheet), le seul
   // repere comparable au pixel, qui envoie son evenement au moment ou le creneau est pris. Un call
   // reserve le 28 pour le 4 du mois suivant comptait sinon hors periode. Ancien funnel : la colonne
@@ -524,6 +541,12 @@ __DATA__
   }
 
   // ---- KPIs
+  // Ecart normal entre « RDV confirmes » (pixel, arrete au dernier releve) et
+  // « Calls bookes » (Sheet, live) : les reservations prises apres le releve.
+  function lateResa(s, sf) {
+    var n = Math.max(0, bookedArr(s) - bookedArr(sf));
+    return n ? ' · ' + fmt(n) + ' réservation' + (n > 1 ? 's' : '') + ' depuis, pas encore dans le relevé pixel' : '';
+  }
   function renderKpis(s, p, sf) {
     var pOk = !!p, pPix = !!p && p.cov === p.n && p.cov > 0;
     var covTxt = s.cov < s.n ? ' · sur ' + s.cov + ' j couverts' : '';
@@ -533,8 +556,12 @@ __DATA__
     var arrCov = curTab === 'new' ? covTxt : '';
     var tiles = [
       { l: TABS[curTab].arrLabel, src: arrSrc, n: fmt(s.arr), sub: (curTab === 'new' ? 'PageView du pixel dédié' : 'landing page views Meta') + arrCov, d: deltaHtml(s.arr, p ? p.arr : null, false, '', curTab === 'new' ? pPix : pOk) },
-      { l: 'Lancements vidéo', src: 'pixel', n: fmt(sf.v[0]), sub: (pct(sf.v[5], sf.v[0]) || '—') + ' passent la 1re minute' + covTxt, d: deltaHtml(sf.v[0], p ? p.v[0] : null, false, '', pPix) },
-      { l: 'RDV confirmés', src: 'pixel', n: fmt(sf.rdv), sub: (sf.v[0] ? pct1(sf.rdv, sf.v[0]) : '—') + ' des lancements (vidéo → RDV)' + covTxt, d: deltaHtml(sf.rdv, p ? p.rdv : null, false, '', pPix), hot: true },
+      { l: 'Lancements vidéo', src: 'pixel', n: fmt(sf.v[0]),
+        sub: (pct(sf.v[0], realArr(sf)) || '—') + ' ' + realArrLabel() + ' · ' + (pct(sf.v[5], sf.v[0]) || '—') + ' passent la 1re minute' + covTxt,
+        d: deltaHtml(sf.v[0], p ? p.v[0] : null, false, '', pPix) },
+      { l: 'RDV confirmés', src: 'pixel', n: fmt(sf.rdv),
+        sub: (sf.v[0] ? pct1(sf.rdv, sf.v[0]) : '—') + ' des lancements (vidéo → RDV)' + covTxt + lateResa(s, sf),
+        d: deltaHtml(sf.rdv, p ? p.rdv : null, false, '', pPix), hot: true },
       { l: 'Calls bookés', src: 'closing', n: fmt(bookedOf(s)), sub: BOOKED_SUB(), d: deltaHtml(bookedOf(s), p ? bookedOf(p) : null, false, '', pOk) },
       { l: 'Présents', src: 'closing', n: fmt(s.cl.present), sub: (pct(s.cl.present, showup) || '—') + ' de show-up sur ' + fmt(showup) + ' renseignés', d: deltaHtml(s.cl.present, p ? p.cl.present : null, false, '', pOk) },
       { l: 'Ventes', src: 'closing', n: fmt(s.cl.vente), sub: fmtEur(s.cl.ca) + ' de CA · ' + (pct(s.cl.vente, s.cl.present) || '—') + ' des présents', d: deltaHtml(s.cl.vente, p ? p.cl.vente : null, false, '', pOk), hot: true }
@@ -568,7 +595,7 @@ __DATA__
   function renderAds(s, p) {
     var a = s.ads, o = { baseLabel: 'des clics sur le lien' };
     var sub = document.getElementById('adsSub');
-    sub.textContent = curTab === 'new' ? 'Campagnes dédiées à la nouvelle LP (aucune pour l\'instant : les chiffres ci-dessous restent à zéro tant que les pubs n\'envoient pas vers la page).' : 'Toutes les campagnes du compte Meta hors webinaires (VSL + retargeting), toute la période sélectionnée. « Arrivées réelles » = la page a fini de charger après le clic (landing page view).';
+    sub.textContent = curTab === 'new' ? ('Campagnes dédiées à la nouvelle LP' + (a.spend ? '.' : ' (aucune en dépense sur la période).')) : 'Toutes les campagnes du compte Meta hors webinaires (VSL + retargeting), toute la période sélectionnée. « Arrivées réelles » = la page a fini de charger après le clic (landing page view).';
     var html = '';
     html += frow('Dépenses publicitaires', curTab === 'new' ? 'campagnes LP Stratégie privée' : 'campagnes VSL + retargeting, hors webinaires', a.spend, 0, { ctx: true, money: true, ctxLabel: a.spend && a.lpv ? fmtEurP(a.spend / a.lpv) + ' par arrivée' : 'période' });
     html += '<div class="bf-sep"></div>';
@@ -642,6 +669,7 @@ __DATA__
     }
     html += mini([
       { l: 'Vidéo → RDV', v: sf.v[0] ? pct1(sf.rdv, sf.v[0]) : '—', s: 'RDV pour 100 démarrages : ' + (sf.v[0] ? (sf.rdv / sf.v[0] * 100).toFixed(1).replace('.', ',') : '—') },
+      { l: 'Arrivée → vidéo', v: pct(sf.v[0], realArr(sf)) || '—', s: 'lancent la vidéo, sur ' + fmt(realArr(sf)) + ' ' + (curTab === 'new' ? 'arrivées pubs' : 'arrivées réelles') },
       { l: 'Arrivée → RDV', v: sf.arr ? pct1(sf.rdv, sf.arr) : '—', s: 'RDV pour 100 arrivées' },
       { l: 'Vont au bout de la vidéo', v: pct(sf.v[95], sf.v[0]) || '—', s: 'des démarrages' },
       { l: 'Formulaire → RDV', v: pct(sf.rdv, sf.pot) || '—', s: fmt(sf.pot) + ' formulaires ouverts' }
@@ -655,7 +683,7 @@ __DATA__
     var showupBase = c.present + c.noshow + c.reprog + c.annule;
     var unknown = Math.max(0, B - showupBase);
     var sub = document.getElementById('clSub');
-    sub.textContent = (curTab === 'new' ? 'Calls du calendrier iClosed « Appel Diagnostic - Club » dans le Sheet closing (aucun pour l\'instant). ' : 'Onglets « Suivi Closing » mensuels (hors webinaires), à la date du call ; une ligne datée d\'un mois antérieur à son onglet (relance closée ce mois-ci) compte au 1er du mois de l\'onglet, comme dans la console closing. ') + 'Show-up = présents ÷ calls renseignés, closing = ventes ÷ présents, vente = VENTE OUI ou virement coché.';
+    sub.textContent = (curTab === 'new' ? ('Calls du calendrier iClosed « Appel Diagnostic - Club » dans le Sheet closing' + (c.resa || B ? '. ' : ' (aucun sur la période). ')) : 'Onglets « Suivi Closing » mensuels (hors webinaires), à la date du call ; une ligne datée d\'un mois antérieur à son onglet (relance closée ce mois-ci) compte au 1er du mois de l\'onglet, comme dans la console closing. ') + 'Show-up = présents ÷ calls renseignés, closing = ventes ÷ présents, vente = VENTE OUI ou virement coché.';
     var html = '';
     if (curTab === 'new' && c.resa !== B) html += leakLine(fmt(c.resa) + ' call' + (c.resa > 1 ? 's' : '') + ' réservé' + (c.resa > 1 ? 's' : '') + ' sur la période (c\'est ce chiffre-là qui se compare au pixel) ; ci-dessous, les calls dont la DATE tombe dans la période');
     html += frow('Calls bookés', 'lignes du Sheet à la date du call' + (c.rel ? ', dont ' + fmt(c.rel) + ' relance' + (c.rel > 1 ? 's' : '') + ' de mois précédents comptée' + (c.rel > 1 ? 's' : '') + ' au 1er du mois' : ''), B, B, { baseLabel: 'des calls' });
