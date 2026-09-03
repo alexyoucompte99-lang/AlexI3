@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Notifie sur Telegram les nouvelles lignes des onglets « EOW Console » et
-« EOD Console » et « Idees Console » du classeur closing (remplis par la console
-via le pont).
+"""Notifie sur Telegram les nouvelles lignes des onglets « EOW Console »,
+« EOD Console », « Idees Console » et « EOD Setter Console » du classeur closing
+(remplis par la console via le pont).
 
-Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count] [../.idea-count]
+Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count] [../.idea-count] [../.eodsetter-count]
 Env : TELEGRAM_TOKEN, TELEGRAM_CHAT (sinon ne fait rien).
 Chaque fichier d'état contient le nombre de lignes déjà notifiées (commité par
 le workflow pour persister entre les runs).
@@ -47,6 +47,17 @@ def fmt_eod(vals):
             f"À signaler : {flag or '·'}")
 
 
+def fmt_eod_setter(vals):
+    ts, jour, setter, energie, acc, rel, rep, quali, prop, book, obj, ret = (vals + [""] * 12)[:12]
+    j = jour[8:10] + "/" + jour[5:7] if len(jour) >= 10 and jour[4] == "-" else (jour or "?")
+    return (f"📱 EOD setting reçu de {setter or '?'} ({j})\n\n"
+            f"Énergie : {energie or '?'}/10\n"
+            f"Accroches : {acc or '0'} · Relances : {rel or '0'} · Réponses : {rep or '0'}\n"
+            f"Conv. qualifiées : {quali or '0'} · RDV proposés : {prop or '0'} · RDV bookés : {book or '0'}\n\n"
+            f"Objections / blocages : {obj or '·'}\n"
+            f"Retours : {ret or '·'}")
+
+
 def fmt_idea(vals):
     date, closer, idea = (vals + [""] * 3)[:3]
     return f"💡 Idée de {closer or '?'}\n\n{idea or '·'}"
@@ -75,7 +86,7 @@ def notify_tab(wb, token, chat, tab, state_path, fmt, label):
         f.write(str(n))
 
 
-def main(xlsx_path, eow_state, eod_state=None, idea_state=None):
+def main(xlsx_path, eow_state, eod_state=None, idea_state=None, setter_state=None):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT")
     if not (token and chat):
@@ -87,7 +98,9 @@ def main(xlsx_path, eow_state, eod_state=None, idea_state=None):
         notify_tab(wb, token, chat, "EOD Console", eod_state, fmt_eod, "EOD")
     if idea_state:
         notify_tab(wb, token, chat, "Idees Console", idea_state, fmt_idea, "Idée")
+    if setter_state:
+        notify_tab(wb, token, chat, "EOD Setter Console", setter_state, fmt_eod_setter, "EOD setter")
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:5])
+    main(*sys.argv[1:6])

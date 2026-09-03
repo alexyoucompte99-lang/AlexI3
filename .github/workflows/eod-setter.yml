@@ -1,0 +1,88 @@
+name: Alerte EOD setter
+
+# Chaque soir ~21h15 Paris : si l'EOD setting du jour (Constant) n'est pas dans
+# l'onglet « EOD Setter Console » du Sheet closing, message Telegram à Alex.
+# (L'EOD reçu est notifié dans les 15 min par refresh.yml via eow_notify.py.)
+# Doubles crons été/hiver + garde sur l'heure de Paris + marqueur anti-doublon
+# .eodsetter-alert (même mécanique que brief.yml).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Afficher l'alerte dans le log sans l'envoyer"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "15 19 * * *"   # 21h15 Paris en heure d'été
+    - cron: "15 20 * * *"   # 21h15 Paris en heure d'hiver (l'autre déclenchement est ignoré)
+
+concurrency:
+  group: eod-setter
+  cancel-in-progress: false
+
+jobs:
+  alerte:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Faut-il verifier ? (heure de Paris + anti-doublon)
+        id: go
+        run: |
+          TODAY=$(TZ=Europe/Paris date '+%Y-%m-%d')
+          HOUR=$(TZ=Europe/Paris date '+%H')
+          SENT=$(cat .eodsetter-alert 2>/dev/null || echo none)
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "$SENT" = "$TODAY" ]; then echo "deja verifie aujourd'hui ($SENT)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ "$HOUR" -lt 21 ]; then echo "trop tot ($HOUR h Paris, heure d'hiver)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
+          echo "send=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.send == 'yes'
+        with:
+          python-version: "3.12"
+
+      - name: Dependances
+        if: steps.go.outputs.send == 'yes'
+        run: pip install --quiet openpyxl
+
+      - name: Recuperer le classeur closing (pont Apps Script)
+        if: steps.go.outputs.send == 'yes'
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+        working-directory: pipeline
+        run: |
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
+          base64 -d closing.b64 > investisseurs30.xlsx
+
+      - name: Verification EOD setter + alerte Telegram
+        if: steps.go.outputs.send == 'yes'
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        working-directory: pipeline
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            python eod_setter_check.py investisseurs30.xlsx --dry-run
+          else
+            python eod_setter_check.py investisseurs30.xlsx
+          fi
+
+      - name: Marquer comme verifie
+        if: steps.go.outputs.send == 'yes' && github.event_name == 'schedule'
+        run: |
+          echo "${{ steps.go.outputs.today }}" > .eodsetter-alert
+          git config user.name "console-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .eodsetter-alert
+          git diff --cached --quiet && exit 0
+          git commit -m "Alerte EOD setter verifiee"
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 10; done

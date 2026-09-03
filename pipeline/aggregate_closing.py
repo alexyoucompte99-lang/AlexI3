@@ -246,6 +246,7 @@ def main(data_path, out_path, updated_at):
 
     eod_appel = [r for r in d.get("setter_reports", []) if r.get("year") == 2026]
     eod_ecrit = [r for r in d.get("dm_reports", []) if r.get("year") == 2026]
+    eod_setter = [r for r in d.get("setter_console", []) if r.get("year") == 2026]
     # semaines ads (spend + résas) pour le brief : chargées depuis ads.json si présent
     weeks = []
     try:
@@ -301,7 +302,7 @@ def main(data_path, out_path, updated_at):
 
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
            "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally,
-           "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "weeks": weeks}
+           "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "eod_setter": eod_setter, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 

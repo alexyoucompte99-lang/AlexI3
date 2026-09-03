@@ -180,6 +180,7 @@ def find_header(rows_iter, must_have, scan=12):
 def main(xlsx_path, out_path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
+    setter_console = []  # onglet « EOD Setter Console » (EOD de Constant saisi dans la console)
     iclosed_leads, iclosed_claims, wa_confirms = [], [], []
 
     for ws in wb.worksheets:
@@ -382,6 +383,47 @@ def main(xlsx_path, out_path):
                                        "idees": cell_str(g("idees"))[:220]})
             continue
 
+        if title == "EOD Setter Console":
+            # EOD du setter (Constant) saisi dans l'onglet « EOD Constant » de la console (pont v12)
+            hidx, header = find_header(iter(all_rows), ["accroches envoyees"])
+            if header is None:
+                continue
+            idx = {}
+            for i, c in enumerate(header):
+                n = norm(cell_str(c))
+                for key, needle in (("ts", "date"), ("jour", "jour"), ("setter", "setter"), ("energie", "energie"),
+                                    ("accroches", "accroches"), ("relances", "relances"), ("reponses", "reponses"),
+                                    ("quali", "conversations"), ("proposes", "rdv proposes"), ("bookes", "rdv bookes"),
+                                    ("objections", "objections"), ("retours", "retours")):
+                    if n.startswith(needle) and key not in idx:
+                        idx[key] = i
+                        break
+            for r in all_rows[hidx + 1:]:
+                def g(k):
+                    i = idx.get(k)
+                    return r[i] if i is not None and i < len(r) else None
+                setter = cell_str(g("setter"))[:30]
+                if not setter or setter.lower().startswith("test"):
+                    continue
+                d = parse_date(g("jour")) or parse_date(g("ts"))
+                if not d:
+                    continue
+                ts = g("ts")
+                heure = f"{ts.hour:02d}:{ts.minute:02d}" if isinstance(ts, dt.datetime) else ""
+                setter_console.append({"year": d[0], "month": d[1],
+                                       "d": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}", "heure": heure,
+                                       "setter": setter,
+                                       "energie": parse_num(g("energie")),
+                                       "accroches": parse_num(g("accroches")) or 0,
+                                       "relances": parse_num(g("relances")) or 0,
+                                       "reponses": parse_num(g("reponses")) or 0,
+                                       "quali": parse_num(g("quali")) or 0,
+                                       "proposes": parse_num(g("proposes")) or 0,
+                                       "bookes": parse_num(g("bookes")) or 0,
+                                       "objections": cell_str(g("objections"))[:400],
+                                       "retours": cell_str(g("retours"))[:400]})
+            continue
+
         if title == "EOD Setting Ecrit":
             hidx, header = find_header(iter(all_rows), ['total de "audit"'])
             if header is None:
@@ -421,6 +463,7 @@ def main(xlsx_path, out_path):
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
            "setter_reports": setter_reports, "dm_reports": dm_reports,
+           "setter_console": setter_console,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
            "wa_confirms": wa_confirms}
     with open(out_path, "w") as f:
@@ -432,7 +475,7 @@ def main(xlsx_path, out_path):
     print("par mois 2026:", dict(sorted(Counter(c["month"] for c in c26).items())), file=sys.stderr)
     print("ventes 2026:", Counter(c["vente"] for c in c26), file=sys.stderr)
     print(f"stripe={len(stripe)} total={sum(s['montant_ttc'] for s in stripe):.0f}", file=sys.stderr)
-    print(f"settings={len(settings_rows)} setter={len(setter_reports)} dm={len(dm_reports)}", file=sys.stderr)
+    print(f"settings={len(settings_rows)} setter={len(setter_reports)} dm={len(dm_reports)} eod_setter={len(setter_console)}", file=sys.stderr)
     print(f"confirmations whatsapp={len(wa_confirms)}", file=sys.stderr)
 
 
