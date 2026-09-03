@@ -210,7 +210,7 @@
   .legend .it { display: inline-flex; align-items: center; gap: 6px; }
   .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
 
-  select, textarea, input[type="text"] {
+  select, textarea, input[type="text"], input[type="number"], input[type="date"] {
     font: inherit; font-size: 13.5px; color: var(--ink); background: var(--card);
     border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px;
   }
@@ -226,6 +226,9 @@
   .btn.ghost:hover { color: var(--ink); border-color: var(--ink-2); background: none; }
 
   .field { margin-top: 14px; }
+  .es-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .es-grid input { width: 100%; font-size: 16px; }
+  @media (max-width: 520px) { .es-grid { grid-template-columns: repeat(2, 1fr); } }
   .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 5px; }
   .range-wrap { display: flex; align-items: center; gap: 12px; }
   .range-wrap output { font-family: var(--serif); font-size: 20px; font-weight: 700; min-width: 46px; }
@@ -281,6 +284,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabFill" aria-selected="true" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabEod" aria-selected="false" data-panel="panelEod">EOD 🌙</button>
+    <button class="tab" role="tab" id="tabEodSetter" aria-selected="false" data-panel="panelEodSetter">EOD Constant 📱</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
@@ -351,6 +355,20 @@ __FUNNEL_CSS__
       <span class="eyebrow">Contrôle paiements</span>
       <h2>Ventes sans virement validé par Justine</h2>
       <div id="virList"></div>
+    </section>
+
+    <section id="esSec">
+      <span class="eyebrow">Setting · EOD Constant</span>
+      <h2>Les EOD du setter</h2>
+      <div class="card full">
+        <div id="esStatus" style="margin-bottom:8px"></div>
+        <div class="sub" id="esSub"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:8px 0 12px"><span class="eyebrow" style="min-width:62px">Période</span><span id="esPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div class="kpis" id="esKpis" style="margin-bottom:14px"></div>
+        <div class="tscroll"><table id="esTable"></table></div>
+        <div id="esChart" style="margin-top:16px"></div>
+        <div id="esVerb" style="margin-top:12px"></div>
+      </div>
     </section>
     </div>
   </div>
@@ -503,6 +521,8 @@ __FUNNEL_CSS__
         détaille et prends du recul sur le call, pas juste un mot.</b></p>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:6px"><span class="eyebrow" style="min-width:62px">Closer</span><span id="fillCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="fillFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+      <input type="search" id="fillSearch" placeholder="Chercher un prospect par son nom" hidden
+             style="width:100%;max-width:340px;margin-bottom:12px">
       <div id="fillList" class="fill-list"></div>
       <p class="lede" id="fillMore" style="margin-top:8px"></p>
     </section>
@@ -588,6 +608,50 @@ __FUNNEL_CSS__
           <button class="btn" id="eodSend">✅ Envoyer mon EOD</button>
           <button class="btn ghost" id="eodClear">Effacer</button>
           <span id="eodOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================== EOD SETTER (Constant) ================== -->
+  <div id="panelEodSetter" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">EOD setting · End of day</span>
+      <h2>Ton EOD de la journée</h2>
+      <p class="lede">Deux minutes en fin de journée : tes chiffres du jour et ce qui a coincé. Ça part directement
+        dans le Sheet, Alex est prévenu, et tout est visible dans le pilotage. Ton brouillon reste enregistré sur ce navigateur.</p>
+      <div class="card" style="max-width:680px" id="esCard">
+        <div class="field">
+          <label>Ton prénom</label>
+          <div class="seg two" id="esSetterSeg"></div>
+          <input type="hidden" id="esSetter" value="Constant">
+          <div id="esSetterOtherWrap" style="margin-top:8px;display:none"><input type="text" id="esSetterOther" placeholder="Ton prénom" style="width:100%"></div>
+        </div>
+        <div class="field">
+          <label for="esDate">Date du jour</label>
+          <input type="date" id="esDate" style="width:100%">
+        </div>
+        <div class="field">
+          <label for="esEnergy">Ton niveau d'énergie aujourd'hui</label>
+          <div class="range-wrap"><input type="range" id="esEnergy" min="0" max="10" step="1" value="5"><output id="esEnergyOut">5/10</output></div>
+        </div>
+        <div class="field">
+          <label>Tes chiffres du jour (laisse vide ce qui est à zéro)</label>
+          <div class="es-grid">
+            <div><label for="esAccroches" style="font-weight:500">Accroches envoyées</label><input type="number" min="0" inputmode="numeric" id="esAccroches"></div>
+            <div><label for="esRelances" style="font-weight:500">Relances envoyées</label><input type="number" min="0" inputmode="numeric" id="esRelances"></div>
+            <div><label for="esReponses" style="font-weight:500">Réponses reçues</label><input type="number" min="0" inputmode="numeric" id="esReponses"></div>
+            <div><label for="esQuali" style="font-weight:500">Conversations qualifiées</label><input type="number" min="0" inputmode="numeric" id="esQuali"></div>
+            <div><label for="esProposes" style="font-weight:500">RDV proposés</label><input type="number" min="0" inputmode="numeric" id="esProposes"></div>
+            <div><label for="esBookes" style="font-weight:500">RDV bookés</label><input type="number" min="0" inputmode="numeric" id="esBookes"></div>
+          </div>
+        </div>
+        <div class="field"><label for="esObj">Objections ou blocages du jour</label><textarea id="esObj" placeholder="Les objections qui reviennent, les profils qui bloquent, ce qui t'a ralenti..."></textarea></div>
+        <div class="field"><label for="esRetours">Retours, idées, questions (optionnel)</label><textarea id="esRetours" placeholder="Une idée de message, un truc à changer dans le process, une question pour Alex..."></textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+          <button class="btn" id="esSend">✅ Envoyer mon EOD</button>
+          <button class="btn ghost" id="esClear">Effacer</button>
+          <span id="esOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
         </div>
       </div>
     </section>
@@ -2211,6 +2275,142 @@ function initEod() {
   });
 }
 
+/* ================= EOD SETTER (Constant) : formulaire -> Sheet « EOD Setter Console » ================= */
+const ES_FIELDS = ["esDate", "esSetter", "esSetterOther", "esEnergy", "esAccroches", "esRelances", "esReponses",
+                   "esQuali", "esProposes", "esBookes", "esObj", "esRetours"];
+const ES_NUMS = ["esAccroches", "esRelances", "esReponses", "esQuali", "esProposes", "esBookes"];
+const ES_SETTERS = ["Constant", "Autre"];
+function initEodSetter() {
+  const saved = JSON.parse(localStorage.getItem("eod-setter-draft") || "{}");
+  for (const id of ES_FIELDS) if (saved[id] != null) $(id).value = saved[id];
+  if (!$("esDate").value) $("esDate").value = TODAY_ISO;
+  if (!ES_SETTERS.includes($("esSetter").value)) $("esSetter").value = "Constant";
+  const sync = () => {
+    $("esEnergyOut").textContent = $("esEnergy").value + "/10";
+    $("esSetterOtherWrap").style.display = $("esSetter").value === "Autre" ? "" : "none";
+    localStorage.setItem("eod-setter-draft", JSON.stringify(Object.fromEntries(ES_FIELDS.map(id => [id, $(id).value]))));
+  };
+  const host = $("esSetterSeg");
+  const draw = () => {
+    host.innerHTML = "";
+    for (const k of ES_SETTERS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = k;
+      b.setAttribute("aria-pressed", String($("esSetter").value === k));
+      b.addEventListener("click", () => { $("esSetter").value = k; draw(); sync(); });
+      host.appendChild(b);
+    }
+  };
+  draw();
+  ES_FIELDS.forEach(id => $(id).addEventListener("input", sync));
+  sync();
+  const msg = (m) => { $("esOk").textContent = m; $("esOk").style.display = "inline"; setTimeout(() => $("esOk").style.display = "none", 5000); };
+  $("esSend").addEventListener("click", () => {
+    const btn = $("esSend");
+    if (btn.disabled) return;
+    const setter = $("esSetter").value === "Autre" ? $("esSetterOther").value.trim() : $("esSetter").value;
+    if (!setter) { msg("Indique ton prénom."); return; }
+    if (!$("esDate").value) { msg("Indique la date du jour."); return; }
+    if (!ES_NUMS.some(id => $(id).value !== "") && !$("esObj").value.trim() && !$("esRetours").value.trim()) {
+      msg("Remplis au moins un chiffre ou un retour avant d'envoyer."); return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Envoi en cours...";
+    bridgePost({
+      what: "eod_setter", jour: $("esDate").value, setter: setter, energie: $("esEnergy").value,
+      accroches: $("esAccroches").value, relances: $("esRelances").value, reponses: $("esReponses").value,
+      quali: $("esQuali").value, proposes: $("esProposes").value, bookes: $("esBookes").value,
+      objections: $("esObj").value, retours: $("esRetours").value,
+    }).then(ok => {
+      if (ok) {
+        localStorage.removeItem("eod-setter-draft");
+        $("esCard").innerHTML = `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:52px;margin-bottom:14px">📱</div>
+          <h2 style="margin:0 0 8px">EOD envoyé, merci ${esc(setter.split(" ")[0])} !</h2>
+          <p class="lede" style="margin:0">C'est dans le Sheet, Alex est prévenu. Bonne soirée, à demain.</p>
+        </div>`;
+      } else {
+        btn.disabled = false;
+        btn.textContent = "✅ Envoyer mon EOD";
+        msg("Envoi impossible pour l'instant : vérifie ta connexion et réessaie dans une minute.");
+      }
+    });
+  });
+  $("esClear").addEventListener("click", () => {
+    localStorage.removeItem("eod-setter-draft");
+    ES_FIELDS.forEach(id => { const el = $(id); if (el.tagName === "TEXTAREA" || el.type === "number" || el.type === "text") el.value = ""; });
+    $("esDate").value = TODAY_ISO; $("esEnergy").value = 5; sync();
+  });
+}
+
+/* ---- Pilotage : les EOD du setter (onglet « EOD Setter Console ») ---- */
+let esPeriod = "7";
+function renderEodSetter() {
+  const all = (DATA.eod_setter || []).slice().sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+  const todayRows = all.filter(r => r.d === TODAY_ISO);
+  const late = NOW.getHours() >= 21;
+  if (todayRows.length) {
+    $("esStatus").innerHTML = `<b style="color:var(--good-text)">✅ EOD d'aujourd'hui reçu : ${todayRows.map(r => esc(r.setter) + (r.heure ? ` à ${r.heure}` : "")).join(", ")}</b>`;
+  } else {
+    $("esStatus").innerHTML = `<b style="color:${late ? "var(--critical)" : "var(--ink-2)"}">${late ? "⚠ Pas d'EOD aujourd'hui (alerte Telegram à 21 h 15)" : "⏳ Pas encore d'EOD aujourd'hui"}</b>`;
+  }
+  if (!all.length) {
+    $("esSub").textContent = "Aucun EOD setter dans le Sheet pour l'instant : le premier arrivera via l'onglet « EOD Constant ».";
+    $("esKpis").innerHTML = ""; $("esTable").innerHTML = ""; $("esChart").innerHTML = ""; $("esVerb").innerHTML = "";
+    $("esPills").innerHTML = "";
+    return;
+  }
+  const lastD = all[all.length - 1].d;
+  const stale = daysAgo(lastD);
+  $("esSub").innerHTML = `${all.length} EOD, du ${frDateFull(all[0].d)} au ${frDateFull(lastD)}` +
+    (stale >= 2 ? ` <b class="late">⚠ Dernier EOD il y a ${stale} jours.</b>` : "");
+  const mStart = TODAY_ISO.slice(0, 8) + "01";
+  const opts = [{ k: "7", label: "7 j" }, { k: "14", label: "14 j" }, { k: "30", label: "30 j" }, { k: "mois", label: "Mois en cours" }, { k: "", label: "Tout" }];
+  pillRow("esPills", opts, esPeriod, k => esPeriod = k, renderEodSetter);
+  let from = null;
+  if (esPeriod === "mois") from = mStart;
+  else if (esPeriod) from = iso(new Date(+new Date(TODAY_ISO) - (Number(esPeriod) - 1) * DAY));
+  const rows = all.filter(r => !from || r.d >= from);
+  const sum = (k) => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const jours = new Set(rows.map(r => r.d)).size;
+  const span = from ? Math.round((new Date(TODAY_ISO) - new Date(from)) / DAY) + 1 : jours;
+  const en = rows.filter(r => r.energie != null);
+  const enAvg = en.length ? en.reduce((a, r) => a + r.energie, 0) / en.length : null;
+  const tRep = sum("accroches") ? 100 * sum("reponses") / sum("accroches") : null;
+  const tBook = sum("proposes") ? 100 * sum("bookes") / sum("proposes") : null;
+  $("esKpis").innerHTML =
+    kpiTile("Accroches", fmtN(sum("accroches")), `${fmtN(sum("relances"))} relances`) +
+    kpiTile("Réponses", fmtN(sum("reponses")), `taux de réponse ${fmtP(tRep, 0)}`) +
+    kpiTile("Conv. qualifiées", fmtN(sum("quali")), sum("reponses") ? `${fmtP(100 * sum("quali") / sum("reponses"), 0)} des réponses` : "·") +
+    kpiTile("RDV proposés", fmtN(sum("proposes")), `${fmtN(sum("bookes"))} bookés (${fmtP(tBook, 0)})`) +
+    kpiTile("Jours avec EOD", `${fmtN(jours)}${from ? " / " + fmtN(span) : ""}`, enAvg != null ? `énergie moyenne ${enAvg.toFixed(1).replace(".", ",")}/10` : "·");
+  const byDay = rows.slice().reverse();
+  $("esTable").innerHTML = `<thead><tr><th>Jour</th><th>Setter</th><th class="num">Énergie</th><th class="num">Accroches</th><th class="num">Relances</th>
+    <th class="num">Réponses</th><th class="num">Quali</th><th class="num">RDV prop.</th><th class="num">Bookés</th></tr></thead><tbody>` +
+    byDay.slice(0, 40).map(r => `<tr><td><b>${frDate(r.d)}</b>${r.heure ? ` <span class="miss">${r.heure}</span>` : ""}</td><td>${esc(r.setter)}</td>
+      <td class="num">${r.energie != null ? fmtN(r.energie) + "/10" : "·"}</td><td class="num">${fmtN(r.accroches)}</td><td class="num">${fmtN(r.relances)}</td>
+      <td class="num">${fmtN(r.reponses)}</td><td class="num">${fmtN(r.quali)}</td><td class="num">${fmtN(r.proposes)}</td><td class="num">${fmtN(r.bookes)}</td></tr>`).join("") + "</tbody>";
+  $("esChart").innerHTML = "";
+  if (rows.length > 1) {
+    const legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML = `<span class="it"><span class="sw" style="background:var(--s1)"></span>Accroches</span>
+      <span class="it"><span class="sw" style="background:var(--s2)"></span>Réponses</span>
+      <span class="it"><span class="sw" style="background:var(--accent)"></span>RDV bookés</span>`;
+    $("esChart").appendChild(legend);
+    const days = rows.slice(-30);
+    barChart($("esChart"), days.map(r => frDate(r.d)), [
+      { name: "Accroches", color: "var(--s1)", values: days.map(r => r.accroches || 0) },
+      { name: "Réponses", color: "var(--s2)", values: days.map(r => r.reponses || 0) },
+      { name: "RDV bookés", color: "var(--accent)", values: days.map(r => r.bookes || 0) },
+    ], { height: 200 });
+  }
+  const verb = rows.filter(r => r.objections || r.retours).slice(-6).reverse();
+  $("esVerb").innerHTML = verb.length ? `<div class="sub" style="margin-bottom:4px">Derniers retours du setter :</div>` +
+    verb.map(r => `<div style="font-size:12.5px;color:var(--ink-2);margin-top:5px"><b>${esc(r.setter)}</b> <span class="miss">(${frDate(r.d)})</span> :
+      ${esc(r.objections || "")}${r.retours ? ` <span style="color:var(--accent)">💡 ${esc(r.retours)}</span>` : ""}</div>`).join("") : "";
+}
+
 /* ================= onglet À remplir (saisie closers -> Sheet) ================= */
 /* Le Sheet reste la source de vérité : la carte envoie what=call_update au pont
    (écriture par nom de colonne dans l'onglet du mois), la console relit le Sheet
@@ -2223,6 +2423,7 @@ const FILL_V_SHEET = { OUI: "OUI", NON: "NON", FOLLOW_UP: "Follow-up", NON_PITCH
 const fillKey = (c) => "fill:" + c.st + "|" + c.sr;
 let fillCloser = localStorage.getItem("fill-closer") || "";
 let fillFilter = "todo";
+let fillQ = "";
 (function applyFillOverlays() {
   /* overlay optimiste en attendant que le Sheet redescende (MAJ ~15 min).
      Purgé dès que le Sheet reflète l'état envoyé (show-up + résultat), ou après 3 jours. */
@@ -2269,19 +2470,36 @@ function renderFill() {
     .sort((a, b) => (b.d + (b.hh || "")).localeCompare(a.d + (a.hh || "")));
   const sent = DATA.calls.filter(c => c._fillSent && mine(c))
     .sort((a, b) => (b.d + (b.hh || "")).localeCompare(a.d + (a.hh || "")));
+  /* correction : un call déjà rempli reste modifiable (ex. un « non pitché » qui
+     devient une vente). Le closer le fait lui-même, sans passer par le Sheet. */
+  const fix = DATA.calls.filter(c => c.d && c.d >= FILL_FROM && c.st && c.sr && c.s && mine(c)
+      && (!fillQ || (c.n || "").toLowerCase().includes(fillQ)))
+    .sort((a, b) => (b.d + (b.hh || "")).localeCompare(a.d + (a.hh || "")));
   pillRow("fillFilterPills",
-    [{ k: "todo", label: `À remplir (${todo.length})` }, { k: "sent", label: `Remplis via la console (${sent.length})` }],
+    [{ k: "todo", label: `À remplir (${todo.length})` },
+     { k: "fix", label: "Corriger un call rempli" },
+     { k: "sent", label: `Remplis via la console (${sent.length})` }],
     fillFilter, k => fillFilter = k, renderFill);
   $("fillBadge").textContent = DATA.calls.filter(fillTodo7).length || "";
-  const list = fillFilter === "todo" ? todo : sent;
+  const searchBox = $("fillSearch");
+  searchBox.hidden = fillFilter !== "fix";
+  if (!searchBox.dataset.bound) {
+    searchBox.dataset.bound = "1";
+    searchBox.addEventListener("input", () => { fillQ = searchBox.value.trim().toLowerCase(); renderFill(); });
+  }
+  const list = fillFilter === "todo" ? todo : (fillFilter === "fix" ? fix : sent);
   const CAP = 20;
-  $("fillMore").textContent = list.length > CAP ? `+ ${list.length - CAP} autres calls plus anciens (remplis ceux-là d'abord, ils réapparaîtront).` :
-    (list.length ? "" : (fillFilter === "todo" ? "Rien à remplir, tout est à jour ✓" : "Aucun call rempli depuis la console sur ce navigateur."));
+  $("fillMore").textContent = list.length > CAP
+    ? (fillFilter === "fix" ? `+ ${list.length - CAP} autres calls : affine avec le nom du prospect.`
+                            : `+ ${list.length - CAP} autres calls plus anciens (remplis ceux-là d'abord, ils réapparaîtront).`)
+    : (list.length ? "" : fillFilter === "todo" ? "Rien à remplir, tout est à jour ✓"
+      : fillFilter === "fix" ? "Aucun call rempli sur les 30 derniers jours pour ce closer."
+      : "Aucun call rempli depuis la console sur ce navigateur.");
   const mount = $("fillList");
   mount.innerHTML = "";
-  for (const c of list.slice(0, CAP)) mount.appendChild(fillCard(c));
+  for (const c of list.slice(0, CAP)) mount.appendChild(fillCard(c, fillFilter === "fix"));
 }
-function fillCard(c) {
+function fillCard(c, edit) {
   /* tous les champs du tracking Sheet, PRÉ-REMPLIS avec ce qui est déjà dedans ;
      à l'envoi, seuls les champs modifiés/ajoutés partent (le reste ne bouge pas) */
   const card = document.createElement("div");
@@ -2321,7 +2539,7 @@ function fillCard(c) {
     who.className = "who";
     who.innerHTML = `<b>${esc(c.n || "(sans nom)")}</b><span>${esc(quand)}${c.c ? " · " + esc(c.c.split(" ")[0]) : ""}</span>`;
     card.appendChild(who);
-    if (c._fillSent) {
+    if (c._fillSent && !edit) {
       const ok = document.createElement("div");
       ok.className = "okline";
       ok.textContent = `✓ Validé (envoyé au Sheet) : ${FILL_SU[c.s] || c.s}${c.v ? " · " + (FILL_V[c.v] || c.v) : ""}${c.q != null ? " · " + c.q + "/10" : ""}${c.pp ? " · " + c.pp + " €" : ""}`;
@@ -2888,6 +3106,7 @@ function initPilotage() {
     $("pilotContent").style.display = "";
     $("tabPilotage").textContent = "Pilotage";
     renderPilotage();
+    renderEodSetter();
     renderVirement();
   };
   if (sessionStorage.getItem("pilot-ok") === "1") unlock();
@@ -3035,7 +3254,7 @@ initIdea();
 $("tabClosers").addEventListener("click", renderClosersTab);
 /* Pilotage n'est plus l'onglet par défaut : re-rendre ses graphes quand il devient visible */
 $("tabPilotage").addEventListener("click", () => {
-  if ($("pilotContent").style.display !== "none") { renderPilotage(); renderVirement(); }
+  if ($("pilotContent").style.display !== "none") { renderPilotage(); renderVirement(); renderEodSetter(); }
 });
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
@@ -3052,6 +3271,7 @@ renderLeads();
 $("ldSearch").addEventListener("input", renderLeads);
 initEow();
 initEod();
+initEodSetter();
 initAlex();
 
 const backtop = $("backtop");
