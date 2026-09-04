@@ -282,6 +282,7 @@ __FUNNEL_CSS__
 
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" id="tabFill" aria-selected="true" data-panel="panelFill">À remplir ✍️ <span class="badge" id="fillBadge"></span></button>
+    <button class="tab" role="tab" id="tabMod" aria-selected="false" data-panel="panelMod">À remodifier ✏️</button>
     <button class="tab" role="tab" id="tabEow" aria-selected="false" data-panel="panelEow">EOW</button>
     <button class="tab" role="tab" id="tabEod" aria-selected="false" data-panel="panelEod">EOD 🌙</button>
     <button class="tab" role="tab" id="tabEodSetter" aria-selected="false" data-panel="panelEodSetter">EOD Constant 📱</button>
@@ -291,6 +292,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
+    <button class="tab" role="tab" id="tabAnnules" aria-selected="false" data-panel="panelAnnules">Annulés 🚫 <span class="badge" id="anBadge"></span></button>
     <button class="tab" role="tab" id="tabIdea" aria-selected="false" data-panel="panelIdea">Idées 💡</button>
     <button class="tab" role="tab" id="tabFunnel" aria-selected="false" data-panel="panelFunnel">Funnel 🔒</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
@@ -528,6 +530,32 @@ __FUNNEL_CSS__
     </section>
   </div>
 
+  <!-- ================== À REMODIFIER (tous les leads, fiche modifiable + historique) ================== -->
+  <div id="panelMod" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Tous les leads</span>
+      <h2>À remodifier</h2>
+      <p class="lede">Tous les calls loggés, modifiables par le closer : show-up, résultat, prix, recap, mais aussi
+        supprimer (doublon), annuler (annulé par le lead) ou changer de closer. Clique « Modifier » sur une ligne :
+        la fiche s'ouvre pré-remplie, seul ce qui change part dans le Sheet. Chaque modif est tracée dans l'historique en bas.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="modCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="modPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Statut</span><span id="modStatutPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <input type="text" id="modSearch" placeholder="Chercher un nom..." style="min-width:170px"></div>
+      </div>
+      <div class="card full"><div class="tscroll"><table id="modTable"></table></div>
+        <div class="sub" id="modMore" style="margin-top:8px"></div></div>
+      <details id="modHist" style="margin-top:18px">
+        <summary style="cursor:pointer;font-weight:700;font-size:15px">Historique des modifications <span class="badge" id="modHistCount"></span></summary>
+        <div class="sub" style="margin:6px 0 8px">Tout ce qui a été modifié depuis la console (onglet Sheet « Historique Console »). Les modifs de cette session
+          apparaissent tout de suite, les autres après la prochaine MAJ (15 min max).</div>
+        <div class="card full"><div class="tscroll"><table id="modHistTable"></table></div><div class="sub" id="modHistNote" style="margin-top:6px"></div></div>
+      </details>
+    </section>
+  </div>
+
   <!-- ================== FOLLOW-UPS ================== -->
   <div id="panelFollowups" role="tabpanel" hidden>
     <section style="margin-top:16px">
@@ -680,6 +708,26 @@ __FUNNEL_CSS__
       <div class="kpis" id="ldAvg" style="margin-bottom:14px"></div>
       <div class="card full"><div class="tscroll"><table id="ldTable"></table></div>
         <div class="sub" id="ldMore" style="margin-top:8px"></div></div>
+    </section>
+  </div>
+
+  <!-- ================== ANNULÉS PAR LE LEAD (base) ================== -->
+  <div id="panelAnnules" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Base leads annulés</span>
+      <h2>Les leads qui ont annulé leur call</h2>
+      <p class="lede">Chaque call marqué « Supprimer : annulé par le lead » depuis l'onglet À remplir arrive ici, avec les infos
+        pour le recontacter. La ligne reste dans le Sheet (show-up « Annulé par le lead ») et ne compte pas comme un no-show.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="anPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="anCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Type</span><span id="anTypePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <input type="text" id="anSearch" placeholder="Chercher un nom..." style="min-width:170px"></div>
+      </div>
+      <div class="kpis" id="anKpis" style="margin-bottom:14px"></div>
+      <div class="card full"><div class="tscroll"><table id="anTable"></table></div>
+        <div class="sub" id="anNote" style="margin-top:8px"></div></div>
     </section>
   </div>
 
@@ -1968,7 +2016,13 @@ async function bridgePost(payload) {
       headers: { "Content-Type": "text/plain" },
       body: JSON.stringify(Object.assign({ key: BRIDGE.key }, payload)),
     });
-    return (await r.text()).indexOf('"ok":true') !== -1;
+    const ok = (await r.text()).indexOf('"ok":true') !== -1;
+    if (ok && payload.what === "call_update" && payload.fields && typeof renderHistory === "function") {
+      HIST_LOCAL.unshift({ local: true, ts: "", tab: payload.tab, row: payload.row, lead: payload.lead || "",
+                           by: payload.by || "", action: payload.action || "", fields: JSON.stringify(payload.fields) });
+      renderHistory();
+    }
+    return ok;
   } catch (e) { return false; }
 }
 let toastEl = null;
@@ -2117,9 +2171,9 @@ function renderFollowups() {
       /* lead perdu : la vente passe en NON dans le Sheet, le follow-up sort du pipe */
       if (!window.confirm(`Marquer ${c.n || "ce lead"} comme lead perdu ? La vente passera en « NON » dans le Sheet et le follow-up sortira de la liste.`)) { cb.checked = false; return; }
       cb.disabled = true;
-      const ok = c.st && c.sr && await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
+      const ok = c.st && c.sr && await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
         headerRow: (DATA.hrows || {})[c.st] || 1,
-        fields: { vente: "NON", commentaire: `Lead perdu le ${frDate(TODAY_ISO)} (follow-up abandonné, coché depuis la console)` } });
+        fields: { vente: "NON", commentaire: `Lead perdu le ${frDate(TODAY_ISO)} (follow-up abandonné, coché depuis la console)` }, action: "Lead perdu" });
       if (!ok) { cb.checked = false; cb.disabled = false; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
       c.v = "NON";
       toast(`Lead perdu noté dans le Sheet pour ${c.n || "le lead"} ✓`);
@@ -2420,6 +2474,110 @@ function renderEodSetter() {
       ${esc(r.objections || "")}${r.retours ? ` <span style="color:var(--accent)">💡 ${esc(r.retours)}</span>` : ""}</div>`).join("") : "";
 }
 
+/* ================= À REMODIFIER : tous les leads, fiche modifiable + historique ================= */
+let modCloser = localStorage.getItem("mod-closer") || "";
+const modSel = { period: "30", statut: "" };
+/* qui modifie : le closer choisi dans À remplir ou À remodifier, sinon « console » */
+const modBy = () => ((fillCloser || modCloser || "").split(" ")[0]) || "console";
+const HIST_LOCAL = [];
+const HIST_LABELS = { show_up: "Show-up", vente: "Résultat", qualif: "Qualif", prix: "Prix", commentaire: "Recap",
+  objection: "Objection", relance: "Relance", cash250: "+250k", video: "Vidéo", mensualites: "Mensualités",
+  recording: "Enregistrement", date: "Date du call", closer: "Closer" };
+const histFields = (json) => {
+  let o; try { o = JSON.parse(json || "{}"); } catch (e) { return esc(json || ""); }
+  return Object.entries(o).map(([k, v]) => `<b>${esc(HIST_LABELS[k] || k)}</b> → ${v === "__VIDE__" ? "<i>(vidé)</i>"
+    : esc(String(v === true ? "OUI" : v === false ? "NON" : v)).slice(0, 160)}`).join(" · ");
+};
+function renderHistory() {
+  const rows = [...HIST_LOCAL, ...(DATA.history || [])];
+  $("modHistCount").textContent = rows.length || "";
+  $("modHistTable").innerHTML = rows.length ? `<thead><tr><th>Quand</th><th>Par</th><th>Lead</th><th>Action</th><th>Modifs</th></tr></thead><tbody>` +
+    rows.slice(0, 300).map(h => `<tr><td>${h.local ? "<b>à l'instant</b>" : esc(frDate((h.ts || "").slice(0, 10)) + " " + (h.ts || "").slice(11))}</td>
+      <td>${esc(h.by || "·")}</td><td><b>${esc(h.lead || "·")}</b><br><span class="miss">${esc(h.tab || "")} · l.${h.row || "?"}</span></td>
+      <td>${esc(h.action || "·")}</td><td style="font-size:12.5px;max-width:420px">${histFields(h.fields)}</td></tr>`).join("") + "</tbody>" : "";
+  $("modHistNote").textContent = rows.length ? (rows.length > 300 ? `${rows.length} modifs, les 300 dernières affichées.` : "") : "Aucune modification tracée pour l'instant.";
+}
+function renderMod() {
+  pillRow("modCloserPills", [{ k: "", label: "Tous" }, ...TOP3.map(n => ({ k: n, label: n.split(" ")[0] }))],
+    modCloser, k => { modCloser = k; localStorage.setItem("mod-closer", k); }, renderMod);
+  pillRow("modPeriodPills", [{ k: "7", label: "7 j" }, { k: "30", label: "30 j" }, { k: "mois", label: "Mois en cours" }, { k: "90", label: "3 mois" }, { k: "", label: "Tout" }],
+    modSel.period, k => modSel.period = k, renderMod);
+  pillRow("modStatutPills", [{ k: "", label: "Tous" }, { k: "VENTE", label: "Vente" }, { k: "FOLLOW_UP", label: "Follow-up" },
+    { k: "NON", label: "Pitché sans vente" }, { k: "NON_PITCHE", label: "Non pitché" }, { k: "NOSHOW", label: "No-show" }, { k: "AUTRE", label: "Autres" }],
+    modSel.statut, k => modSel.statut = k, renderMod);
+  let from = null;
+  if (modSel.period === "mois") from = TODAY_ISO.slice(0, 8) + "01";
+  else if (modSel.period) from = iso(new Date(+new Date(TODAY_ISO) - (Number(modSel.period) - 1) * DAY));
+  const q = $("modSearch").value.trim().toLowerCase();
+  const list = DATA.calls.filter(c => c.st && c.sr && c.d && (!from || c.d >= from)
+      && (!modCloser || c.c === modCloser) && (!modSel.statut || leadStatut(c) === modSel.statut)
+      && (!q || (c.n || "").toLowerCase().includes(q)))
+    .sort((a, b) => ((b.d || "") + (b.hh || "")).localeCompare((a.d || "") + (a.hh || "")));
+  const CAP = 60;
+  const tbl = $("modTable");
+  tbl.innerHTML = `<thead><tr><th>Date du call</th><th>Closer</th><th>Lead</th><th>Show-up</th><th>Résultat</th><th class="num">Prix</th><th></th></tr></thead>`;
+  const tb = document.createElement("tbody");
+  for (const c of list.slice(0, CAP)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${frDateFull(c.d)}${c.hh ? ` <span class="miss">${esc(c.hh)}</span>` : ""}</td><td>${esc(c.c)}</td>
+      <td><b>${esc(c.n)}</b>${c.al ? ` <span class="miss">annulé par le lead</span>` : ""}</td>
+      <td>${chip(CHIP_S, c.s)}</td><td>${venteChip(c)}</td><td class="num">${c.p || c.pp ? fmtE(c.p || c.pp) : "·"}</td><td></td>`;
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "btn ghost"; btn.style.cssText = "font-size:12.5px;padding:5px 10px;white-space:nowrap";
+    btn.textContent = "Modifier ✏️";
+    let open = null;
+    btn.addEventListener("click", () => {
+      if (open) { open.remove(); open = null; btn.textContent = "Modifier ✏️"; return; }
+      open = document.createElement("tr");
+      const td = document.createElement("td"); td.colSpan = 7; td.style.padding = "8px 4px 14px";
+      td.appendChild(fillCard(c, true));
+      open.appendChild(td); tr.after(open); btn.textContent = "Fermer";
+    });
+    tr.lastElementChild.appendChild(btn);
+    tb.appendChild(tr);
+  }
+  tbl.appendChild(tb);
+  $("modMore").textContent = list.length > CAP ? `${list.length} leads sur la sélection, les ${CAP} plus récents affichés : affine avec le nom, le statut ou la période.`
+    : (list.length ? `${list.length} lead(s) sur la sélection.` : "Aucun lead sur cette sélection.");
+  renderHistory();
+}
+
+/* ================= ANNULÉS PAR LE LEAD : base consultable ================= */
+const anSel = { period: "30", closer: "", type: "lead" };
+const anWa = (tel) => { let d = (tel || "").replace(/\D/g, ""); if (d.startsWith("00")) d = d.slice(2); if (d.length === 10 && d.startsWith("0")) d = "33" + d.slice(1); if (d.length === 9) d = "33" + d; return d; };
+function renderAnnules() {
+  const isLead = (c) => c.s === "ANNULE" && c.al;
+  const isAnn = (c) => c.s === "ANNULE";
+  $("anBadge").textContent = DATA.calls.filter(c => isLead(c) && c.d && c.d >= iso(new Date(NOW - 30 * DAY))).length || "";
+  pillRow("anPeriodPills", [{ k: "7", label: "7 j" }, { k: "30", label: "30 j" }, { k: "mois", label: "Mois en cours" }, { k: "", label: "Tout" }],
+    anSel.period, k => anSel.period = k, renderAnnules);
+  pillRow("anCloserPills", [{ k: "", label: "Tous" }, ...TOP3.map(n => ({ k: n, label: n.split(" ")[0] }))],
+    anSel.closer, k => anSel.closer = k, renderAnnules);
+  pillRow("anTypePills", [{ k: "lead", label: "Annulés par le lead" }, { k: "all", label: "Tous les annulés" }],
+    anSel.type, k => anSel.type = k, renderAnnules);
+  let from = null;
+  if (anSel.period === "mois") from = TODAY_ISO.slice(0, 8) + "01";
+  else if (anSel.period) from = iso(new Date(+new Date(TODAY_ISO) - (Number(anSel.period) - 1) * DAY));
+  const q = $("anSearch").value.trim().toLowerCase();
+  const list = DATA.calls.filter(c => (anSel.type === "lead" ? isLead(c) : isAnn(c))
+      && (!from || (c.d && c.d >= from)) && (!anSel.closer || c.c === anSel.closer)
+      && (!q || (c.n || "").toLowerCase().includes(q)))
+    .sort((a, b) => ((b.d || "") + (b.hh || "")).localeCompare((a.d || "") + (a.hh || "")));
+  const byC = new Map();
+  list.forEach(c => byC.set(c.c || "?", (byC.get(c.c || "?") || 0) + 1));
+  $("anKpis").innerHTML =
+    kpiTile("Leads annulés", fmtN(list.length), anSel.type === "lead" ? "marqués « annulé par le lead »" : "tout show-up « Annulé »") +
+    kpiTile("Par closer", [...byC.entries()].map(([n, k]) => `${esc(n.split(" ")[0])} ${k}`).join(" · ") || "·", "sur la sélection") +
+    kpiTile("Joignables", fmtN(list.filter(c => c.tel).length), `avec téléphone · ${fmtN(list.filter(c => c.mail).length)} avec mail`);
+  $("anTable").innerHTML = `<thead><tr><th>Date du call</th><th>Closer</th><th>Lead</th><th>Contact</th><th>Booké le</th><th>Source</th><th>Note</th></tr></thead><tbody>` +
+    list.slice(0, 300).map(c => `<tr><td>${frDateFull(c.d)}${c.hh ? ` <span class="miss">${esc(c.hh)}</span>` : ""}</td><td>${esc(c.c)}</td>
+      <td><b>${esc(c.n)}</b>${c.al ? "" : ` <span class="miss">annulé</span>`}</td>
+      <td>${c.tel ? `<a class="tel" href="https://wa.me/${esc(anWa(c.tel))}" target="_blank" rel="noopener">${esc(c.tel)}</a>` : "·"}${c.mail ? `<br><a href="mailto:${esc(c.mail)}">${esc(c.mail)}</a>` : ""}</td>
+      <td>${c.b ? frDate(c.b) : "·"}</td><td>${esc(c.utm || "")}</td>
+      <td style="max-width:320px;font-size:12.5px;color:var(--ink-2)">${esc(c.com || "")}</td></tr>`).join("") + "</tbody>";
+  $("anNote").textContent = list.length > 300 ? `${list.length} lignes, les 300 plus récentes affichées.` : (list.length ? "" : "Aucun lead annulé sur cette sélection.");
+}
+
 /* ================= onglet À remplir (saisie closers -> Sheet) ================= */
 /* Le Sheet reste la source de vérité : la carte envoie what=call_update au pont
    (écriture par nom de colonne dans l'onglet du mois), la console relit le Sheet
@@ -2637,6 +2795,13 @@ function fillCard(c, edit) {
     dbl.title = "Marque la ligne DOUBLON dans le Sheet : elle sort de la console et des stats";
     dbl.addEventListener("click", () => fillDoublon(c, dbl));
     extra.appendChild(dbl);
+    const anl = document.createElement("button");
+    anl.type = "button"; anl.className = "btn";
+    anl.style.cssText = "font-size:13px;opacity:.8";
+    anl.textContent = "Supprimer : annulé par le lead 🚫";
+    anl.title = "Le lead a annulé son call : la ligne passe en « Annulé par le lead » dans le Sheet et rejoint l'onglet Annulés";
+    anl.addEventListener("click", () => fillAnnuleLead(c, anl));
+    extra.appendChild(anl);
     card.appendChild(extra);
   };
   redraw();
@@ -2648,8 +2813,8 @@ async function fillReassign(c, newCloser, sel) {
   if (!newCloser) return;
   if (!window.confirm(`Passer le call de ${c.n || "ce lead"} chez ${newCloser.split(" ")[0]} ? Le Sheet sera mis à jour.`)) { sel.value = ""; return; }
   sel.disabled = true;
-  const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
-    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { closer: newCloser } });
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { closer: newCloser }, action: "Changement de closer" });
   sel.disabled = false;
   if (!ok) { sel.value = ""; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
   c.c = newCloser;
@@ -2661,13 +2826,26 @@ async function fillDoublon(c, btn) {
      la ligne partout (console, stats, mails) */
   if (!window.confirm(`Marquer le call de ${c.n || "ce lead"} comme DOUBLON ? Il disparaît de la console et des stats (le Sheet garde la ligne marquée).`)) return;
   btn.disabled = true;
-  const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
-    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { show_up: "DOUBLON" } });
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { show_up: "DOUBLON" }, action: "Doublon (supprimé)" });
   btn.disabled = false;
   if (!ok) { toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
   c.s = "DOUBLON"; /* sort de fillTodo tout de suite ; au prochain refresh la ligne est ignorée */
   toast("✅ Marqué doublon dans le Sheet 🗑");
   renderFill();
+}
+async function fillAnnuleLead(c, btn) {
+  /* le lead a annulé : show-up « Annulé par le lead » dans le Sheet. Reste ANNULE pour
+     les stats (pas un no-show), drapeau c.al pour la base de l'onglet Annulés */
+  if (!window.confirm(`Marquer le call de ${c.n || "ce lead"} comme ANNULÉ PAR LE LEAD ? Il sort de la liste à remplir et rejoint l'onglet Annulés (le Sheet garde la ligne, show-up « Annulé par le lead »).`)) return;
+  btn.disabled = true;
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields: { show_up: "Annulé par le lead" }, action: "Annulé par le lead" });
+  btn.disabled = false;
+  if (!ok) { toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
+  c.s = "ANNULE"; c.al = true; c.hasS = true;
+  toast("🚫 Annulé par le lead : noté dans le Sheet");
+  renderFill(); renderAnnules();
 }
 async function fillSend(c, orig, state, btn) {
   /* n'envoie QUE ce qui a changé ou été ajouté : ce qui est déjà dans le Sheet ne bouge pas */
@@ -2712,8 +2890,8 @@ async function fillSend(c, orig, state, btn) {
   if (!Object.keys(fields).length) { toast("Rien de nouveau à envoyer : tout est déjà dans le Sheet ✓"); return; }
   if (btn.dataset.busy) return;
   btn.dataset.busy = "1"; btn.textContent = "Envoi...";
-  const ok = await bridgePost({ what: "call_update", tab: c.st, row: c.sr,
-    headerRow: (DATA.hrows || {})[c.st] || 1, fields });
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+    headerRow: (DATA.hrows || {})[c.st] || 1, fields, action: c.hasS || c.hasV ? "Correction de la fiche" : "Saisie post-call" });
   delete btn.dataset.busy;
   if (!ok) {
     btn.textContent = "Réessayer";
@@ -3278,6 +3456,12 @@ renderClosersTab();
 renderFollowups();
 renderLeads();
 $("ldSearch").addEventListener("input", renderLeads);
+$("tabAnnules").addEventListener("click", renderAnnules);
+$("tabMod").addEventListener("click", renderMod);
+$("modSearch").addEventListener("input", renderMod);
+renderMod();
+$("anSearch").addEventListener("input", renderAnnules);
+renderAnnules();
 initEow();
 initEod();
 initEodSetter();

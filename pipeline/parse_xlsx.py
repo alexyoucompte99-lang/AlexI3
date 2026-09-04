@@ -139,7 +139,7 @@ def norm_show_up(s):
         return "REPROGRAMMER"
     if n.startswith("non") or n.startswith("no show"):
         return "NON"
-    if n.startswith("annul"):
+    if n.startswith("annul") or n.startswith("supprim"):
         return "ANNULE"
     if n.startswith("doubl"):
         return "DOUBLON"
@@ -181,6 +181,7 @@ def main(xlsx_path, out_path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
     setter_console = []  # onglet « EOD Setter Console » (EOD de Constant saisi dans la console)
+    history = []  # onglet « Historique Console » (modifs faites depuis la console, pont v14)
     iclosed_leads, iclosed_claims, wa_confirms = [], [], []
 
     for ws in wb.worksheets:
@@ -209,7 +210,11 @@ def main(xlsx_path, out_path):
                 # lignes de test (résas « alex test » faites pour tester le funnel)
                 if re.search(r"\btests?\b", prospect, re.I):
                     continue
-                show_up = norm_show_up(cell_str(g("show_up")))
+                show_up_raw = cell_str(g("show_up"))
+                show_up = norm_show_up(show_up_raw)
+                # « Annulé par le lead » / « Supprimé » (bouton console) : reste ANNULE
+                # pour les stats, avec un drapeau pour la base des leads annulés
+                annule_lead = show_up == "ANNULE" and ("lead" in norm(show_up_raw) or norm(show_up_raw).startswith("supprim"))
                 # ligne marquée DOUBLON (coche console ou saisie manuelle) : ignorée
                 # partout (consoles, stats, briefs, mails), le Sheet garde la trace
                 if show_up == "DOUBLON":
@@ -229,7 +234,7 @@ def main(xlsx_path, out_path):
                     "date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None,
                     "hour": parse_time(g("date")),
                     "year": year, "month": month,
-                    "show_up": show_up, "vente": vente,
+                    "show_up": show_up, "vente": vente, "annule_lead": annule_lead,
                     "qualif": parse_num(g("qualif")),
                     "prix": parse_num(g("prix")),
                     "prix_confirme": parse_num(g("prix_confirme")),
@@ -383,6 +388,21 @@ def main(xlsx_path, out_path):
                                        "idees": cell_str(g("idees"))[:220]})
             continue
 
+        if title == "Historique Console":
+            # Date, Onglet, Ligne, Lead, Par, Action, Champs modifies (JSON)
+            for r in all_rows[1:]:
+                r = list(r) + [None] * 7
+                ts = r[0]
+                if not isinstance(ts, dt.datetime):
+                    continue
+                by = cell_str(r[4])
+                if by.lower().startswith("test"):
+                    continue
+                history.append({"ts": ts.strftime("%Y-%m-%d %H:%M"), "tab": cell_str(r[1])[:40],
+                                "row": parse_num(r[2]), "lead": cell_str(r[3])[:60], "by": by[:30],
+                                "action": cell_str(r[5])[:60], "fields": cell_str(r[6])[:1500]})
+            continue
+
         if title == "EOD Setter Console":
             # EOD du setter (Constant) saisi dans l'onglet « EOD Constant » de la console (pont v12)
             hidx, header = find_header(iter(all_rows), ["accroches envoyees"])
@@ -466,7 +486,7 @@ def main(xlsx_path, out_path):
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
            "setter_reports": setter_reports, "dm_reports": dm_reports,
-           "setter_console": setter_console,
+           "setter_console": setter_console, "history": history,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
            "wa_confirms": wa_confirms}
     with open(out_path, "w") as f:
