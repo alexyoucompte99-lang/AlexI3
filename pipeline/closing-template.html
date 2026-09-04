@@ -287,6 +287,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabEod" aria-selected="false" data-panel="panelEod">EOD 🌙</button>
     <button class="tab" role="tab" id="tabEodSetter" aria-selected="false" data-panel="panelEodSetter">EOD Constant 📱</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
+    <button class="tab" role="tab" id="tabCsm" aria-selected="false" data-panel="panelCsm">CSM 🤝 <span class="badge" id="csmBadge"></span></button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
@@ -384,6 +385,7 @@ __FUNNEL_CSS__
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="clCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="clPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Source</span><span id="clSrcPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       </div>
       <p class="lede" id="clLede" style="margin-bottom:10px"></p>
       <div class="kpis" id="clKpis"></div>
@@ -403,6 +405,51 @@ __FUNNEL_CSS__
         <div class="card"><h3>Taux de closing sur les présents</h3><div id="clChartClos"></div></div>
         <div class="card"><h3>Taux de show-up</h3><div id="clChartShow"></div></div>
       </div>
+    </section>
+  </div>
+
+  <!-- ================== CSM (suivi post-vente, onglet Sheet « CSM ») ================== -->
+  <div id="panelCsm" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Suivi clients · CSM</span>
+      <h2>Accompagnement après la vente</h2>
+      <p class="lede">Le suivi CSM du tracking Sheet, vu par CSM : les 3 calls d'accompagnement (nouvelle offre), les mails J-0 / J+10
+        (ancienne offre), témoignages et recos. Un call dont la date cible est passée sans être effectué = à relancer ;
+        30 jours sans échange ni RDV = alerte. Le bouton WhatsApp ouvre la conversation du client avec le message pré-écrit.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">CSM</span><span id="csmPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Offre</span><span id="csmOffrePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+      </div>
+      <div class="kpis" id="csmKpis" style="margin-bottom:14px"></div>
+    </section>
+    <section style="margin-top:22px">
+      <span class="eyebrow">Priorité</span>
+      <h2>🚨 À relancer : RDV pas fait</h2>
+      <p class="lede">Les clients dont le prochain call est en retard, sans RDV pris ou après un no-show. Ceux sans aucun RDV pris
+        passent en premier. « WhatsApp » ouvre la conversation avec le message pour faire le call.</p>
+      <div class="card full" id="csmPrio"></div>
+    </section>
+    <section style="margin-top:22px">
+      <span class="eyebrow">Alerte 30 jours</span>
+      <h2>⏰ Sans nouvelles depuis 30 jours</h2>
+      <p class="lede">Aucun échange (vente, slot 15 min, call effectué) depuis 30 jours et pas de RDV pris : une relance simple pour
+        prendre des nouvelles.</p>
+      <div class="card full" id="csmAlert"></div>
+    </section>
+    <section style="margin-top:22px">
+      <span class="eyebrow">Tous les clients</span>
+      <h2>Le tableau CSM</h2>
+      <div class="card full"><div class="tscroll"><table id="csmTable"></table></div><div class="sub" id="csmNote" style="margin-top:8px"></div></div>
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-weight:700">⚙️ Messages de relance (variables : {prenom} {csm} {call} {date} {lien})</summary>
+        <div class="card" style="margin-top:8px">
+          <div class="field"><label for="csmTplCall">Relance « RDV pas fait »</label><textarea id="csmTplCall"></textarea></div>
+          <div class="field"><label for="csmTplSimple">Relance simple (30 jours sans nouvelles)</label><textarea id="csmTplSimple"></textarea></div>
+          <div class="field"><label for="csmLien">Lien de réservation des calls CSM (optionnel, remplace {lien})</label><input type="text" id="csmLien" placeholder="https://..." style="width:100%"></div>
+          <div style="display:flex;gap:10px;margin-top:12px"><button class="btn" id="csmTplSave">Enregistrer</button><button class="btn ghost" id="csmTplReset">Rétablir</button></div>
+          <div class="sub" style="margin-top:8px">Pas d'emoji dans les messages : WhatsApp casse le lien avec. Enregistré sur ce navigateur.</div>
+        </div>
+      </details>
     </section>
   </div>
 
@@ -950,7 +997,11 @@ const PERIODS = [
   { k: "3proch", label: "3 prochains jours", range: () => ({ from: iso(new Date(+NOW + DAY)), to: iso(new Date(+NOW + 3 * DAY)) }) },
   { k: "7proch", label: "7 prochains jours", range: () => ({ from: iso(new Date(+NOW + DAY)), to: iso(new Date(+NOW + 7 * DAY)) }) },
 ];
-const state = { period: "7j", compare: false, custom: null };
+const state = { period: "7j", compare: false, custom: null, src: "" };
+/* canal du call (champ fun, calculé par aggregate_closing) : partagé par Pilotage et Closers */
+const FUN_OPTS = [{ k: "", label: "Toutes sources" }, { k: "org", label: "Organique / setting" }, { k: "old", label: "Funnel" },
+                  { k: "new", label: "New funnel" }, { k: "webi", label: "Webinaire" }];
+const srcOk = (c) => !state.src || c.fun === state.src;
 
 function currentRange() {
   if (state.custom) return state.custom;
@@ -977,14 +1028,14 @@ const isMtdRange = (r) => r.to === TODAY_ISO && r.from === TODAY_ISO.slice(0, 8)
 const plannedIn = (r) => {
   /* période « mois » (pills de l'onglet Closers) : règle onglet du mois complet,
      relances comprises, comme les récaps du Sheet */
-  if (r.tm) return DATA.calls.filter(c => c.tm === r.tm && (!c.d || c.d <= TODAY_ISO));
+  if (r.tm) return DATA.calls.filter(c => srcOk(c) && c.tm === r.tm && (!c.d || c.d <= TODAY_ISO));
   if (isMtdRange(r)) {
     const m = TODAY_ISO.slice(0, 7);
-    return DATA.calls.filter(c => c.tm === m && (!c.d || c.d <= TODAY_ISO));
+    return DATA.calls.filter(c => srcOk(c) && c.tm === m && (!c.d || c.d <= TODAY_ISO));
   }
-  return DATA.calls.filter(c => inRange(c.d, r));
+  return DATA.calls.filter(c => srcOk(c) && inRange(c.d, r));
 };
-const bookedIn = (r) => DATA.calls.filter(c => inRange(c.b, r));
+const bookedIn = (r) => DATA.calls.filter(c => srcOk(c) && inRange(c.b, r));
 
 /* ================= stats ================= */
 /* vente comptée si validée par le closer (OUI) ou par Justine (virement coché) */
@@ -1067,6 +1118,17 @@ function buildFilterbar() {
   });
   cust.appendChild(go);
   bar.appendChild(cust);
+  /* source du call : organique / funnel / new funnel / webinaire */
+  bar.appendChild(Object.assign(document.createElement("div"), { className: "fsep" }));
+  for (const o of FUN_OPTS) {
+    const b = document.createElement("button");
+    b.className = "fpill"; b.textContent = o.label;
+    b.title = { "": "Tous les calls", org: "Setting téléphonique, site, sans attribution pub", old: "VSL / Calendly Investisseurs 3.0 / pubs Meta",
+                new: "Nouvelle LP VSL (calendrier iClosed « Appel Diagnostic - Club »)", webi: "Onglets webinaire" }[o.k];
+    b.setAttribute("aria-pressed", String(state.src === o.k));
+    b.addEventListener("click", () => { state.src = o.k; renderPilotage(); });
+    bar.appendChild(b);
+  }
   if (state.custom) { $("cFrom").value = state.custom.from; $("cTo").value = state.custom.to; }
 }
 
@@ -1105,6 +1167,7 @@ function clStats(name, r) {
 function renderClosersTab() {
   pillRow("clCloserPills", [...TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), { k: CL_LES3, label: "Les 3" }], clSel, k => clSel = k, renderClosersTab);
   pillRow("clPeriodPills", CL_PERIODS.map(pp => ({ k: pp.k, label: pp.label })), clPeriodK, k => clPeriodK = k, renderClosersTab);
+  pillRow("clSrcPills", FUN_OPTS, state.src, k => state.src = k, renderClosersTab);
   const per = CL_PERIODS.find(pp => pp.k === clPeriodK);
   const r = per.range();
   $("clLede").textContent = (clSel === CL_LES3 ? "Les 3 closers réunis" : clSel) + " · " +
@@ -2542,6 +2605,113 @@ function renderMod() {
   renderHistory();
 }
 
+/* ================= CSM : suivi post-vente (onglet Sheet « CSM ») ================= */
+const CSM_ALL = "__2__";
+let csmSel = localStorage.getItem("csm-sel") || CSM_ALL;
+let csmOffre = "nf";  /* nf = nouvelle offre (3 calls), v1 = ancienne offre (mails), "" = toutes */
+const CSM_TPL_DEFAULT = {
+  call: "Salut {prenom}, c'est {csm} d'Investisseurs 3.0. Ton {call} d'accompagnement était prévu autour du {date} et on ne l'a pas encore fait. {lien} C'est important pour avancer sur ton plan, on cale ça ?",
+  simple: "Salut {prenom}, c'est {csm} d'Investisseurs 3.0. Ça fait un moment qu'on n'a pas échangé : comment ça avance de ton côté ? Dis-moi si tu bloques quelque part, je suis là pour t'aider.",
+};
+const csmTpl = (k) => localStorage.getItem("csm-tpl-" + k) || CSM_TPL_DEFAULT[k];
+const csmLien = () => localStorage.getItem("csm-lien") || "";
+const csmStatus = (st) => { const t = (st || "").toLowerCase(); if (t.startsWith("effect")) return "DONE"; if (t.startsWith("prog")) return "PROG"; if (t.includes("no")) return "NOSHOW"; if (t.startsWith("annul")) return "ANN"; return ""; };
+const CHIP_K = { "": ["empty", "à programmer"], PROG: ["o", "programmé"], DONE: ["g", "effectué"], NOSHOW: ["r", "no-show"], ANN: ["m", "annulé"] };
+function csmInfo(x) {
+  /* prochain call non effectué, retard vs date cible, dernier échange, alerte 30 j */
+  const k = x.k || [];
+  let next = null;
+  for (let i = 0; i < 3; i++) {
+    const c = k[i] || {};
+    if (csmStatus(c.st) !== "DONE") { next = { i, d: c.d || null, s: csmStatus(c.st) }; break; }
+  }
+  const doneDates = k.filter(c => csmStatus(c.st) === "DONE" && c.d).map(c => c.d);
+  const lastEx = [x.dv, x.last, ...doneDates].filter(Boolean).sort().pop() || null;
+  const since = lastEx ? daysAgo(lastEx) : null;
+  const retard = next && next.d && next.d < TODAY_ISO ? daysAgo(next.d) : 0;
+  const planned = !!next && next.s === "PROG" && !!next.d && next.d >= TODAY_ISO;  /* RDV à venir : rien à faire */
+  const noBooking = !!next && next.s !== "PROG";                                    /* aucun RDV pris pour ce call */
+  const relance = !!next && !planned && (retard > 0 || next.s === "NOSHOW" || next.s === "ANN");
+  const alert30 = !!next && noBooking && since != null && since >= 30;
+  return { next, lastEx, since, retard, planned, noBooking, relance, alert30, done: !next };
+}
+const csmFirst = (n) => (n || "").trim().split(/\s+/)[0] || "";
+const csmMsg = (x, info, kind) => {
+  const lien = csmLien() ? `Réserve ton créneau ici : ${csmLien()}` : "Dis-moi tes dispos cette semaine.";
+  return csmTpl(kind).replace(/{prenom}/g, csmFirst(x.n)).replace(/{csm}/g, x.csm || "l'équipe")
+    .replace(/{call}/g, info.next ? `call ${info.next.i + 1}` : "call")
+    .replace(/{date}/g, info.next && info.next.d ? frDate(info.next.d) : "ces jours-ci").replace(/{lien}/g, lien);
+};
+const csmWa = (x, txt) => `https://wa.me/${anWa(x.tel)}${txt ? "?text=" + encodeURIComponent(txt).replace(/'/g, "%27") : ""}`;
+const csmBtns = (x, info, kind) => {
+  const txt = csmMsg(x, info, kind);
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap">${x.tel
+    ? `<a class="btn" style="font-size:12.5px;padding:5px 10px" href="${csmWa(x, txt)}" target="_blank" rel="noopener">💬 WhatsApp</a>`
+    : `<span class="miss">pas de numéro</span>`}<button type="button" class="btn ghost" style="font-size:12.5px;padding:5px 10px" data-copy="${esc(txt)}">Copier</button></div>`;
+};
+function renderCsm() {
+  const all = DATA.csm || [];
+  const names = [...new Set(all.map(x => x.csm).filter(Boolean))].sort();
+  const opts = [{ k: CSM_ALL, label: names.length === 2 ? "Les 2" : "Tous" }, ...names.map(n => ({ k: n, label: n }))];
+  if (all.some(x => !x.csm)) opts.push({ k: "__na__", label: "Non assigné" });
+  pillRow("csmPills", opts, csmSel, k => { csmSel = k; localStorage.setItem("csm-sel", k); }, renderCsm);
+  pillRow("csmOffrePills", [{ k: "nf", label: "Nouvelle offre (3 calls)" }, { k: "v1", label: "Ancienne offre (V1)" }, { k: "", label: "Toutes" }],
+    csmOffre, k => csmOffre = k, renderCsm);
+  const mine = (x) => csmSel === CSM_ALL || (csmSel === "__na__" ? !x.csm : x.csm === csmSel);
+  const offreOk = (x) => !csmOffre || (csmOffre === "nf" ? x.nf : !x.nf);
+  const list = all.filter(x => mine(x) && offreOk(x)).map(x => ({ x, i: csmInfo(x) }));
+  const nf = list.filter(o => o.x.nf);
+  const cnt = (f) => nf.filter(f).length;
+  const prio = list.filter(o => o.x.nf && o.i.relance).sort((a, b) => (b.i.noBooking - a.i.noBooking) || (b.i.retard - a.i.retard));
+  const alerts = list.filter(o => o.x.nf && o.i.alert30).sort((a, b) => b.i.since - a.i.since);
+  $("csmBadge").textContent = all.filter(x => x.nf && csmInfo(x).relance).length || "";
+  const doneN = cnt(o => o.i.done);
+  $("csmKpis").innerHTML =
+    kpiTile("Clients", fmtN(list.length), `${fmtN(nf.length)} nouvelle offre · ${fmtN(list.length - nf.length)} ancienne (V1)`) +
+    kpiTile("À relancer", fmtN(prio.length), `${fmtN(prio.filter(o => o.i.noBooking).length)} sans RDV pris`) +
+    kpiTile("Alerte 30 j", fmtN(alerts.length), "sans échange ni RDV depuis 30 j") +
+    kpiTile("Call 1 / 2 / 3 à programmer", [0, 1, 2].map(n => fmtN(cnt(o => o.i.next && o.i.next.i === n && o.i.noBooking))).join(" / "), "prochain call sans RDV pris") +
+    kpiTile("RDV programmés", fmtN(cnt(o => o.i.planned)), "call à venir, rien à faire") +
+    kpiTile("Accompagnements terminés", fmtN(doneN), nf.length ? `${fmtP(100 * doneN / nf.length, 0)} des clients nouvelle offre` : "·") +
+    kpiTile("Témoignages", fmtN(list.filter(o => o.x.tem).length), `${fmtN(list.filter(o => o.x.reco).length)} recos demandées`) +
+    kpiTile("Mails V1 : J-0 / J+10", `${fmtN(list.filter(o => !o.x.nf && o.x.j0).length)} / ${fmtN(list.filter(o => !o.x.nf && o.x.j10).length)}`, `envoyés, sur ${fmtN(list.length - nf.length)} clients V1`);
+  const nextLbl = (i) => i.done ? `<span class="chip g">terminé</span>` : `<b>Call ${i.next.i + 1}</b> ${chip(CHIP_K, i.next.s)}`;
+  const lastLbl = (i) => i.lastEx ? `${frDate(i.lastEx)} <span class="miss">(${i.since} j)</span>` : "·";
+  $("csmPrio").innerHTML = prio.length ? `<div class="tscroll"><table><thead><tr><th>Client</th><th>CSM</th><th>Prochain call</th><th>Date cible</th><th class="num">Retard</th><th>Dernier échange</th><th>Relancer</th></tr></thead><tbody>` +
+    prio.map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b>${i.noBooking ? `<br><span class="late">aucun RDV pris</span>` : ""}</td><td>${esc(x.csm || "non assigné")}</td>
+      <td>${nextLbl(i)}</td><td>${i.next.d ? frDate(i.next.d) : "·"}</td><td class="num">${i.retard ? `<b class="late">${i.retard} j</b>` : "·"}</td>
+      <td>${lastLbl(i)}</td><td>${csmBtns(x, i, "call")}</td></tr>`).join("") + "</tbody></table></div>"
+    : `<div class="sub" style="margin:0">Rien à relancer : tous les calls sont faits ou programmés ✓</div>`;
+  $("csmAlert").innerHTML = alerts.length ? `<div class="tscroll"><table><thead><tr><th>Client</th><th>CSM</th><th>Sans nouvelles depuis</th><th>Prochain call</th><th>Relancer simplement</th></tr></thead><tbody>` +
+    alerts.map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b></td><td>${esc(x.csm || "non assigné")}</td><td><b class="late">${i.since} j</b> <span class="miss">(${frDate(i.lastEx)})</span></td>
+      <td>${nextLbl(i)}</td><td>${csmBtns(x, i, "simple")}</td></tr>`).join("") + "</tbody></table></div>"
+    : `<div class="sub" style="margin:0">Aucun client sans nouvelles depuis 30 jours ✓</div>`;
+  const kCell = (x, n) => { const c = (x.k || [])[n] || {}; return x.nf ? `${c.d ? frDate(c.d) : "·"}<br>${chip(CHIP_K, csmStatus(c.st))}` : "·"; };
+  $("csmTable").innerHTML = `<thead><tr><th>Client</th><th>CSM</th><th>Closer</th><th>Vente le</th><th>Offre</th><th>Call 1</th><th>Call 2</th><th>Call 3</th><th>Mails V1</th><th>Dernier échange</th><th>Témoignage</th><th>WhatsApp</th></tr></thead><tbody>` +
+    list.sort((a, b) => (b.x.dv || "").localeCompare(a.x.dv || "")).map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b>${x.valar ? ` <span class="chip o">Valar</span>` : ""}<br><span class="miss">${esc(x.mail || "")}</span></td>
+      <td>${esc(x.csm || "·")}</td><td>${esc(csmFirst(x.c))}</td><td>${x.dv ? frDate(x.dv) : "·"}</td><td>${x.nf ? "Nouvelle" : "V1"}</td>
+      <td>${kCell(x, 0)}</td><td>${kCell(x, 1)}</td><td>${kCell(x, 2)}</td>
+      <td>${x.nf ? "·" : `J-0 ${x.j0 ? "✓" : "✗"} · J+10 ${x.j10 ? "✓" : "✗"}`}</td><td>${lastLbl(i)}</td>
+      <td>${x.tem ? "✓" : "·"}${x.reco ? " · reco" : ""}</td>
+      <td>${x.tel ? `<a class="btn ghost" style="font-size:12.5px;padding:5px 10px" href="${csmWa(x, "")}" target="_blank" rel="noopener">💬</a>` : "·"}</td></tr>`).join("") + "</tbody>";
+  $("csmNote").textContent = list.length ? `${list.length} client(s) · source : onglet Sheet « CSM », MAJ auto toutes les 15 min.` : "Aucun client dans l'onglet CSM pour cette sélection.";
+}
+function csmSettingsInit() {
+  const show = () => { $("csmTplCall").value = csmTpl("call"); $("csmTplSimple").value = csmTpl("simple"); $("csmLien").value = csmLien(); };
+  show();
+  $("csmTplSave").addEventListener("click", () => {
+    for (const [k, id] of [["call", "csmTplCall"], ["simple", "csmTplSimple"]]) {
+      const v = $(id).value.trim();
+      if (v && v !== CSM_TPL_DEFAULT[k]) localStorage.setItem("csm-tpl-" + k, v); else localStorage.removeItem("csm-tpl-" + k);
+    }
+    const l = $("csmLien").value.trim();
+    if (l) localStorage.setItem("csm-lien", l); else localStorage.removeItem("csm-lien");
+    toast("Messages enregistrés ✓"); renderCsm();
+  });
+  $("csmTplReset").addEventListener("click", () => { ["csm-tpl-call", "csm-tpl-simple", "csm-lien"].forEach(k => localStorage.removeItem(k)); show(); renderCsm(); toast("Messages par défaut rétablis"); });
+  $("panelCsm").addEventListener("click", async (e) => { const b = e.target.closest("[data-copy]"); if (b) { await copyText(b.dataset.copy); toast("Message copié ✓"); } });
+}
+
 /* ================= ANNULÉS PAR LE LEAD : base consultable ================= */
 const anSel = { period: "30", closer: "", type: "lead" };
 const anWa = (tel) => { let d = (tel || "").replace(/\D/g, ""); if (d.startsWith("00")) d = d.slice(2); if (d.length === 10 && d.startsWith("0")) d = "33" + d.slice(1); if (d.length === 9) d = "33" + d; return d; };
@@ -3460,6 +3630,9 @@ $("tabAnnules").addEventListener("click", renderAnnules);
 $("tabMod").addEventListener("click", renderMod);
 $("modSearch").addEventListener("input", renderMod);
 renderMod();
+$("tabCsm").addEventListener("click", renderCsm);
+csmSettingsInit();
+renderCsm();
 $("anSearch").addEventListener("input", renderAnnules);
 renderAnnules();
 initEow();

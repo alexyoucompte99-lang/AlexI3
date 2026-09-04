@@ -182,6 +182,7 @@ def main(xlsx_path, out_path):
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
     setter_console = []  # onglet « EOD Setter Console » (EOD de Constant saisi dans la console)
     history = []  # onglet « Historique Console » (modifs faites depuis la console, pont v14)
+    csm = []  # onglet « CSM » : suivi post-vente (3 calls d'accompagnement, mails V1, témoignages)
     iclosed_leads, iclosed_claims, wa_confirms = [], [], []
 
     for ws in wb.worksheets:
@@ -388,6 +389,52 @@ def main(xlsx_path, out_path):
                                        "idees": cell_str(g("idees"))[:220]})
             continue
 
+        if title == "CSM":
+            hidx, header = find_header(iter(all_rows), ["nom du csm"])
+            if header is None:
+                continue
+            idx = {}
+            for i, c in enumerate(header):
+                n = norm(cell_str(c))
+                for key, needle in (("closer", "closer"), ("r1", "date de l'appel"), ("name", "nom prenom"), ("mail", "mail"),
+                                    ("phone", "telephone"), ("show_up", "show up"), ("qualif", "qualifie"), ("cash250", "prospect"),
+                                    ("vente", "vente"), ("virement", "virement"), ("r2", "r2"), ("comment", "commentaires"),
+                                    ("date_vente", "date vente"), ("csm", "nom du csm"), ("valar", "lead potentiel valar"),
+                                    ("j0", "j-0"), ("j10_date", "j+10 date"), ("j10", "envoye a j+10"),
+                                    ("c1d", "call 1 — date"), ("c1s", "call 1 — statut"), ("c2d", "call 2 — date"), ("c2s", "call 2 — statut"),
+                                    ("c3d", "call 3 — date"), ("c3s", "call 3 — statut"), ("new_offer", "nouvelle offre"),
+                                    ("temoignage", "temoignage"), ("reco", "reco"), ("slots", "slots 15"), ("last_slot", "dernier slot")):
+                    if n.startswith(needle) and key not in idx:
+                        idx[key] = i
+                        break
+            def iso_of(v):
+                d = parse_date(v)
+                return f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None
+            def truthy(v):
+                return cell_str(v).strip().upper() in ("TRUE", "OUI", "VRAI", "YES", "X")
+            for ridx, r in enumerate(all_rows[hidx + 1:], start=hidx + 2):
+                def g(k):
+                    i = idx.get(k)
+                    return r[i] if i is not None and i < len(r) else None
+                name = re.sub(r"\s+", " ", cell_str(g("name"))).strip()
+                if not name or re.search(r"\btests?\b", name, re.I):
+                    continue
+                ph = g("phone")
+                phone = str(int(ph)) if isinstance(ph, float) else re.sub(r"\D", "", cell_str(ph))
+                csm.append({
+                    "row": ridx, "closer": re.sub(r"\s+", " ", cell_str(g("closer"))).strip(), "r1": iso_of(g("r1")),
+                    "name": name[:60], "mail": cell_str(g("mail"))[:80].strip(), "phone": phone[:20],
+                    "show_up": norm_show_up(cell_str(g("show_up"))), "qualif": parse_num(g("qualif")),
+                    "cash250": truthy(g("cash250")), "vente": norm_vente(cell_str(g("vente"))), "virement": truthy(g("virement")),
+                    "r2": cell_str(g("r2"))[:30].strip(), "comment": cell_str(g("comment"))[:600],
+                    "date_vente": iso_of(g("date_vente")), "csm": cell_str(g("csm")).strip()[:30],
+                    "valar": truthy(g("valar")), "j0": truthy(g("j0")), "j10_date": iso_of(g("j10_date")), "j10": truthy(g("j10")),
+                    "calls": [{"d": iso_of(g(f"c{n}d")), "st": cell_str(g(f"c{n}s")).strip()[:30]} for n in (1, 2, 3)],
+                    "new_offer": truthy(g("new_offer")), "temoignage": truthy(g("temoignage")), "reco": truthy(g("reco")),
+                    "slots": parse_num(g("slots")) or 0, "last_slot": iso_of(g("last_slot")),
+                })
+            continue
+
         if title == "Historique Console":
             # Date, Onglet, Ligne, Lead, Par, Action, Champs modifies (JSON)
             for r in all_rows[1:]:
@@ -486,7 +533,7 @@ def main(xlsx_path, out_path):
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
            "setter_reports": setter_reports, "dm_reports": dm_reports,
-           "setter_console": setter_console, "history": history,
+           "setter_console": setter_console, "history": history, "csm": csm,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
            "wa_confirms": wa_confirms}
     with open(out_path, "w") as f:

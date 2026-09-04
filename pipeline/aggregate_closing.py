@@ -196,6 +196,26 @@ def attach_wa_confirms(calls, confirms):
     return [o for o in orphans.values() if o["wac"] or o["war"]]
 
 
+NEW_CAL_RE = re.compile(r"appel diagnostic\s*-\s*club", re.I)
+OLD_CAL_RE = re.compile(r"investisseurs 3\.0|programme investisseu", re.I)
+ADS_UTM_RE = re.compile(r"^(broad|utm_|ads|\[market|retargeting|funnel)", re.I)
+
+
+def funnel_of(c):
+    src = c.get("source") or ""
+    src2 = (c.get("source2") or "").lower()
+    utm = (c.get("utm") or "").strip()
+    if c.get("webi"):
+        return "webi"
+    if NEW_CAL_RE.search(src):
+        return "new"
+    if "setting" in src2:
+        return "org"
+    if OLD_CAL_RE.search(src) or src2.startswith("vsl") or ADS_UTM_RE.match(utm):
+        return "old"
+    return "org"
+
+
 def main(data_path, out_path, updated_at):
     d = json.load(open(data_path))
     calls = []
@@ -243,12 +263,21 @@ def main(data_path, out_path, updated_at):
             "sr": c.get("row"),
             "rf": (c.get("relance_faite") or "").strip(),
             "utm": (c.get("utm") or "").strip()[:40],
+            # canal du call : webi (onglets webinaire), new (calendrier iClosed « Appel Diagnostic - Club »,
+            # nouvelle LP VSL), old (VSL / Calendly Investisseurs 3.0 / ads), org (setting, site, sans attribution)
+            "fun": funnel_of(c),
         })
 
     eod_appel = [r for r in d.get("setter_reports", []) if r.get("year") == 2026]
     eod_ecrit = [r for r in d.get("dm_reports", []) if r.get("year") == 2026]
     eod_setter = [r for r in d.get("setter_console", []) if r.get("year") == 2026]
     history = sorted(d.get("history", []), key=lambda h: h["ts"], reverse=True)[:500]
+    csm = [{
+        "row": x["row"], "c": x["closer"], "n": x["name"], "mail": x["mail"], "tel": x["phone"], "r1": x["r1"],
+        "q": x["qualif"], "v": x["vente"], "vir": x["virement"], "r2": x["r2"], "com": x["comment"],
+        "dv": x["date_vente"], "csm": x["csm"], "valar": x["valar"], "j0": x["j0"], "j10d": x["j10_date"], "j10": x["j10"],
+        "k": x["calls"], "nf": x["new_offer"], "tem": x["temoignage"], "reco": x["reco"], "slots": x["slots"], "last": x["last_slot"],
+    } for x in d.get("csm", [])]
     # semaines ads (spend + résas) pour le brief : chargées depuis ads.json si présent
     weeks = []
     try:
@@ -304,7 +333,7 @@ def main(data_path, out_path, updated_at):
 
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
            "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally,
-           "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "eod_setter": eod_setter, "history": history, "weeks": weeks}
+           "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "eod_setter": eod_setter, "history": history, "csm": csm, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 
