@@ -394,7 +394,8 @@ def main(xlsx_path, out_path):
                 for key, needle in (("ts", "date"), ("jour", "jour"), ("setter", "setter"), ("energie", "energie"),
                                     ("accroches", "accroches"), ("relances", "relances"), ("reponses", "reponses"),
                                     ("quali", "conversations"), ("proposes", "rdv proposes"), ("bookes", "rdv bookes"),
-                                    ("objections", "objections"), ("retours", "retours")):
+                                    ("objections", "objections"), ("retours", "retours"),
+                                    ("audits", "audits"), ("contactes", "leads audit")):
                     if n.startswith(needle) and key not in idx:
                         idx[key] = i
                         break
@@ -414,6 +415,8 @@ def main(xlsx_path, out_path):
                                        "d": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}", "heure": heure,
                                        "setter": setter,
                                        "energie": parse_num(g("energie")),
+                                       "audits": parse_num(g("audits")) or 0,
+                                       "contactes": parse_num(g("contactes")) or 0,
                                        "accroches": parse_num(g("accroches")) or 0,
                                        "relances": parse_num(g("relances")) or 0,
                                        "reponses": parse_num(g("reponses")) or 0,

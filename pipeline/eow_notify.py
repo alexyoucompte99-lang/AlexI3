@@ -48,12 +48,13 @@ def fmt_eod(vals):
 
 
 def fmt_eod_setter(vals):
-    ts, jour, setter, energie, acc, rel, rep, quali, prop, book, obj, ret = (vals + [""] * 12)[:12]
+    ts, jour, setter, energie, acc, rel, rep, quali, prop, book, obj, ret, aud, con = (vals + [""] * 14)[:14]
     j = jour[8:10] + "/" + jour[5:7] if len(jour) >= 10 and jour[4] == "-" else (jour or "?")
     return (f"📱 EOD setting reçu de {setter or '?'} ({j})\n\n"
             f"Énergie : {energie or '?'}/10\n"
-            f"Accroches : {acc or '0'} · Relances : {rel or '0'} · Réponses : {rep or '0'}\n"
-            f"Conv. qualifiées : {quali or '0'} · RDV proposés : {prop or '0'} · RDV bookés : {book or '0'}\n\n"
+            f"Audits reçus : {aud or '0'} · Leads audit contactés : {con or '0'}\n"
+            f"Conv. qualifiées : {quali or '0'} · RDV proposés : {prop or '0'} · RDV bookés : {book or '0'}\n"
+            f"Accroches : {acc or '0'} · Relances : {rel or '0'}\n\n"
             f"Objections / blocages : {obj or '·'}\n"
             f"Retours : {ret or '·'}")
 

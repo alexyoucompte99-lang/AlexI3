@@ -638,9 +638,8 @@ __FUNNEL_CSS__
         <div class="field">
           <label>Tes chiffres du jour (laisse vide ce qui est à zéro)</label>
           <div class="es-grid">
-            <div><label for="esAccroches" style="font-weight:500">Accroches envoyées</label><input type="number" min="0" inputmode="numeric" id="esAccroches"></div>
-            <div><label for="esRelances" style="font-weight:500">Relances envoyées</label><input type="number" min="0" inputmode="numeric" id="esRelances"></div>
-            <div><label for="esReponses" style="font-weight:500">Réponses reçues</label><input type="number" min="0" inputmode="numeric" id="esReponses"></div>
+            <div><label for="esAudits" style="font-weight:500">Nombre d'AUDIT reçus</label><input type="number" min="0" inputmode="numeric" id="esAudits"></div>
+            <div><label for="esContactes" style="font-weight:500">Nombre de leads audit contactés</label><input type="number" min="0" inputmode="numeric" id="esContactes"></div>
             <div><label for="esQuali" style="font-weight:500">Conversations qualifiées</label><input type="number" min="0" inputmode="numeric" id="esQuali"></div>
             <div><label for="esProposes" style="font-weight:500">RDV proposés</label><input type="number" min="0" inputmode="numeric" id="esProposes"></div>
             <div><label for="esBookes" style="font-weight:500">RDV bookés</label><input type="number" min="0" inputmode="numeric" id="esBookes"></div>
@@ -648,6 +647,13 @@ __FUNNEL_CSS__
         </div>
         <div class="field"><label for="esObj">Objections ou blocages du jour</label><textarea id="esObj" placeholder="Les objections qui reviennent, les profils qui bloquent, ce qui t'a ralenti..."></textarea></div>
         <div class="field"><label for="esRetours">Retours, idées, questions (optionnel)</label><textarea id="esRetours" placeholder="Une idée de message, un truc à changer dans le process, une question pour Alex..."></textarea></div>
+        <div class="field">
+          <label>Facultatif</label>
+          <div class="es-grid">
+            <div><label for="esAccroches" style="font-weight:500">Accroches envoyées</label><input type="number" min="0" inputmode="numeric" id="esAccroches"></div>
+            <div><label for="esRelances" style="font-weight:500">Relances envoyées</label><input type="number" min="0" inputmode="numeric" id="esRelances"></div>
+          </div>
+        </div>
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
           <button class="btn" id="esSend">✅ Envoyer mon EOD</button>
           <button class="btn ghost" id="esClear">Effacer</button>
@@ -2155,9 +2161,10 @@ function renderFollowups() {
 
 /* choix du closer en boutons (EOW/EOD) : la valeur vit dans un input caché,
    les brouillons et l'envoi ne changent pas */
-function closerSeg(segId, inputId, onPick) {
+function closerSeg(segId, inputId, onPick, extra = []) {
   const names = [...new Set(DATA.calls.filter(c => c.d && daysAgo(c.d) < 60 && c.c).map(c => c.c))].sort();
-  const opts = [...names.map(n => [n, n.split(" ")[0]]), ["Autre", "Autre"]];
+  // extra : prénoms ajoutés à la main (ex. le setter Constant dans la boîte à idées)
+  const opts = [...names.map(n => [n, n.split(" ")[0]]), ...extra.map(n => [n, n]), ["Autre", "Autre"]];
   const inp = $(inputId), host = $(segId);
   if (!opts.some(o => o[0] === inp.value)) inp.value = opts[0][0];
   const draw = () => {
@@ -2276,9 +2283,9 @@ function initEod() {
 }
 
 /* ================= EOD SETTER (Constant) : formulaire -> Sheet « EOD Setter Console » ================= */
-const ES_FIELDS = ["esDate", "esSetter", "esSetterOther", "esEnergy", "esAccroches", "esRelances", "esReponses",
+const ES_FIELDS = ["esDate", "esSetter", "esSetterOther", "esEnergy", "esAudits", "esContactes", "esAccroches", "esRelances",
                    "esQuali", "esProposes", "esBookes", "esObj", "esRetours"];
-const ES_NUMS = ["esAccroches", "esRelances", "esReponses", "esQuali", "esProposes", "esBookes"];
+const ES_NUMS = ["esAudits", "esContactes", "esAccroches", "esRelances", "esQuali", "esProposes", "esBookes"];
 const ES_SETTERS = ["Constant", "Autre"];
 function initEodSetter() {
   const saved = JSON.parse(localStorage.getItem("eod-setter-draft") || "{}");
@@ -2318,7 +2325,8 @@ function initEodSetter() {
     btn.textContent = "Envoi en cours...";
     bridgePost({
       what: "eod_setter", jour: $("esDate").value, setter: setter, energie: $("esEnergy").value,
-      accroches: $("esAccroches").value, relances: $("esRelances").value, reponses: $("esReponses").value,
+      audits: $("esAudits").value, contactes: $("esContactes").value,
+      accroches: $("esAccroches").value, relances: $("esRelances").value,
       quali: $("esQuali").value, proposes: $("esProposes").value, bookes: $("esBookes").value,
       objections: $("esObj").value, retours: $("esRetours").value,
     }).then(ok => {
@@ -2376,32 +2384,33 @@ function renderEodSetter() {
   const span = from ? Math.round((new Date(TODAY_ISO) - new Date(from)) / DAY) + 1 : jours;
   const en = rows.filter(r => r.energie != null);
   const enAvg = en.length ? en.reduce((a, r) => a + r.energie, 0) / en.length : null;
-  const tRep = sum("accroches") ? 100 * sum("reponses") / sum("accroches") : null;
+  const tCon = sum("audits") ? 100 * sum("contactes") / sum("audits") : null;
   const tBook = sum("proposes") ? 100 * sum("bookes") / sum("proposes") : null;
   $("esKpis").innerHTML =
-    kpiTile("Accroches", fmtN(sum("accroches")), `${fmtN(sum("relances"))} relances`) +
-    kpiTile("Réponses", fmtN(sum("reponses")), `taux de réponse ${fmtP(tRep, 0)}`) +
-    kpiTile("Conv. qualifiées", fmtN(sum("quali")), sum("reponses") ? `${fmtP(100 * sum("quali") / sum("reponses"), 0)} des réponses` : "·") +
+    kpiTile("Audits reçus", fmtN(sum("audits")), `${fmtN(sum("contactes"))} leads audit contactés (${fmtP(tCon, 0)})`) +
+    kpiTile("Conv. qualifiées", fmtN(sum("quali")), sum("contactes") ? `${fmtP(100 * sum("quali") / sum("contactes"), 0)} des contactés` : "·") +
     kpiTile("RDV proposés", fmtN(sum("proposes")), `${fmtN(sum("bookes"))} bookés (${fmtP(tBook, 0)})`) +
-    kpiTile("Jours avec EOD", `${fmtN(jours)}${from ? " / " + fmtN(span) : ""}`, enAvg != null ? `énergie moyenne ${enAvg.toFixed(1).replace(".", ",")}/10` : "·");
+    kpiTile("Jours avec EOD", `${fmtN(jours)}${from ? " / " + fmtN(span) : ""}`, enAvg != null ? `énergie moyenne ${enAvg.toFixed(1).replace(".", ",")}/10` : "·") +
+    kpiTile("Accroches", fmtN(sum("accroches")), `${fmtN(sum("relances"))} relances (facultatif)`);
   const byDay = rows.slice().reverse();
-  $("esTable").innerHTML = `<thead><tr><th>Jour</th><th>Setter</th><th class="num">Énergie</th><th class="num">Accroches</th><th class="num">Relances</th>
-    <th class="num">Réponses</th><th class="num">Quali</th><th class="num">RDV prop.</th><th class="num">Bookés</th></tr></thead><tbody>` +
+  $("esTable").innerHTML = `<thead><tr><th>Jour</th><th>Setter</th><th class="num">Énergie</th><th class="num">Audits reçus</th><th class="num">Contactés</th>
+    <th class="num">Quali</th><th class="num">RDV prop.</th><th class="num">Bookés</th><th class="num">Accroches</th><th class="num">Relances</th></tr></thead><tbody>` +
     byDay.slice(0, 40).map(r => `<tr><td><b>${frDate(r.d)}</b>${r.heure ? ` <span class="miss">${r.heure}</span>` : ""}</td><td>${esc(r.setter)}</td>
-      <td class="num">${r.energie != null ? fmtN(r.energie) + "/10" : "·"}</td><td class="num">${fmtN(r.accroches)}</td><td class="num">${fmtN(r.relances)}</td>
-      <td class="num">${fmtN(r.reponses)}</td><td class="num">${fmtN(r.quali)}</td><td class="num">${fmtN(r.proposes)}</td><td class="num">${fmtN(r.bookes)}</td></tr>`).join("") + "</tbody>";
+      <td class="num">${r.energie != null ? fmtN(r.energie) + "/10" : "·"}</td><td class="num">${fmtN(r.audits)}</td><td class="num">${fmtN(r.contactes)}</td>
+      <td class="num">${fmtN(r.quali)}</td><td class="num">${fmtN(r.proposes)}</td><td class="num">${fmtN(r.bookes)}</td>
+      <td class="num">${r.accroches ? fmtN(r.accroches) : "·"}</td><td class="num">${r.relances ? fmtN(r.relances) : "·"}</td></tr>`).join("") + "</tbody>";
   $("esChart").innerHTML = "";
   if (rows.length > 1) {
     const legend = document.createElement("div");
     legend.className = "legend";
-    legend.innerHTML = `<span class="it"><span class="sw" style="background:var(--s1)"></span>Accroches</span>
-      <span class="it"><span class="sw" style="background:var(--s2)"></span>Réponses</span>
+    legend.innerHTML = `<span class="it"><span class="sw" style="background:var(--s1)"></span>Audits reçus</span>
+      <span class="it"><span class="sw" style="background:var(--s2)"></span>Leads contactés</span>
       <span class="it"><span class="sw" style="background:var(--accent)"></span>RDV bookés</span>`;
     $("esChart").appendChild(legend);
     const days = rows.slice(-30);
     barChart($("esChart"), days.map(r => frDate(r.d)), [
-      { name: "Accroches", color: "var(--s1)", values: days.map(r => r.accroches || 0) },
-      { name: "Réponses", color: "var(--s2)", values: days.map(r => r.reponses || 0) },
+      { name: "Audits reçus", color: "var(--s1)", values: days.map(r => r.audits || 0) },
+      { name: "Leads contactés", color: "var(--s2)", values: days.map(r => r.contactes || 0) },
       { name: "RDV bookés", color: "var(--accent)", values: days.map(r => r.bookes || 0) },
     ], { height: 200 });
   }
@@ -3130,7 +3139,7 @@ function initIdea() {
     if (d.t) $("ideaText").value = d.t;
   } catch (e) { /* brouillon illisible : on repart de zéro */ }
   $("ideaText").addEventListener("input", draft);
-  closerSeg("ideaCloserSeg", "ideaCloser", draft);
+  closerSeg("ideaCloserSeg", "ideaCloser", draft, ["Constant"]);
   const msg = (m) => { $("ideaOk").textContent = m; $("ideaOk").style.display = "inline"; setTimeout(() => $("ideaOk").style.display = "none", 5000); };
   $("ideaSend").addEventListener("click", () => {
     const btn = $("ideaSend");
