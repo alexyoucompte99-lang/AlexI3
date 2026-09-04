@@ -437,6 +437,15 @@ __FUNNEL_CSS__
       <div class="card full" id="csmAlert"></div>
     </section>
     <section style="margin-top:22px">
+      <span class="eyebrow">Historique</span>
+      <h2>📞 Historique des calls pris</h2>
+      <p class="lede">Tous les calls d'accompagnement qui ont une date et un statut dans le Sheet (effectué, programmé, no-show, annulé),
+        du plus récent au plus ancien. Un call effectué = fait ; programmé = RDV pris.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:12px"><span class="eyebrow" style="min-width:62px">Statut</span><span id="csmHistPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+      <div class="kpis" id="csmHistKpis" style="margin-bottom:14px"></div>
+      <div class="card full"><div class="tscroll"><table id="csmHistTable"></table></div><div class="sub" id="csmHistNote" style="margin-top:8px"></div></div>
+    </section>
+    <section style="margin-top:22px">
       <span class="eyebrow">Tous les clients</span>
       <h2>Le tableau CSM</h2>
       <div class="card full"><div class="tscroll"><table id="csmTable"></table></div><div class="sub" id="csmNote" style="margin-top:8px"></div></div>
@@ -2608,7 +2617,8 @@ function renderMod() {
 /* ================= CSM : suivi post-vente (onglet Sheet « CSM ») ================= */
 const CSM_ALL = "__2__";
 let csmSel = localStorage.getItem("csm-sel") || CSM_ALL;
-let csmOffre = "nf";  /* nf = nouvelle offre (3 calls), v1 = ancienne offre (mails), "" = toutes */
+let csmOffre = "";  /* "" = toutes (défaut), nf = nouvelle offre (3 calls), v1 = ancienne offre (mails) */
+let csmHistSel = "";  /* historique des calls : "" tous, DONE, PROG, NOSHOW */
 const CSM_TPL_DEFAULT = {
   call: "Salut {prenom}, c'est {csm} d'Investisseurs 3.0. Ton {call} d'accompagnement était prévu autour du {date} et on ne l'a pas encore fait. {lien} C'est important pour avancer sur ton plan, on cale ça ?",
   simple: "Salut {prenom}, c'est {csm} d'Investisseurs 3.0. Ça fait un moment qu'on n'a pas échangé : comment ça avance de ton côté ? Dis-moi si tu bloques quelque part, je suis là pour t'aider.",
@@ -2655,7 +2665,7 @@ function renderCsm() {
   const opts = [{ k: CSM_ALL, label: names.length === 2 ? "Les 2" : "Tous" }, ...names.map(n => ({ k: n, label: n }))];
   if (all.some(x => !x.csm)) opts.push({ k: "__na__", label: "Non assigné" });
   pillRow("csmPills", opts, csmSel, k => { csmSel = k; localStorage.setItem("csm-sel", k); }, renderCsm);
-  pillRow("csmOffrePills", [{ k: "nf", label: "Nouvelle offre (3 calls)" }, { k: "v1", label: "Ancienne offre (V1)" }, { k: "", label: "Toutes" }],
+  pillRow("csmOffrePills", [{ k: "", label: "Toutes" }, { k: "nf", label: "Nouvelle offre (3 calls)" }, { k: "v1", label: "Ancienne offre (V1)" }],
     csmOffre, k => csmOffre = k, renderCsm);
   const mine = (x) => csmSel === CSM_ALL || (csmSel === "__na__" ? !x.csm : x.csm === csmSel);
   const offreOk = (x) => !csmOffre || (csmOffre === "nf" ? x.nf : !x.nf);
@@ -2663,19 +2673,21 @@ function renderCsm() {
   const nf = list.filter(o => o.x.nf);
   const cnt = (f) => nf.filter(f).length;
   const prio = list.filter(o => o.x.nf && o.i.relance).sort((a, b) => (b.i.noBooking - a.i.noBooking) || (b.i.retard - a.i.retard));
-  const alerts = list.filter(o => o.x.nf && o.i.alert30).sort((a, b) => b.i.since - a.i.since);
+  /* alerte 30 j : nouvelle offre ET ancienne offre (V1, aucun call tracé : on regarde juste le dernier échange) */
+  const alerts = list.filter(o => o.i.alert30).sort((a, b) => b.i.since - a.i.since);
+  const sel = all.filter(mine);
   $("csmBadge").textContent = all.filter(x => x.nf && csmInfo(x).relance).length || "";
   const doneN = cnt(o => o.i.done);
   $("csmKpis").innerHTML =
-    kpiTile("Clients", fmtN(list.length), `${fmtN(nf.length)} nouvelle offre · ${fmtN(list.length - nf.length)} ancienne (V1)`) +
+    kpiTile("Clients", fmtN(list.length), `${fmtN(sel.filter(x => x.nf).length)} nouvelle offre · ${fmtN(sel.filter(x => !x.nf).length)} ancienne (V1)` + (csmOffre ? " (filtre offre actif)" : "")) +
     kpiTile("À relancer", fmtN(prio.length), `${fmtN(prio.filter(o => o.i.noBooking).length)} sans RDV pris`) +
-    kpiTile("Alerte 30 j", fmtN(alerts.length), "sans échange ni RDV depuis 30 j") +
+    kpiTile("Alerte 30 j", fmtN(alerts.length), `sans échange ni RDV depuis 30 j · ${fmtN(alerts.filter(o => !o.x.nf).length)} V1`) +
     kpiTile("Call 1 / 2 / 3 à programmer", [0, 1, 2].map(n => fmtN(cnt(o => o.i.next && o.i.next.i === n && o.i.noBooking))).join(" / "), "prochain call sans RDV pris") +
     kpiTile("RDV programmés", fmtN(cnt(o => o.i.planned)), "call à venir, rien à faire") +
     kpiTile("Accompagnements terminés", fmtN(doneN), nf.length ? `${fmtP(100 * doneN / nf.length, 0)} des clients nouvelle offre` : "·") +
     kpiTile("Témoignages", fmtN(list.filter(o => o.x.tem).length), `${fmtN(list.filter(o => o.x.reco).length)} recos demandées`) +
     kpiTile("Mails V1 : J-0 / J+10", `${fmtN(list.filter(o => !o.x.nf && o.x.j0).length)} / ${fmtN(list.filter(o => !o.x.nf && o.x.j10).length)}`, `envoyés, sur ${fmtN(list.length - nf.length)} clients V1`);
-  const nextLbl = (i) => i.done ? `<span class="chip g">terminé</span>` : `<b>Call ${i.next.i + 1}</b> ${chip(CHIP_K, i.next.s)}`;
+  const nextLbl = (i, x) => x && !x.nf ? `<span class="chip empty">V1 · suivi mails</span>` : i.done ? `<span class="chip g">terminé</span>` : `<b>Call ${i.next.i + 1}</b> ${chip(CHIP_K, i.next.s)}`;
   const lastLbl = (i) => i.lastEx ? `${frDate(i.lastEx)} <span class="miss">(${i.since} j)</span>` : "·";
   $("csmPrio").innerHTML = prio.length ? `<div class="tscroll"><table><thead><tr><th>Client</th><th>CSM</th><th>Prochain call</th><th>Date cible</th><th class="num">Retard</th><th>Dernier échange</th><th>Relancer</th></tr></thead><tbody>` +
     prio.map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b>${i.noBooking ? `<br><span class="late">aucun RDV pris</span>` : ""}</td><td>${esc(x.csm || "non assigné")}</td>
@@ -2684,8 +2696,32 @@ function renderCsm() {
     : `<div class="sub" style="margin:0">Rien à relancer : tous les calls sont faits ou programmés ✓</div>`;
   $("csmAlert").innerHTML = alerts.length ? `<div class="tscroll"><table><thead><tr><th>Client</th><th>CSM</th><th>Sans nouvelles depuis</th><th>Prochain call</th><th>Relancer simplement</th></tr></thead><tbody>` +
     alerts.map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b></td><td>${esc(x.csm || "non assigné")}</td><td><b class="late">${i.since} j</b> <span class="miss">(${frDate(i.lastEx)})</span></td>
-      <td>${nextLbl(i)}</td><td>${csmBtns(x, i, "simple")}</td></tr>`).join("") + "</tbody></table></div>"
+      <td>${nextLbl(i, x)}</td><td>${csmBtns(x, i, "simple")}</td></tr>`).join("") + "</tbody></table></div>"
     : `<div class="sub" style="margin:0">Aucun client sans nouvelles depuis 30 jours ✓</div>`;
+  /* historique des calls pris : chaque call 1/2/3 daté ET statué, tous clients de la sélection CSM */
+  const hist = [];
+  all.filter(mine).forEach(x => (x.k || []).forEach((c, n) => {
+    const st = csmStatus(c.st);
+    if (c.d && st) hist.push({ x, n, d: c.d, st, past: c.d <= TODAY_ISO });
+  }));
+  hist.sort((a, b) => b.d.localeCompare(a.d));
+  pillRow("csmHistPills", [{ k: "", label: `Tous (${hist.length})` }, { k: "DONE", label: `Effectués (${hist.filter(h => h.st === "DONE").length})` },
+    { k: "PROG", label: `Programmés (${hist.filter(h => h.st === "PROG").length})` }, { k: "NOSHOW", label: `No-show (${hist.filter(h => h.st === "NOSHOW").length})` }],
+    csmHistSel, k => csmHistSel = k, renderCsm);
+  const hRows = hist.filter(h => !csmHistSel || h.st === csmHistSel);
+  const hDone = hist.filter(h => h.st === "DONE"), hProg = hist.filter(h => h.st === "PROG");
+  const h30 = hDone.filter(h => daysAgo(h.d) <= 30).length;
+  $("csmHistKpis").innerHTML =
+    kpiTile("Calls effectués", fmtN(hDone.length), `${fmtN(h30)} sur les 30 derniers jours`) +
+    kpiTile("RDV programmés", fmtN(hProg.length), `${fmtN(hProg.filter(h => !h.past).length)} à venir · ${fmtN(hProg.filter(h => h.past).length)} date passée (à confirmer)`) +
+    kpiTile("No-show", fmtN(hist.filter(h => h.st === "NOSHOW").length), `${fmtN(hist.filter(h => h.st === "ANN").length)} annulés`) +
+    kpiTile("Clients avec au moins 1 call fait", fmtN(new Set(hDone.map(h => h.x.n)).size), `sur ${fmtN(all.filter(mine).filter(x => x.nf).length)} clients nouvelle offre`);
+  $("csmHistTable").innerHTML = hRows.length ? `<thead><tr><th>Date</th><th>Client</th><th>CSM</th><th>Call</th><th>Statut</th><th>Slots 15 min</th><th>WhatsApp</th></tr></thead><tbody>` +
+    hRows.slice(0, 200).map(h => `<tr><td><b>${frDateFull(h.d)}</b>${!h.past ? ` <span class="miss">à venir</span>` : ""}</td><td><b>${esc(h.x.n)}</b></td><td>${esc(h.x.csm || "non assigné")}</td>
+      <td>Call ${h.n + 1}</td><td>${chip(CHIP_K, h.st)}${h.st === "PROG" && h.past ? ` <span class="late">date passée</span>` : ""}</td>
+      <td>${h.x.slots ? `${fmtN(h.x.slots)}${h.x.last ? ` · dernier ${frDate(h.x.last)}` : ""}` : "·"}</td>
+      <td>${h.x.tel ? `<a class="btn ghost" style="font-size:12.5px;padding:5px 10px" href="${csmWa(h.x, "")}" target="_blank" rel="noopener">💬</a>` : "·"}</td></tr>`).join("") + "</tbody>" : "";
+  $("csmHistNote").textContent = hRows.length ? (hRows.length > 200 ? `${hRows.length} calls, les 200 plus récents affichés.` : "") : "Aucun call daté et statué dans le Sheet pour cette sélection.";
   const kCell = (x, n) => { const c = (x.k || [])[n] || {}; return x.nf ? `${c.d ? frDate(c.d) : "·"}<br>${chip(CHIP_K, csmStatus(c.st))}` : "·"; };
   $("csmTable").innerHTML = `<thead><tr><th>Client</th><th>CSM</th><th>Closer</th><th>Vente le</th><th>Offre</th><th>Call 1</th><th>Call 2</th><th>Call 3</th><th>Mails V1</th><th>Dernier échange</th><th>Témoignage</th><th>WhatsApp</th></tr></thead><tbody>` +
     list.sort((a, b) => (b.x.dv || "").localeCompare(a.x.dv || "")).map(({ x, i }) => `<tr><td><b>${esc(x.n)}</b>${x.valar ? ` <span class="chip o">Valar</span>` : ""}<br><span class="miss">${esc(x.mail || "")}</span></td>
