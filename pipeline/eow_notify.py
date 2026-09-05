@@ -81,6 +81,10 @@ def notify_tab(wb, token, chat, tab, state_path, fmt, label):
         vals = [str(v).strip() if v is not None else "" for v in r]
         # les floats du Sheet (7.0) s'affichent en entier
         vals = [v[:-2] if v.endswith(".0") else v for v in vals]
+        # lignes de test (« Test Claude ») : pas de notification, comme dans parse_xlsx
+        if any(v.startswith("Test") for v in vals[1:3]):
+            print(f"{label} : ligne de test ignorée", file=sys.stderr)
+            continue
         send(token, chat, fmt(vals))
         print(f"{label} notifié : {vals[1] if len(vals) > 1 else '?'}", file=sys.stderr)
     with open(state_path, "w") as f:
