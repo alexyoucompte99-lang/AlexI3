@@ -5,6 +5,8 @@ dans le navigateur (AES-256-CBC via openssl, PBKDF2 200k itérations).
 Usage: python3 encrypt_page.py <page.html> <sortie.html> <code> <titre>
 """
 import base64
+import os
+import re
 import subprocess
 import sys
 
@@ -83,6 +85,14 @@ def main(src, dst, code, titre):
     with open(dst, "w") as f:
         f.write(out)
     print(f"OK -> {dst} ({len(out) // 1024} KB)")
+    # v.txt = BUILD_ID de la page (voir build.py) : lu hors cache par la page pour se
+    # recharger si le navigateur/CDN a servi une copie plus ancienne
+    m = re.search(r'BUILD_ID = "([0-9a-f]{6,40})"', open(src, encoding="utf-8").read())
+    if m:
+        vpath = os.path.join(os.path.dirname(os.path.abspath(dst)), "v.txt")
+        with open(vpath, "w") as f:
+            f.write(m.group(1) + "\n")
+        print(f"OK -> {vpath} ({m.group(1)})")
 
 
 if __name__ == "__main__":

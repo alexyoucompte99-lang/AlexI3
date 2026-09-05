@@ -5,6 +5,7 @@ Substitue aussi les placeholders privés __NOM__ (codes d'accès, numéros
 WhatsApp, pont de données) depuis private.json (à côté du script) ou, à
 défaut, depuis les variables d'environnement (GitHub Actions).
 """
+import hashlib
 import json
 import os
 import sys
@@ -24,6 +25,10 @@ with open(tpl_path) as f:
 blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
 out = tpl.replace("__DATA_JSON__", blob)
 assert "__DATA_JSON__" not in out
+# identifiant du build (données + template) : la page le compare à v.txt (écrit par
+# encrypt_page.py à côté de index.html) pour détecter une copie servie depuis le cache
+build_id = hashlib.sha256((blob + tpl).encode("utf-8")).hexdigest()[:12]
+out = out.replace("__BUILD_ID__", build_id)
 
 here = os.path.dirname(os.path.abspath(__file__))
 

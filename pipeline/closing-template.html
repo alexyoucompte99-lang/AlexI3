@@ -2146,14 +2146,16 @@ async function bridgePost(payload, opts = {}) {
       body: JSON.stringify(Object.assign({ key: BRIDGE.key }, payload)),
       keepalive: !!opts.keepalive, // EOD/EOW : la requête aboutit même si le closer quitte l'onglet
     });
-    const ok = (await r.text()).indexOf('"ok":true') !== -1;
+    const txt = await r.text();
+    const ok = txt.indexOf('"ok":true') !== -1;
+    bridgePost.lastReason = ok ? "" : ((txt.match(/"raison":"([^"]*)"/) || [])[1] || "");
     if (ok && payload.what === "call_update" && payload.fields && typeof renderHistory === "function") {
       HIST_LOCAL.unshift({ local: true, ts: "", tab: payload.tab, row: payload.row, lead: payload.lead || "",
                            by: payload.by || "", action: payload.action || "", fields: JSON.stringify(payload.fields) });
       renderHistory();
     }
     return ok;
-  } catch (e) { return false; }
+  } catch (e) { bridgePost.lastReason = "pont injoignable"; return false; }
 }
 let toastEl = null;
 function toast(msg) {
@@ -2906,9 +2908,17 @@ const fillKey = (c) => "fill:" + c.st + "|" + c.sr;
 let fillCloser = localStorage.getItem("fill-closer") || "";
 let fillFilter = "todo";
 let fillQ = "";
+/* heure de génération de cette page (updated_at « jj/mm/aaaa HH:MM », heure de Paris) */
+const BUILD_MS = (() => {
+  const m = (DATA.updated_at || "").match(/(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})/);
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime() : 0;
+})();
 (function applyFillOverlays() {
   /* overlay optimiste en attendant que le Sheet redescende (MAJ ~15 min).
-     Purgé dès que le Sheet reflète l'état envoyé (show-up + résultat), ou après 3 jours. */
+     Purgé dès que le Sheet reflète l'état envoyé (show-up + résultat), ou après 3 jours.
+     Jamais purgé si cette page a été générée AVANT la saisie (copie servie depuis le cache
+     navigateur/CDN) : le Sheet ne peut pas encore la refléter, c'est ce qui faisait
+     « revenir vides » les calls remplis la veille. */
   for (const c of DATA.calls) {
     if (!c.st || !c.sr) continue;
     const raw = localStorage.getItem(fillKey(c));
@@ -2918,7 +2928,8 @@ let fillQ = "";
       const f = o.f || o; /* compat ancien format */
       const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v) && (f.q == null || c.q === f.q)
         && (!f.d || c.d === f.d);
-      if (caughtUp || Date.now() - (o.when || 0) > 3 * 86400e3) { localStorage.removeItem(fillKey(c)); continue; }
+      const pageOlder = o.when && BUILD_MS && BUILD_MS < o.when + 2 * 60e3;
+      if (!pageOlder && (caughtUp || Date.now() - (o.when || 0) > 3 * 86400e3)) { localStorage.removeItem(fillKey(c)); continue; }
       if (f.s) c.s = f.s;
       if (f.d) { c.d = f.d; c.hh = f.hh || c.hh; }
       if (f.v) c.v = f.v;
@@ -3210,7 +3221,7 @@ async function fillSend(c, orig, state, btn) {
   delete btn.dataset.busy;
   if (!ok) {
     btn.textContent = "Réessayer";
-    toast("❌ Pas pu écrire dans le Sheet. Réessaie ; si ça persiste, dis-le à Alex.");
+    toast("❌ Pas pu écrire dans le Sheet" + (bridgePost.lastReason ? " : " + bridgePost.lastReason : "") + ". Réessaie ; si ça persiste, dis-le à Alex.");
     return;
   }
   /* MAJ optimiste locale, purgée dès que le Sheet renvoie la vraie valeur */
@@ -3933,27 +3944,38 @@ $("updatedAt").textContent = DATA.updated_at;
 /* bouton Actualiser : sur GitHub Pages il déclenche la vraie MAJ serveur via le
    pont Apps Script ; ailleurs (artifact claude.ai) il garde l'ouverture de Claude */
 const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
+const BUILD_ID = "__BUILD_ID__"; // injecté par build.py, comparé à v.txt (voir setupRefresh)
 function setupRefresh(btn, note) {
   if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
     if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>La page se recharge toute seule dès qu'une version plus récente est en ligne.<br>Le bouton force une MAJ complète immédiate (environ 2 min).";
     btn.textContent = "↻ Mettre à jour maintenant";
     btn.title = "Relance la récupération de toutes les datas (Sheet closing + ads + Meta) puis recharge la page automatiquement.";
-    /* détection de version : ETag de la page en HEAD hors cache ; recharge en ?v= pour sauter le cache CDN (~10 min) */
-    let etag0 = null;
+    /* détection de version : v.txt (BUILD_ID courant, ~12 octets, lu hors cache) comparé au
+       BUILD_ID de cette page ; recharge en ?v= pour sauter le cache navigateur/CDN (~10 min).
+       Vérifié DÈS le chargement : le navigateur pouvait servir une copie plus ancienne que la
+       dernière vue, d'où des saisies récentes « revenues vides » pendant quelques minutes. */
+    const etag0 = BUILD_ID;
     const pageTag = async () => {
       try {
-        const r = await fetch(location.pathname + "?ping=" + Date.now(), { method: "HEAD", cache: "no-store" });
-        return r.headers.get("etag") || r.headers.get("last-modified") || "";
+        const r = await fetch("v.txt?ping=" + Date.now(), { cache: "no-store" });
+        if (!r.ok) return "";
+        const t = (await r.text()).trim();
+        return /^[0-9a-f]{6,40}$/.test(t) ? t : "";
       } catch (err) { return null; }
     };
-    const initTag = async () => { etag0 = await pageTag(); if (!etag0) setTimeout(initTag, 30000); };
-    initTag();
-    const goFresh = () => location.replace(location.pathname + "?v=" + Date.now());
+    const goFresh = () => {
+      /* garde-fou : au plus un rechargement forcé toutes les 2 min (pas de boucle si le CDN traîne) */
+      const last = +(sessionStorage.getItem("fresh-at") || 0);
+      if (Date.now() - last < 120000) return;
+      sessionStorage.setItem("fresh-at", String(Date.now()));
+      location.replace(location.pathname + "?v=" + Date.now());
+    };
     const maybeReload = async () => {
-      if (btn.dataset.busy || document.hidden || !etag0) return;
+      if (btn.dataset.busy || document.hidden) return;
       const t = await pageTag();
       if (t && t !== etag0) goFresh();
     };
+    maybeReload();
     setInterval(maybeReload, 60000);
     document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
     btn.onclick = async (e) => {
