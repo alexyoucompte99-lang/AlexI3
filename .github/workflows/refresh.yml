@@ -120,7 +120,8 @@ jobs:
           git config user.name "console-bot"
           git config user.email "actions@users.noreply.github.com"
           git add index.html closing/index.html .data-hash
-          git add v.txt closing/v.txt 2>/dev/null || true
+          git add closing/v.txt 2>/dev/null || true
+          git add v.txt 2>/dev/null || true
           git add .sales-ledger.json funnel-data.enc 2>/dev/null || true
           git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)
