@@ -288,6 +288,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabEodSetter" aria-selected="false" data-panel="panelEodSetter">EOD Constant 📱</button>
     <button class="tab" role="tab" id="tabClosers" aria-selected="false" data-panel="panelClosers">Closers</button>
     <button class="tab" role="tab" id="tabCsm" aria-selected="false" data-panel="panelCsm">CSM 🤝 <span class="badge" id="csmBadge"></span></button>
+    <button class="tab" role="tab" id="tabValar" aria-selected="false" data-panel="panelValar">Leads Valar 🏦 <span class="badge" id="vlBadge"></span></button>
     <button class="tab" role="tab" id="tabRelances" aria-selected="false" data-panel="panelRelances">À relancer <span class="badge" id="icBadge"></span></button>
     <button class="tab" role="tab" id="tabScan" aria-selected="false" data-panel="panelScan">Scan Patrimoine <span class="badge" id="tyBadge"></span></button>
     <button class="tab" role="tab" id="tabRappels" aria-selected="false" data-panel="panelRappels">Calls à venir <span class="badge" id="rpBadge"></span></button>
@@ -521,6 +522,27 @@ __FUNNEL_CSS__
 
       <div class="card full"><div class="tscroll"><table id="tyTable"></table></div></div>
       <p class="lede" id="tyMore" style="margin-top:8px"></p>
+    </section>
+  </div>
+
+  <!-- ================== LEADS VALAR ================== -->
+  <div id="panelValar" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Suivi chez Valar Gestion Privée</span>
+      <h2>Leads Valar</h2>
+      <p class="lede">Les prospects que vous avez envoyés en appel chez Valar, et où ils en sont dans leur CRM : R1 programmé, R2, client signé, no-show, à relancer ou non abouti.
+        Choisis ton prénom pour ne voir que les tiens. Un lead est rattaché à toi si Valar t'a noté en source, ou si on retrouve son mail, son numéro ou son nom dans tes calls.
+        Les chiffres viennent du CRM Valar, mis à jour avec la console.</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="vlCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Étape</span><span id="vlStagePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+      </div>
+      <div class="kpis" id="vlKpis" style="margin-bottom:14px"></div>
+      <div class="card" id="vlByCloserCard" style="margin-bottom:14px"><h3 style="margin-top:0">Closer par closer</h3>
+        <p class="lede" style="margin-bottom:8px">Ce que chacun a envoyé chez Valar et ce que c'est devenu.</p>
+        <div class="tscroll"><table id="vlByCloser"></table></div></div>
+      <div class="card full"><div class="tscroll"><table id="vlTable"></table></div></div>
+      <p class="lede" id="vlMore" style="margin-top:8px"></p>
     </section>
   </div>
 
@@ -3126,6 +3148,138 @@ async function fillSend(c, orig, state, btn) {
   renderFill();
 }
 
+/* ================= LEADS VALAR ================= */
+const VL = DATA.valar || {};
+const VL_STAGE = {
+  r1: { label: "R1", chip: "m", ord: 0 },
+  r2: { label: "R2", chip: "o", ord: 1 },
+  asuivre: { label: "À relancer", chip: "o", ord: 2 },
+  noshow: { label: "No show", chip: "r", ord: 3 },
+  client: { label: "Signé ✓", chip: "g", ord: 4 },
+  nonabouti: { label: "Non abouti", chip: "r", ord: 5 },
+};
+const VL_EN_COURS = ["r1", "r2", "asuivre"];
+let vlCloser = localStorage.getItem("vl-closer") || "", vlStage = "encours";
+const vlIsTop3 = (l) => TOP3.includes(l.cl);
+const vlLeads = () => (VL.leads || []).filter(l => l.i3);
+const vlOfCloser = (list, k) => k === "" ? list
+  : k === "autres" ? list.filter(l => l.cl && !vlIsTop3(l))
+  : k === "sans" ? list.filter(l => !l.cl)
+  : list.filter(l => l.cl === k || l.cl2 === k);
+const vlNext = (l) => {
+  /* prochain rendez-vous Valar à venir (R1, R2 ou R3), sinon null */
+  const cands = [["R1", l.r1, l.r1h], ["R2", l.r2, l.r2h], ["R3", l.r3, l.r3h]].filter(x => x[1] && x[1] >= TODAY_ISO);
+  cands.sort((a, b) => a[1].localeCompare(b[1]));
+  return cands[0] || null;
+};
+const vlLast = (l) => [l.r1, l.r2, l.r3, l.sign, l.perte, l.cd].filter(Boolean).sort().pop() || "";
+function vlDates(l) {
+  const parts = [];
+  for (const [lbl, d, h] of [["R1", l.r1, l.r1h], ["R2", l.r2, l.r2h], ["R3", l.r3, l.r3h]]) {
+    if (!d) continue;
+    const fut = d >= TODAY_ISO;
+    parts.push(`<span style="white-space:nowrap${fut ? ";font-weight:700;color:var(--accent)" : ""}">${lbl} ${frDate(d)}${h ? " " + esc(h) : ""}${fut ? " ⏳" : ""}</span>`);
+  }
+  if (l.r2txt) parts.push(`<span class="miss">${esc(l.r2txt)}</span>`);
+  if (l.sign) parts.push(`<span style="white-space:nowrap;color:var(--good-text)">Signé le ${frDateFull(l.sign)}</span>`);
+  if (l.perte) parts.push(`<span style="white-space:nowrap;color:var(--critical)">Perdu le ${frDateFull(l.perte)}</span>`);
+  return parts.join("<br>") || "·";
+}
+function vlStats(list) {
+  const enCours = list.filter(l => VL_EN_COURS.includes(l.stage));
+  const signes = list.filter(l => l.stage === "client");
+  return {
+    n: list.length, enCours: enCours.length, signes: signes.length,
+    r1: list.filter(l => l.stage === "r1").length, r2: list.filter(l => l.stage === "r2").length,
+    rel: list.filter(l => l.stage === "asuivre").length,
+    noshow: list.filter(l => l.stage === "noshow").length,
+    perdus: list.filter(l => l.stage === "nonabouti").length,
+    enc: signes.reduce((a, l) => a + (l.enc || 0), 0),
+    enca: signes.reduce((a, l) => a + (l.enca || 0), 0),
+    hon: list.reduce((a, l) => a + (l.hon || 0), 0),
+    rdv7: list.filter(l => { const nx = vlNext(l); return nx && nx[1] <= iso(new Date(NOW.getTime() + 7 * 864e5)); }).length,
+  };
+}
+function renderValar() {
+  const all = vlLeads();
+  const horsI3 = (VL.leads || []).filter(l => !l.i3);
+  $("vlBadge").textContent = all.filter(l => VL_EN_COURS.includes(l.stage)).length || "";
+  if (!VL.fetched_at) {
+    $("vlKpis").innerHTML = ""; $("vlByCloser").innerHTML = ""; $("vlTable").innerHTML = "";
+    $("vlByCloserCard").style.display = "none";
+    $("vlMore").textContent = "Pas encore de données Valar : elles arrivent à la prochaine mise à jour de la console.";
+    return;
+  }
+  const autres = all.filter(l => l.cl && !vlIsTop3(l)).length, sans = all.filter(l => !l.cl).length;
+  pillRow("vlCloserPills", [
+    { k: "", label: `Tous I3 (${all.length})` },
+    { k: "Louis Granier", label: `Louis (${vlOfCloser(all, "Louis Granier").length})` },
+    { k: "Romain Gourand", label: `Romain (${vlOfCloser(all, "Romain Gourand").length})` },
+    { k: "Adrien Soret", label: `Adrien (${vlOfCloser(all, "Adrien Soret").length})` },
+    ...(autres ? [{ k: "autres", label: `Autres closers (${autres})` }] : []),
+    ...(sans ? [{ k: "sans", label: `Closer inconnu (${sans})` }] : []),
+    ...(horsI3.length ? [{ k: "hors", label: `Hors I3 (${horsI3.length})` }] : []),
+  ], vlCloser, k => { vlCloser = k; localStorage.setItem("vl-closer", k); }, renderValar);
+  const mine = vlCloser === "hors" ? horsI3 : vlOfCloser(all, vlCloser);
+  const st = vlStats(mine);
+  pillRow("vlStagePills", [
+    { k: "encours", label: `En cours (${st.enCours})` },
+    { k: "client", label: `Signés (${st.signes})` },
+    { k: "noshow", label: `No show (${st.noshow})` },
+    { k: "asuivre", label: `À relancer (${st.rel})` },
+    { k: "nonabouti", label: `Non aboutis (${st.perdus})` },
+    { k: "all", label: `Tous (${st.n})` },
+  ], vlStage, k => vlStage = k, renderValar);
+
+  $("vlKpis").innerHTML = [
+    kpiTile("Envoyés chez Valar", fmtN(st.n), vlCloser === "hors" ? "leads Valar sans lien I3" : "leads rattachés" + (vlCloser && vlCloser !== "hors" ? " à ce closer" : " à I3")),
+    kpiTile("En cours", fmtN(st.enCours), `${fmtN(st.r1)} en R1 · ${fmtN(st.r2)} en R2 · ${fmtN(st.rel)} à relancer`),
+    kpiTile("RDV Valar sous 7 j", fmtN(st.rdv7), "R1, R2 ou R3 programmé"),
+    kpiTile("Signés", fmtN(st.signes), st.n ? Math.round(100 * st.signes / st.n) + " % des envoyés" : ""),
+    kpiTile("Encours signé", fmtE(st.enc), st.enca ? `+ ${fmtE(st.enca)} en attente` : "sous gestion validé"),
+    kpiTile("Honoraires", fmtE(st.hon), "notés dans le CRM Valar"),
+    kpiTile("No show", fmtN(st.noshow), st.n ? Math.round(100 * st.noshow / st.n) + " % des envoyés" : ""),
+    kpiTile("Non aboutis", fmtN(st.perdus), st.n ? Math.round(100 * st.perdus / st.n) + " % des envoyés" : ""),
+  ].join("");
+
+  /* closer par closer : seulement en vue globale */
+  const showBy = vlCloser === "";
+  $("vlByCloserCard").style.display = showBy ? "" : "none";
+  if (showBy) {
+    const rows = [...TOP3.map(k => [k.split(" ")[0], vlOfCloser(all, k)]),
+      ...(autres ? [["Autres closers", vlOfCloser(all, "autres")]] : []),
+      ...(sans ? [["Closer inconnu", vlOfCloser(all, "sans")]] : [])];
+    $("vlByCloser").innerHTML = "<thead><tr><th>Closer</th><th class='num'>Envoyés</th><th class='num'>En cours</th><th class='num'>Signés</th><th class='num'>Taux</th><th class='num'>Encours signé</th><th class='num'>No show</th><th class='num'>Non abouti</th></tr></thead><tbody>" +
+      rows.map(([lbl, list]) => { const x = vlStats(list); return `<tr><td><b>${esc(lbl)}</b></td><td class="num">${fmtN(x.n)}</td><td class="num">${fmtN(x.enCours)}</td><td class="num">${fmtN(x.signes)}</td><td class="num">${x.n ? Math.round(100 * x.signes / x.n) + " %" : "·"}</td><td class="num">${fmtE(x.enc)}</td><td class="num">${fmtN(x.noshow)}</td><td class="num">${fmtN(x.perdus)}</td></tr>`; }).join("") + "</tbody>";
+  }
+
+  let list = mine.filter(l => vlStage === "all" ? true : vlStage === "encours" ? VL_EN_COURS.includes(l.stage) : l.stage === vlStage);
+  list.sort((a, b) => {
+    const na = vlNext(a), nb = vlNext(b);
+    if (na && nb) return na[1].localeCompare(nb[1]);
+    if (na || nb) return na ? -1 : 1;
+    return vlLast(b).localeCompare(vlLast(a)) || VL_STAGE[a.stage].ord - VL_STAGE[b.stage].ord;
+  });
+  $("vlTable").innerHTML = "<thead><tr><th>Prospect</th><th>Closer I3</th><th>Étape</th><th>Statut Valar</th><th>Rendez-vous Valar</th><th>Conseiller Valar</th><th>Montants</th><th>Commentaire Valar</th></tr></thead><tbody>" +
+    list.map(l => {
+      const stg = VL_STAGE[l.stage] || { label: l.stage, chip: "m" };
+      const closer = l.cl ? `<b>${esc(l.cl.split(" ")[0])}</b>${l.cl2 ? " + " + esc(l.cl2.split(" ")[0]) : ""}` : `<span class="miss">inconnu</span>`;
+      const how = l.cd ? `<br><span class="miss">call I3 le ${frDateFull(l.cd)}${l.cv === "OUI" ? " · vendu" : l.cv === "FOLLOW_UP" ? " · follow-up" : ""}</span>`
+        : l.how === "src" ? `<br><span class="miss">noté par Valar</span>` : "";
+      const montants = [l.enc ? `Encours ${fmtE(l.enc)}` : "", l.enca ? `Attente ${fmtE(l.enca)}` : "", l.hon ? `Honoraires ${fmtE(l.hon)}` : ""].filter(Boolean).join("<br>") || "·";
+      const src = l.src ? `<br><span class="miss">Source Valar : ${esc(l.src)}</span>` : "";
+      return `<tr><td><b>${esc(l.n)}</b>${l.mail ? `<br><span class="miss">${esc(l.mail)}</span>` : ""}${src}</td>
+        <td>${closer}${how}</td>
+        <td><span class="chip ${stg.chip}">${stg.label}</span></td>
+        <td>${esc(l.statut) || "·"}${l.raison ? `<br><span class="miss">${esc(l.raison)}</span>` : ""}${l.rel ? `<br><span class="miss">Relance Valar le ${frDateFull(l.rel)}</span>` : ""}</td>
+        <td>${vlDates(l)}</td>
+        <td>${esc(l.gf) || "·"}${l.preq ? `<br><span class="miss">Pré-qualif : ${esc(l.preq)}</span>` : ""}</td>
+        <td>${montants}</td>
+        <td style="max-width:320px;white-space:normal">${esc(l.com) || "·"}</td></tr>`;
+    }).join("") + "</tbody>";
+  $("vlMore").textContent = list.length ? `${list.length} lead(s) · CRM Valar lu le ${frDateFull((VL.fetched_at || "").slice(0, 10))} à ${(VL.fetched_at || "").slice(11, 16)}` : "Rien dans cette vue.";
+}
+
 /* ================= onglets ================= */
 document.querySelectorAll(".tab").forEach(t => {
   t.addEventListener("click", () => {
@@ -3652,8 +3806,10 @@ $("tabPilotage").addEventListener("click", () => {
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
 $("tabScan").addEventListener("click", renderScan);
+$("tabValar").addEventListener("click", renderValar);
 tyInit();
 renderScan();
+renderValar();
 rpSettingsInit();
 renderRappels();
 $("tabFill").addEventListener("click", renderFill);

@@ -55,6 +55,8 @@ jobs:
           PAGE_CODE: ${{ secrets.PAGE_CODE }}
           FUNNEL_CODE: ${{ secrets.FUNNEL_CODE }}
           TALLY_API_KEY: ${{ secrets.TALLY_API_KEY }}
+          VALAR_URL: ${{ secrets.VALAR_URL }}
+          VALAR_TOKEN: ${{ secrets.VALAR_TOKEN }}
           DATA_KEY: ${{ secrets.DATA_KEY }}
           PARSE_XLSX: ${{ github.workspace }}/pipeline/parse_xlsx.py
         working-directory: pipeline
@@ -64,6 +66,8 @@ jobs:
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           python tally_fetch.py || true
+          # Leads Valar (CRM business Valar, onglet Leads Valar de la console closing)
+          python valar_fetch.py || true
           python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count ../.idea-count ../.eodsetter-count || true
           # Onglet Funnel : on repart du bloc chiffre de console-suivi-i3 (c'est la
           # que se fait le releve pixel manuel), a defaut de notre propre copie, puis
@@ -91,7 +95,7 @@ jobs:
           ) || echo "PIPELINE FUNNEL KO : onglet Funnel indisponible sur cette MAJ"
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
           # SOURCES_AT change a chaque run : exclu du hash, sinon plus aucun court-circuit
-          HASH=$( { cat data.json ads.json tally.json 2>/dev/null; \
+          HASH=$( { cat data.json ads.json tally.json valar.json 2>/dev/null; \
                     grep -v "^var SOURCES_AT" funnel/data-block.js 2>/dev/null; } | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
           if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then

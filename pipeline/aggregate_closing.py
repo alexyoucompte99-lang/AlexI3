@@ -216,6 +216,94 @@ def funnel_of(c):
     return "org"
 
 
+# ── Leads Valar : rattachement aux calls I3 ──────────────────────────────────
+VALAR_CLOSERS = [("louis", "Louis Granier"), ("romain", "Romain Gourand"), ("adrien", "Adrien Soret")]
+VALAR_I3_RE = re.compile(r"i3|i\s*3\.0|club|closer|closing", re.I)
+VALAR_NON_I3_RE = re.compile(r"non\s*i3|pas\s*i3|hors\s*i3", re.I)
+
+
+def _valar_name_key(n):
+    import unicodedata
+    n = unicodedata.normalize("NFD", n or "")
+    n = "".join(ch for ch in n if unicodedata.category(ch) != "Mn").lower()
+    toks = [t for t in re.split(r"[^a-z]+", n) if len(t) > 1]
+    return " ".join(sorted(toks))
+
+
+def _valar_by_surname(nom, calls):
+    """Secours : « Denis Cordier » chez Valar, « D Cordier » dans le Sheet closing.
+    Le nom de famille (token le plus long, 5 lettres et plus) doit désigner un
+    seul prospect, dont les autres tokens commencent par les mêmes lettres."""
+    toks = _valar_name_key(nom).split()
+    longs = sorted((t for t in toks if len(t) >= 5), key=len, reverse=True)
+    if not longs:
+        return None
+    sur = longs[0]
+    others = [t[0] for t in toks if t != sur]
+    found = {}
+    for c in calls:
+        ct = _valar_name_key(c.get("n")).split()
+        if sur not in ct:
+            continue
+        rest = [t for t in ct if t != sur]
+        raw_first = [w[0].lower() for w in re.split(r"\s+", (c.get("n") or "").strip()) if w and w.lower() != sur]
+        initials = set(t[0] for t in rest) | set(raw_first)
+        if others and not all(o in initials for o in others):
+            continue
+        found[_valar_name_key(c.get("n")) or c.get("n")] = c
+    return list(found.values())[0] if len(found) == 1 else None
+
+
+def attach_valar(calls, valar):
+    """Chaque lead Valar est rattaché au call I3 correspondant (e-mail, sinon
+    téléphone, sinon nom) : on en tire le closer, la date et l'issue du call.
+    Le closer nommé dans la colonne Source de Valar prime quand il y est.
+    « i3 » = lead envoyé par un closer I3 (source ou call retrouvé)."""
+    by_mail, by_tel, by_name = {}, {}, {}
+    for c in sorted(calls, key=lambda c: c.get("d") or ""):
+        m = (c.get("mail") or "").strip().lower()
+        t = re.sub(r"\D", "", c.get("tel") or "")
+        k = _valar_name_key(c.get("n"))
+        if m:
+            by_mail[m] = c
+        if len(t) >= 9:
+            by_tel[t[-9:]] = c
+        if k:
+            by_name[k] = c
+    for l in valar.get("leads", []):
+        c = None
+        if l.get("mail"):
+            c = by_mail.get(l["mail"])
+        if c is None and len(l.get("tel") or "") >= 9:
+            c = by_tel.get(l["tel"][-9:])
+        if c is None:
+            c = by_name.get(_valar_name_key(l.get("n")))
+        if c is None:
+            c = _valar_by_surname(l.get("n"), calls)
+        src = l.get("src") or ""
+        from_src = [full for key, full in VALAR_CLOSERS if re.search(key, src, re.I)]
+        l["cl"] = from_src[0] if from_src else (c["c"] if c else "")
+        l["cl2"] = from_src[1] if len(from_src) > 1 else ""
+        l["how"] = "src" if from_src else ("call" if c else "")
+        if c:
+            l["cd"] = c.get("d")        # date du call I3
+            l["cv"] = c.get("v")        # issue du call I3 (OUI / FOLLOW_UP / NON…)
+            l["cs"] = c.get("s")        # show-up du call I3
+            l["cn"] = c.get("n")        # nom tel qu'écrit dans le Sheet closing
+        i3_src = bool(VALAR_I3_RE.search(src)) and not VALAR_NON_I3_RE.search(src)
+        l["i3"] = bool(from_src or i3_src or c)
+    # doublons du Sheet (même nom dans le même onglet) : on garde la ligne la
+    # plus renseignée (source, mail, commentaire), la seconde disparaît
+    seen = {}
+    for l in valar.get("leads", []):
+        k = (l["stage"], _valar_name_key(l["n"]))
+        score = sum(1 for f in ("src", "mail", "tel", "com", "r1", "r2") if l.get(f))
+        if k not in seen or score > seen[k][0]:
+            seen[k] = (score, l)
+    valar["leads"] = [x[1] for x in seen.values()]
+    return valar
+
+
 def main(data_path, out_path, updated_at):
     d = json.load(open(data_path))
     calls = []
@@ -331,8 +419,18 @@ def main(data_path, out_path, updated_at):
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
+    # Leads Valar : valar.json écrit par valar_fetch.py (CRM business Valar).
+    # Les closers I3 y suivent l'avancée des prospects envoyés en appel.
+    valar = {}
+    try:
+        import os
+        valar_path = os.path.join(os.path.dirname(os.path.abspath(out_path)) or ".", "valar.json")
+        valar = attach_valar(calls, json.load(open(valar_path)))
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
     out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
-           "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally,
+           "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally, "valar": valar,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "eod_setter": eod_setter, "history": history, "csm": csm, "weeks": weeks}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
