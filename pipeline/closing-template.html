@@ -3947,7 +3947,7 @@ const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
 const BUILD_ID = "__BUILD_ID__"; // injecté par build.py, comparé à v.txt (voir setupRefresh)
 function setupRefresh(btn, note) {
   if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
-    if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>La page se recharge toute seule dès qu'une version plus récente est en ligne.<br>Le bouton force une MAJ complète immédiate (environ 2 min).";
+    if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>À l'ouverture, si la page date de plus de 10 min, la MAJ se lance toute seule (environ 2 min).<br>Le bouton force une MAJ complète immédiate.";
     btn.textContent = "↻ Mettre à jour maintenant";
     btn.title = "Relance la récupération de toutes les datas (Sheet closing + ads + Meta) puis recharge la page automatiquement.";
     /* détection de version : v.txt (BUILD_ID courant, ~12 octets, lu hors cache) comparé au
@@ -3975,16 +3975,13 @@ function setupRefresh(btn, note) {
       const t = await pageTag();
       if (t && t !== etag0) goFresh();
     };
-    maybeReload();
-    setInterval(maybeReload, 60000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
-    btn.onclick = async (e) => {
-      e.preventDefault();
+    /* MAJ complète : dispatch GitHub via le pont, puis attente de la nouvelle version (v.txt) */
+    const runRefresh = async (auto) => {
       if (btn.dataset.busy) return;
       btn.dataset.busy = "1";
       let ok = false;
       for (let i = 0; i < 3 && !ok; i++) {
-        btn.textContent = i ? "Pont occupé · nouvel essai..." : "Demande envoyée...";
+        btn.textContent = i ? "Pont occupé · nouvel essai..." : (auto ? "MAJ auto lancée..." : "Demande envoyée...");
         try {
           const r = await fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh", { cache: "no-store" });
           ok = (await r.text()).indexOf('"ok":true') !== -1;
@@ -3992,14 +3989,14 @@ function setupRefresh(btn, note) {
         if (!ok) await new Promise(res => setTimeout(res, 2500));
       }
       if (!ok) {
-        btn.textContent = "Pont indisponible · reclique dans 1 min";
+        btn.textContent = auto ? "↻ Mettre à jour maintenant" : "Pont indisponible · reclique dans 1 min";
         delete btn.dataset.busy;
         return;
       }
       const started = Date.now();
       const t = setInterval(async () => {
         const sec = Math.round((Date.now() - started) / 1000);
-        btn.textContent = "MAJ en cours · " + sec + " s";
+        btn.textContent = (auto ? "MAJ auto en cours · " : "MAJ en cours · ") + sec + " s";
         const tag = await pageTag();
         if (tag && etag0 && tag !== etag0) {
           clearInterval(t);
@@ -4009,11 +4006,28 @@ function setupRefresh(btn, note) {
           clearInterval(t); goFresh();
         } else if (sec >= 300) {
           clearInterval(t);
-          btn.textContent = "Toujours rien après 5 min · reclique";
+          btn.textContent = auto ? "↻ Mettre à jour maintenant" : "Toujours rien après 5 min · reclique";
           delete btn.dataset.busy;
         }
       }, 5000);
     };
+    btn.onclick = (e) => { e.preventDefault(); runRefresh(false); };
+    /* MAJ automatique à l'ouverture : si la page date de plus de 10 min et qu'aucune MAJ auto
+       n'a été lancée depuis ce navigateur dans les 10 dernières min (plusieurs onglets/closers
+       en même temps → le workflow GitHub met de toute façon les demandes en file). */
+    const autoRefresh = async () => {
+      if (!BUILD_MS || Date.now() - BUILD_MS < 10 * 60e3) return;
+      const last = +(localStorage.getItem("auto-refresh-at") || 0);
+      if (Date.now() - last < 10 * 60e3) return;
+      const t = await pageTag();
+      if (t === null) return;           // hors ligne / pas de v.txt
+      if (t && t !== etag0) { goFresh(); return; } // une version plus récente existe déjà
+      localStorage.setItem("auto-refresh-at", String(Date.now()));
+      runRefresh(true);
+    };
+    maybeReload().then(autoRefresh);
+    setInterval(maybeReload, 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
   } else {
     btn.href = "https://claude.ai/new?q=" + encodeURIComponent(
       "Mets à jour les consoles Thomas (business + closing) : suis le runbook /Users/alex/Alex/thomas-dashboard/README.md (re-télécharge les Google Sheets, relance le pipeline complet, republie les deux artifacts aux mêmes URLs).");
