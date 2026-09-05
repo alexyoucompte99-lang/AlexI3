@@ -254,7 +254,7 @@ def _valar_by_surname(nom, calls):
     return list(found.values())[0] if len(found) == 1 else None
 
 
-def attach_valar(calls, valar):
+def attach_valar(calls, valar, claims=()):
     """Chaque lead Valar est rattaché au call I3 correspondant (e-mail, sinon
     téléphone, sinon nom) : on en tire le closer, la date et l'issue du call.
     Le closer nommé dans la colonne Source de Valar prime quand il y est.
@@ -301,6 +301,26 @@ def attach_valar(calls, valar):
         if k not in seen or score > seen[k][0]:
             seen[k] = (score, l)
     valar["leads"] = [x[1] for x in seen.values()]
+    # Réclamations (onglet Sheet « Reclamations Valar ») : la dernière décision par lead
+    # Valar fait foi. VALIDE = le lead passe sous le closer réclamant ; EN_ATTENTE = signalé
+    # sur le lead en attendant Alex ; REFUSE = rien ne change. Toutes remontent à la console
+    # (bloc « Réclamations » en haut de l'onglet + validation dans l'onglet Alex).
+    claims = list(claims)
+    last = {}
+    for cl in claims:
+        key = cl.get("lead_id") or _valar_name_key(cl.get("lead"))
+        last[key] = cl
+    for l in valar["leads"]:
+        cl = last.get(l["id"]) or last.get(_valar_name_key(l["n"]))
+        if not cl:
+            continue
+        if cl["statut"] == "VALIDE" and cl.get("closer"):
+            l["cl"], l["cl2"], l["how"], l["i3"] = cl["closer"], "", "claim", True
+        elif cl["statut"] == "EN_ATTENTE":
+            l["pend"] = cl.get("closer") or ""
+    valar["claims"] = [{"d": c["d"], "id": c["id"], "lid": c.get("lead_id") or "", "n": c["lead"],
+                        "c": c["closer"], "stage": c.get("stage") or "", "st": c["statut"],
+                        "dd": c.get("dd") or "", "com": c.get("com") or ""} for c in claims]
     return valar
 
 
@@ -425,7 +445,7 @@ def main(data_path, out_path, updated_at):
     try:
         import os
         valar_path = os.path.join(os.path.dirname(os.path.abspath(out_path)) or ".", "valar.json")
-        valar = attach_valar(calls, json.load(open(valar_path)))
+        valar = attach_valar(calls, json.load(open(valar_path)), d.get("valar_claims", []))
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 

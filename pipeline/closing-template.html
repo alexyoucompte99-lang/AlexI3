@@ -533,6 +533,27 @@ __FUNNEL_CSS__
       <p class="lede">Les prospects que vous avez envoyés en appel chez Valar, et où ils en sont dans leur CRM : R1 programmé, R2, client signé, no-show, à relancer ou non abouti.
         Choisis ton prénom pour ne voir que les tiens. Un lead est rattaché à toi si Valar t'a noté en source, ou si on retrouve son mail, son numéro ou son nom dans tes calls.
         Les chiffres viennent du CRM Valar, mis à jour avec la console.</p>
+
+      <div class="card" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;border-color:var(--accent)">
+        <div style="flex:1;min-width:240px"><b style="font-size:15px">Un lead à toi qui n'est pas à ton nom ?</b>
+          <div class="sub">Réclame-le : Alex reçoit une notif Telegram, valide, et le lead passe sous ton prénom.</div></div>
+        <button class="btn" id="vlClaimBtn" style="font-size:16px;padding:13px 24px">🙋 Réclamer un lead</button>
+      </div>
+      <div class="card" id="vlClaimForm" style="display:none;margin-bottom:14px;max-width:720px">
+        <h3 style="margin-top:0">Réclamer un lead Valar</h3>
+        <div class="field"><label for="vlClaimCloser">Ton prénom</label><div class="seg" id="vlClaimCloserSeg"></div><input type="hidden" id="vlClaimCloser"></div>
+        <div class="field"><label for="vlClaimSearch">Le lead</label>
+          <input type="text" id="vlClaimSearch" placeholder="Tape un nom pour filtrer la liste…" autocomplete="off" style="margin-bottom:6px">
+          <select id="vlClaimLead" size="7" style="width:100%"></select></div>
+        <div class="field"><label for="vlClaimCom">Un mot pour Alex (optionnel)</label><textarea id="vlClaimCom" style="min-height:64px" placeholder="Ex. : je l'ai eu en call le 2 septembre, il a booké Valar juste après."></textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px">
+          <button class="btn" id="vlClaimSend">🙋 Envoyer ma réclamation</button>
+          <button class="btn ghost" id="vlClaimCancel">Annuler</button>
+          <span id="vlClaimMsg" style="font-size:12.5px;display:none"></span>
+        </div>
+      </div>
+      <div id="vlClaims" style="margin-bottom:14px"></div>
+
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="vlCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Étape</span><span id="vlStagePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -894,6 +915,11 @@ __FUNNEL_CSS__
           <button class="btn ghost" id="briefCopy">📋 Copier</button>
           <span id="briefOk" style="font-size:12.5px;color:var(--good-text);display:none"></span>
         </div>
+      </div>
+      <div class="card full" style="margin-top:14px" id="vlAlexCard">
+        <h3>Réclamations de leads Valar <span class="badge" id="vlAlexBadge"></span></h3>
+        <div class="sub">Un closer dit qu'un lead Valar est à lui. Valide pour l'attribuer (il passe sous son prénom dans l'onglet Leads Valar), ou refuse. Écrit dans le Sheet, visible de tous à la prochaine MAJ.</div>
+        <div id="vlAlexClaims" style="margin-top:10px"></div>
       </div>
       <div class="card full" style="margin-top:14px">
         <h3>EOD setting : rapports de fin de journée des setters</h3>
@@ -3261,7 +3287,118 @@ function vlStats(list) {
     rdv7: list.filter(l => { const nx = vlNext(l); return nx && nx[1] <= iso(new Date(NOW.getTime() + 7 * 864e5)); }).length,
   };
 }
+/* --- réclamations : Sheet « Reclamations Valar » via le pont (v16), en attendant la MAJ
+   les envois et décisions de ce navigateur vivent en localStorage --- */
+const vlLocalClaims = () => { try { return JSON.parse(localStorage.getItem("vl-claims-local") || "[]"); } catch (e) { return []; } };
+const vlLocalDecisions = () => { try { return JSON.parse(localStorage.getItem("vl-decisions") || "{}"); } catch (e) { return {}; } };
+function vlAllClaims() {
+  /* Sheet + envois locaux pas encore remontés, décisions locales par-dessus ; purge de ce que le Sheet connaît */
+  const sheet = VL.claims || [];
+  const ids = new Set(sheet.map(c => c.id));
+  const locals = vlLocalClaims().filter(c => !ids.has(c.id));
+  if (locals.length !== vlLocalClaims().length) localStorage.setItem("vl-claims-local", JSON.stringify(locals));
+  const dec = vlLocalDecisions();
+  let changed = false;
+  for (const c of sheet) if (dec[c.id] && c.st !== "EN_ATTENTE") { delete dec[c.id]; changed = true; }
+  if (changed) localStorage.setItem("vl-decisions", JSON.stringify(dec));
+  return [...sheet, ...locals].map(c => dec[c.id] ? Object.assign({}, c, { st: dec[c.id], local: true }) : c)
+    .sort((a, b) => (b.d || "").localeCompare(a.d || ""));
+}
+const vlStageLabel = (k) => (VL_STAGE[k] || {}).label || k || "?";
+const vlClaimChip = (c) => c.st === "VALIDE" ? `<span class="chip g">✅ Validée par Alex</span>`
+  : c.st === "REFUSE" ? `<span class="chip r">❌ Refusée</span>` : `<span class="chip o">⏳ En attente d'Alex</span>`;
+function renderValarClaims() {
+  const claims = vlAllClaims();
+  const pend = claims.filter(c => c.st === "EN_ATTENTE");
+  const recent = claims.filter(c => c.st !== "EN_ATTENTE").filter(c => !c.dd || daysAgo(c.dd.slice(0, 10)) <= 10).slice(0, 8);
+  if (!pend.length && !recent.length) { $("vlClaims").innerHTML = ""; return; }
+  const row = (c) => `<tr><td>${c.d ? frDateFull(c.d.slice(0, 10)) : "·"}</td><td><b>${esc((c.c || "").split(" ")[0])}</b></td>
+    <td><b>${esc(c.n)}</b>${c.stage ? ` <span class="chip m">${esc(vlStageLabel(c.stage))}</span>` : ""}${c.com ? `<br><span class="miss">${esc(c.com)}</span>` : ""}</td>
+    <td>${vlClaimChip(c)}</td></tr>`;
+  $("vlClaims").innerHTML = `<div class="card"><h3 style="margin-top:0">Réclamations ${pend.length ? `<span class="chip o">${pend.length} en attente</span>` : ""}</h3>
+    <p class="lede" style="margin-bottom:8px">${pend.length ? "Alex a été prévenu sur Telegram : dès qu'il valide, le lead passe sous le prénom du closer." : "Rien en attente."}</p>
+    <div class="tscroll"><table><thead><tr><th>Date</th><th>Closer</th><th>Lead</th><th>Statut</th></tr></thead><tbody>${[...pend, ...recent].map(row).join("")}</tbody></table></div></div>`;
+}
+let vlClaimPick = "";
+function vlClaimOptions() {
+  const q = ($("vlClaimSearch").value || "").trim().toLowerCase();
+  const norm = (x) => (x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const leads = (VL.leads || []).filter(l => !q || norm(l.n).includes(norm(q)) || norm(l.mail).includes(norm(q)));
+  const groups = [["Closer inconnu", l => l.i3 && !l.cl], ["Hors I3 (pas encore rattaché)", l => !l.i3], ["Déjà attribués à un closer", l => l.cl]];
+  const sel = $("vlClaimLead");
+  sel.innerHTML = groups.map(([lbl, f]) => {
+    const rows = leads.filter(f).sort((a, b) => a.n.localeCompare(b.n));
+    return rows.length ? `<optgroup label="${lbl}">` + rows.map(l => `<option value="${esc(l.id)}" ${l.id === vlClaimPick ? "selected" : ""}>${esc(l.n)} · ${esc(vlStageLabel(l.stage))}${l.cl ? " · " + esc(l.cl.split(" ")[0]) : ""}${l.pend ? " · réclamé par " + esc(l.pend.split(" ")[0]) : ""}</option>`).join("") + "</optgroup>" : "";
+  }).join("");
+}
+function vlOpenClaim(leadId) {
+  vlClaimPick = leadId || vlClaimPick;
+  $("vlClaimForm").style.display = "";
+  closerSeg("vlClaimCloserSeg", "vlClaimCloser", () => {}, [], [localStorage.getItem("vl-claim-closer") || "", vlCloser && TOP3.includes(vlCloser) ? vlCloser : ""]);
+  vlClaimOptions();
+  $("vlClaimForm").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function initValarClaims() {
+  $("vlClaimBtn").addEventListener("click", () => vlOpenClaim(""));
+  $("vlClaimCancel").addEventListener("click", () => { $("vlClaimForm").style.display = "none"; });
+  $("vlClaimSearch").addEventListener("input", vlClaimOptions);
+  $("vlClaimLead").addEventListener("change", () => { vlClaimPick = $("vlClaimLead").value; });
+  const msg = (m, bad) => { const el = $("vlClaimMsg"); el.textContent = m; el.style.color = bad ? "var(--critical)" : "var(--good-text)"; el.style.display = "inline"; setTimeout(() => el.style.display = "none", 6000); };
+  $("vlClaimSend").addEventListener("click", async () => {
+    const btn = $("vlClaimSend");
+    if (btn.disabled) return;
+    const leadId = $("vlClaimLead").value, closer = $("vlClaimCloser").value;
+    const l = (VL.leads || []).find(x => x.id === leadId);
+    if (!l) { msg("Choisis le lead dans la liste.", true); return; }
+    if (!closer || closer === "Autre") { msg("Choisis ton prénom.", true); return; }
+    if (l.cl === closer) { msg("Ce lead est déjà à ton nom.", true); return; }
+    btn.disabled = true;
+    const claim = { id: newSendId(), lid: l.id, n: l.n, c: closer, stage: l.stage, st: "EN_ATTENTE",
+                    d: new Date().toISOString().slice(0, 16).replace("T", " "), com: $("vlClaimCom").value.trim().slice(0, 300) };
+    const ok = await reliablePost({ what: "valar_claim", id: claim.id, leadId: l.id, lead: l.n, closer, stage: l.stage, comment: claim.com }, btn, "🙋 Envoyer ma réclamation");
+    btn.disabled = false;
+    if (!ok) { msg("Envoi impossible pour l'instant : vérifie ta connexion et réessaie dans une minute.", true); return; }
+    localStorage.setItem("vl-claim-closer", closer);
+    localStorage.setItem("vl-claims-local", JSON.stringify([...vlLocalClaims(), claim]));
+    l.pend = closer;
+    $("vlClaimForm").style.display = "none"; $("vlClaimCom").value = ""; $("vlClaimSearch").value = ""; vlClaimPick = "";
+    toast("🙋 Réclamation envoyée, Alex est prévenu 🐯");
+    renderValar();
+  });
+}
+/* onglet Alex : valider / refuser */
+function renderValarClaimsAlex() {
+  if (!$("vlAlexClaims")) return;
+  const claims = vlAllClaims();
+  const pend = claims.filter(c => c.st === "EN_ATTENTE");
+  $("vlAlexBadge").textContent = pend.length || "";
+  const leadOf = (c) => (VL.leads || []).find(l => l.id === c.lid) || null;
+  const row = (c) => {
+    const l = leadOf(c);
+    return `<tr><td>${c.d ? frDateFull(c.d.slice(0, 10)) + " " + c.d.slice(11, 16) : "·"}</td><td><b>${esc(c.c)}</b></td>
+      <td><b>${esc(c.n)}</b> <span class="chip m">${esc(vlStageLabel(c.stage))}</span>${l ? `<br><span class="miss">Valar : ${esc(l.statut || "·")}${l.src ? " · source « " + esc(l.src) + " »" : ""}${l.cl ? " · rattaché à " + esc(l.cl.split(" ")[0]) + (l.cd ? " (call I3 le " + frDateFull(l.cd) + ")" : "") : " · aucun closer retrouvé"}</span>` : ""}${c.com ? `<br><span class="miss">« ${esc(c.com)} »</span>` : ""}</td>
+      <td>${c.st === "EN_ATTENTE" ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-vld="${esc(c.id)}" data-st="VALIDE">✅ Valider</button><button class="btn ghost" data-vld="${esc(c.id)}" data-st="REFUSE">❌ Refuser</button></div>` : vlClaimChip(c) + (c.local ? ` <span class="miss">(à l'instant)</span>` : "")}</td></tr>`;
+  };
+  const done = claims.filter(c => c.st !== "EN_ATTENTE").slice(0, 20);
+  $("vlAlexClaims").innerHTML = (pend.length || done.length)
+    ? `<div class="tscroll"><table><thead><tr><th>Date</th><th>Closer</th><th>Lead</th><th>Décision</th></tr></thead><tbody>${[...pend, ...done].map(row).join("")}</tbody></table></div>`
+    : `<div class="sub">Aucune réclamation pour l'instant ✓</div>`;
+  $("vlAlexClaims").querySelectorAll("button[data-vld]").forEach(b => b.addEventListener("click", async () => {
+    const id = b.dataset.vld, st = b.dataset.st;
+    b.disabled = true; b.textContent = "Envoi…";
+    const ok = await bridgePost({ what: "valar_decide", id, statut: st });
+    if (!ok) { b.disabled = false; b.textContent = st === "VALIDE" ? "✅ Valider" : "❌ Refuser"; toast("Envoi impossible, réessaie dans une minute."); return; }
+    const dec = vlLocalDecisions(); dec[id] = st; localStorage.setItem("vl-decisions", JSON.stringify(dec));
+    const c = vlAllClaims().find(x => x.id === id);
+    const l = c && (VL.leads || []).find(x => x.id === c.lid);
+    if (l) { delete l.pend; if (st === "VALIDE") { l.cl = c.c; l.cl2 = ""; l.how = "claim"; l.i3 = true; } }
+    toast(st === "VALIDE" ? "✅ Lead attribué, écrit dans le Sheet" : "Réclamation refusée, écrit dans le Sheet");
+    renderValarClaimsAlex(); renderValar();
+  }));
+}
+
 function renderValar() {
+  renderValarClaims();
   const all = vlLeads();
   const horsI3 = (VL.leads || []).filter(l => !l.i3);
   $("vlBadge").textContent = all.filter(l => VL_EN_COURS.includes(l.stage)).length || "";
@@ -3325,8 +3462,11 @@ function renderValar() {
     list.map(l => {
       const stg = VL_STAGE[l.stage] || { label: l.stage, chip: "m" };
       const closer = l.cl ? `<b>${esc(l.cl.split(" ")[0])}</b>${l.cl2 ? " + " + esc(l.cl2.split(" ")[0]) : ""}` : `<span class="miss">inconnu</span>`;
-      const how = l.cd ? `<br><span class="miss">call I3 le ${frDateFull(l.cd)}${l.cv === "OUI" ? " · vendu" : l.cv === "FOLLOW_UP" ? " · follow-up" : ""}</span>`
-        : l.how === "src" ? `<br><span class="miss">noté par Valar</span>` : "";
+      const how = (l.how === "claim" ? `<br><span class="miss">attribué par Alex</span>` : "")
+        + (l.cd ? `<br><span class="miss">call I3 le ${frDateFull(l.cd)}${l.cv === "OUI" ? " · vendu" : l.cv === "FOLLOW_UP" ? " · follow-up" : ""}</span>`
+        : l.how === "src" ? `<br><span class="miss">noté par Valar</span>` : "")
+        + (l.pend ? `<br><span class="chip o">⏳ réclamé par ${esc(l.pend.split(" ")[0])}</span>` : "")
+        + (!l.pend && (!l.cl || !l.i3) ? `<br><button class="btn ghost" style="padding:3px 9px;font-size:12px;margin-top:4px" data-vlclaim="${esc(l.id)}">🙋 C'est mon lead</button>` : "");
       const montants = [l.enc ? `Encours ${fmtE(l.enc)}` : "", l.enca ? `Attente ${fmtE(l.enca)}` : "", l.hon ? `Honoraires ${fmtE(l.hon)}` : ""].filter(Boolean).join("<br>") || "·";
       const src = l.src ? `<br><span class="miss">Source Valar : ${esc(l.src)}</span>` : "";
       return `<tr><td><b>${esc(l.n)}</b>${l.mail ? `<br><span class="miss">${esc(l.mail)}</span>` : ""}${src}</td>
@@ -3338,6 +3478,7 @@ function renderValar() {
         <td>${montants}</td>
         <td style="max-width:320px;white-space:normal">${esc(l.com) || "·"}</td></tr>`;
     }).join("") + "</tbody>";
+  $("vlTable").querySelectorAll("button[data-vlclaim]").forEach(b => b.addEventListener("click", () => vlOpenClaim(b.dataset.vlclaim)));
   $("vlMore").textContent = list.length ? `${list.length} lead(s) · CRM Valar lu le ${frDateFull((VL.fetched_at || "").slice(0, 10))} à ${(VL.fetched_at || "").slice(11, 16)}` : "Rien dans cette vue.";
 }
 
@@ -3687,6 +3828,7 @@ function initAlex() {
     buildBrief();
     renderEod();
     renderAlexChecks();
+    renderValarClaimsAlex();
   };
   if (sessionStorage.getItem("alex-ok") === "1") unlock();
   const tryCode = () => {
@@ -3868,6 +4010,7 @@ $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
 $("tabScan").addEventListener("click", renderScan);
 $("tabValar").addEventListener("click", renderValar);
+initValarClaims();
 tyInit();
 renderScan();
 renderValar();

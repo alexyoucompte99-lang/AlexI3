@@ -3,7 +3,7 @@
 « EOD Console », « Idees Console » et « EOD Setter Console » du classeur closing
 (remplis par la console via le pont).
 
-Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count] [../.idea-count] [../.eodsetter-count]
+Usage: python3 eow_notify.py investisseurs30.xlsx ../.eow-count [../.eod-count] [../.idea-count] [../.eodsetter-count] [../.valarclaim-count]
 Env : TELEGRAM_TOKEN, TELEGRAM_CHAT (sinon ne fait rien).
 Chaque fichier d'état contient le nombre de lignes déjà notifiées (commité par
 le workflow pour persister entre les runs).
@@ -64,7 +64,17 @@ def fmt_idea(vals):
     return f"💡 Idée de {closer or '?'}\n\n{idea or '·'}"
 
 
-def notify_tab(wb, token, chat, tab, state_path, fmt, label):
+def fmt_claim(vals):
+    date, cid, lead_id, lead, closer, stage, statut, decide, com = (vals + [""] * 9)[:9]
+    etape = {"r1": "R1", "r2": "R2", "client": "client signé", "noshow": "no show",
+             "asuivre": "à relancer", "nonabouti": "non abouti"}.get(stage, stage or "?")
+    return (f"🏦 Réclamation d'un lead Valar\n\n"
+            f"{closer or '?'} dit que « {lead or '?'} » ({etape} chez Valar) est un lead à lui.\n"
+            + (f"Son mot : {com}\n" if com else "")
+            + "\nÀ valider ou refuser dans la console closing → onglet Alex 🔒 → Réclamations Valar.")
+
+
+def notify_tab(wb, token, chat, tab, state_path, fmt, label, test_cols=(1, 2)):
     if tab not in wb.sheetnames:
         print(f"onglet {tab} absent (rien d'envoyé pour l'instant)", file=sys.stderr)
         return
@@ -82,7 +92,7 @@ def notify_tab(wb, token, chat, tab, state_path, fmt, label):
         # les floats du Sheet (7.0) s'affichent en entier
         vals = [v[:-2] if v.endswith(".0") else v for v in vals]
         # lignes de test (« Test Claude ») : pas de notification, comme dans parse_xlsx
-        if any(v.startswith("Test") for v in vals[1:3]):
+        if any(vals[i].startswith("Test") for i in test_cols if i < len(vals)):
             print(f"{label} : ligne de test ignorée", file=sys.stderr)
             continue
         send(token, chat, fmt(vals))
@@ -91,7 +101,7 @@ def notify_tab(wb, token, chat, tab, state_path, fmt, label):
         f.write(str(n))
 
 
-def main(xlsx_path, eow_state, eod_state=None, idea_state=None, setter_state=None):
+def main(xlsx_path, eow_state, eod_state=None, idea_state=None, setter_state=None, claim_state=None):
     token = os.environ.get("TELEGRAM_TOKEN")
     chat = os.environ.get("TELEGRAM_CHAT")
     if not (token and chat):
@@ -105,7 +115,10 @@ def main(xlsx_path, eow_state, eod_state=None, idea_state=None, setter_state=Non
         notify_tab(wb, token, chat, "Idees Console", idea_state, fmt_idea, "Idée")
     if setter_state:
         notify_tab(wb, token, chat, "EOD Setter Console", setter_state, fmt_eod_setter, "EOD setter")
+    if claim_state:
+        # réclamations de leads Valar : le closer est en colonne E (index 4)
+        notify_tab(wb, token, chat, "Reclamations Valar", claim_state, fmt_claim, "Réclamation Valar", test_cols=(4,))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:6])
+    main(*sys.argv[1:7])

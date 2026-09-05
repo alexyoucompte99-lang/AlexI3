@@ -68,7 +68,7 @@ jobs:
           python tally_fetch.py || true
           # Leads Valar (CRM business Valar, onglet Leads Valar de la console closing)
           python valar_fetch.py || true
-          python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count ../.idea-count ../.eodsetter-count || true
+          python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count ../.idea-count ../.eodsetter-count ../.valarclaim-count || true
           # Onglet Funnel : on repart du bloc chiffre de console-suivi-i3 (c'est la
           # que se fait le releve pixel manuel), a defaut de notre propre copie, puis
           # closing et ads sont rafraichis ici comme le reste de la console.
@@ -103,8 +103,8 @@ jobs:
             cd ..
             git config user.name "console-bot"
             git config user.email "actions@users.noreply.github.com"
-            git add .eow-count .eod-count .idea-count .eodsetter-count 2>/dev/null || true
-            git diff --cached --quiet || (git commit -m "EOW/EOD/idees/EOD setter notifies" && git push)
+            git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count 2>/dev/null || true
+            git diff --cached --quiet || (git commit -m "EOW/EOD/idees/EOD setter/reclamations notifies" && git push)
             exit 0
           fi
           echo "$HASH" > ../.data-hash
@@ -121,5 +121,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add index.html closing/index.html .data-hash
           git add .sales-ledger.json funnel-data.enc 2>/dev/null || true
-          git add .eow-count .eod-count .idea-count .eodsetter-count 2>/dev/null || true
+          git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)

@@ -183,7 +183,7 @@ def main(xlsx_path, out_path):
     setter_console = []  # onglet « EOD Setter Console » (EOD de Constant saisi dans la console)
     history = []  # onglet « Historique Console » (modifs faites depuis la console, pont v14)
     csm = []  # onglet « CSM » : suivi post-vente (3 calls d'accompagnement, mails V1, témoignages)
-    iclosed_leads, iclosed_claims, wa_confirms = [], [], []
+    iclosed_leads, iclosed_claims, wa_confirms, valar_claims = [], [], [], []
 
     for ws in wb.worksheets:
         title = ws.title.strip()
@@ -281,6 +281,22 @@ def main(xlsx_path, out_path):
                                        "lead": cell_str(r[1]),
                                        "closer": cell_str(r[2]) if len(r) > 2 else "",
                                        "statut": cell_str(r[3]) if len(r) > 3 else ""})
+            continue
+
+        if title == "Reclamations Valar":
+            # rempli par la console (onglet Leads Valar, bouton « Réclamer un lead ») via le pont v16 :
+            # Date, Id, Lead Valar (_ID), Lead, Closer, Etape, Statut (EN_ATTENTE / VALIDE / REFUSE),
+            # Decide le, Commentaire. Alex décide depuis l'onglet Alex. Closers « Test* » ignorés.
+            for r in all_rows[1:]:
+                if not r or not cell_str(r[1] if len(r) > 1 else None):
+                    continue
+                def g(i):
+                    return cell_str(r[i]) if i < len(r) else ""
+                if g(4).startswith("Test"):
+                    continue
+                valar_claims.append({"d": g(0)[:16], "id": g(1), "lead_id": g(2), "lead": g(3),
+                                     "closer": g(4), "stage": g(5), "statut": g(6) or "EN_ATTENTE",
+                                     "dd": g(7)[:16], "com": g(8)[:300]})
             continue
 
         if title == "Confirmations WhatsApp":
@@ -535,7 +551,7 @@ def main(xlsx_path, out_path):
            "setter_reports": setter_reports, "dm_reports": dm_reports,
            "setter_console": setter_console, "history": history, "csm": csm,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
-           "wa_confirms": wa_confirms}
+           "wa_confirms": wa_confirms, "valar_claims": valar_claims}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 
