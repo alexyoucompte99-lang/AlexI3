@@ -2324,8 +2324,12 @@ function closerSeg(segId, inputId, onPick, extra = [], def = "") {
   // extra : prénoms ajoutés à la main (ex. le setter Constant dans la boîte à idées)
   const opts = [...names.map(n => [n, n.split(" ")[0]]), ...extra.map(n => [n, n]), ["Autre", "Autre"]];
   const inp = $(inputId), host = $(segId);
-  // def : prénom (ou nom complet) sélectionné par défaut quand rien n'est mémorisé (ex. Romain pour l'EOD)
-  if (!opts.some(o => o[0] === inp.value)) inp.value = (def && (opts.find(o => o[0] === def || o[1] === def) || [])[0]) || opts[0][0];
+  // def : prénom(s) ou nom(s) complet(s) à sélectionner par défaut quand rien n'est mémorisé,
+  // dans l'ordre de préférence (ex. EOD : dernier closer de ce navigateur, sinon Romain)
+  if (!opts.some(o => o[0] === inp.value)) {
+    const defs = [].concat(def).filter(Boolean);
+    inp.value = defs.map(d => (opts.find(o => o[0] === d || o[1] === d) || [])[0]).find(Boolean) || opts[0][0];
+  }
   const draw = () => {
     host.innerHTML = "";
     for (const [k, lbl] of opts) {
@@ -2432,7 +2436,7 @@ function initEod() {
   };
   EOD_FIELDS.forEach(id => $(id).addEventListener("input", sync));
   // par défaut : dernier closer qui a envoyé depuis ce navigateur, sinon Romain
-  closerSeg("eodCloserSeg", "eodCloser", sync, [], localStorage.getItem("eod-closer") || "Romain");
+  closerSeg("eodCloserSeg", "eodCloser", sync, [], [localStorage.getItem("eod-closer"), "Romain"]);
   sync();
   const showBanner = () => { // EOD déjà envoyé aujourd'hui depuis ce navigateur
     const last = JSON.parse(localStorage.getItem("eod-sent") || "null");
