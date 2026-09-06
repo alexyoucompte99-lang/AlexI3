@@ -1791,7 +1791,7 @@ function renderRappels() {
     return n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j";
   };
   const rpCell = (c, i, s) => { const v = rpState(c)[s.k]; return `<td style="white-space:nowrap;text-align:center"><label style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font-size:11.5px" title="${s.label}"><input type="checkbox" data-rpi="${i}" data-step="${s.k}" ${v ? "checked" : ""} style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer"><span class="sub" style="font-size:10.5px">${v && v !== "oui" ? esc(v) : "&nbsp;"}</span></label></td>`; };
-  $("rpTable").innerHTML = "<thead><tr>" + RP_STEPS.map(s => `<th style="text-align:center" title="${s.label}">${s.label}</th>`).join("") + "<th title=\"Clic sur le bouton WhatsApp de la page merci (auto) + message vraiment reçu (à cocher)\">Confirmé WhatsApp</th><th>Call</th><th>Closer</th><th>Prospect</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
+  $("rpTable").innerHTML = "<thead><tr>" + RP_STEPS.map(s => `<th style="text-align:center" title="${s.label}">${s.label}</th>`).join("") + "<th title=\"Clic sur le bouton WhatsApp de la page merci (auto) + message vraiment reçu (à cocher)\">Confirmé WhatsApp</th><th>Call</th><th>Closer</th><th>Prospect</th><th title=\"Réponses du questionnaire iClosed : patrimoine disponible hors immobilier, puis épargne mensuelle (remplies par le Zap depuis le 06/09)\">Budget (iClosed)</th><th>WhatsApp</th><th>Mail</th><th>Booké le</th><th>Pub d'origine</th><th>Message</th></tr></thead><tbody>" +
     list.map((c, i) => {
       const st = rpState(c), done = !!(st.appel && st.r1 && st.r2 && st.r3);
       const dd = new Date(c.d + "T12:00:00");
@@ -1803,6 +1803,7 @@ function renderRappels() {
         <td style="white-space:nowrap"><b>${esc(JOURS[dd.getDay()])} ${frDate(c.d)}</b>${c.hh ? " à " + rpHeure(c.hh) : ""}<div class="sub" style="font-size:11px">${delaiTxt(c)}</div></td>
         <td>${esc((c.c || "·").split(" ")[0])}</td>
         <td><b>${esc(c.n) || "·"}</b></td>
+        <td style="white-space:nowrap;font-size:12px">${(c.pa || c.ep) ? `<b>${esc(c.pa || "·")}</b><div class="sub" style="font-size:11px">épargne ${esc(c.ep || "·")}</div>` : `<span class="sub" title="Pas de réponse iClosed (call booké avant le 06/09 ou hors iClosed)">·</span>`}</td>
         <td>${c.tel ? `<a class="tel" href="${rpWaHref(c)}" target="_blank" rel="noopener" title="Ouvre WhatsApp avec le message de la relance ${rpNext(c)} pré-écrit">${esc(c.tel)}</a><div class="sub" style="font-size:10.5px">msg relance ${rpNext(c)}</div>` : "·"}</td>
         <td style="max-width:22ch;overflow-wrap:anywhere">${esc(c.mail) || "·"}</td>
         <td>${frDate(c.b)}</td>

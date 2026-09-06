@@ -349,6 +349,9 @@ def main(data_path, out_path, updated_at):
             "vir": bool(c.get("virement")),
             "com": (c.get("commentaire") or "").strip(),
             "obj": (c.get("objection") or "").strip(),
+            # réponses du questionnaire iClosed (colonnes remplies par le Zap depuis le 06/09/2026)
+            "ep": (c.get("epargne") or "").strip(),
+            "pa": (c.get("patrimoine") or "").strip(),
             "mens": (c.get("mensualites") or "").strip(),
             # case à cocher dans le Sheet : TRUE/FALSE -> OUI/NON
             "c250": {"TRUE": "OUI", "OUI": "OUI", "VRAI": "OUI",
