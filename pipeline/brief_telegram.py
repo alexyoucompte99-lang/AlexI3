@@ -42,6 +42,17 @@ def sale_day(c):
     return c.get("sale_date") or c.get("date") or ""
 
 
+def last_sale(calls, today):
+    """Dernière vente cochée jusqu'à today : (date ISO, prospect, closer, montant) ou None."""
+    best = None
+    t = today.isoformat()
+    for c in calls:
+        if is_sale(c) and sale_day(c) and sale_day(c) <= t:
+            if best is None or sale_day(c) > best[0]:
+                best = (sale_day(c), c.get("prospect") or "?", (c.get("closer") or "").split(" ")[0], sale_amount(c))
+    return best
+
+
 def ca_mois(data, today):
     # CA attribué au mois du cochage de la vente (règle Alex 01/09)
     m = today.strftime("%Y-%m")

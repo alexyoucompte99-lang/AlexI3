@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from brief_telegram import is_sale, sale_amount, spend_range  # noqa: E402
+from brief_telegram import is_sale, last_sale, sale_amount, spend_range  # noqa: E402
 
 PARIS = ZoneInfo("Europe/Paris")
 JOURS = ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
@@ -268,6 +268,12 @@ def build_bilan(data, ads, today, now=None, data_time=None):
     if today == now.date() and now.hour < 20:
         head += " (journée en cours)"
     head += f"\n🔄 Données à jour du {(data_time or now):%d/%m à %H:%M} (classeur closing + Meta Ads)"
+    ls = last_sale(calls, today)
+    if ls:
+        sans = (today - dt.date.fromisoformat(ls[0])).days
+        if sans >= 4:
+            head += (f"\n{'🔴' if sans >= 7 else '🟠'} {b(str(sans) + ' jours sans vente')}"
+                     f" (dernière : {dlabel(dt.date.fromisoformat(ls[0]))}, {esc(ls[1])})")
     blocks = [head,
               month_block(calls, ads, today),
               # aujourd'hui : pas d'ads ni de bookés (la data du jour remonte trop tard),

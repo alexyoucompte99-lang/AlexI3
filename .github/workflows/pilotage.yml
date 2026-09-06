@@ -1,0 +1,98 @@
+name: Prise de recul du matin
+
+# Chaque matin (~8h Paris) : 2 messages Telegram à Alex = prise de recul cap 100 k
+# (objectif du mois, alertes dont les jours sans vente, chaîne 7 j / 28 j, goulot)
+# + récap prêt à envoyer à Thomas (bloc à copier + lien WhatsApp pré-rempli).
+# Données rafraîchies juste avant (pont Apps Script + Meta), comme brief.yml.
+# Indépendant du Mac d'Alex ; le bot local (telegram_bot.py) sert de filet à 8h45.
+# Marqueur .pilotage-sent (date Paris) = anti-doublon.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Afficher les messages dans le log sans les envoyer"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 6 * * *"   # 8h00 Paris en heure d'été
+    - cron: "0 7 * * *"   # 8h00 Paris en heure d'hiver (l'autre déclenchement est ignoré)
+
+concurrency:
+  group: pilotage
+  cancel-in-progress: false
+
+jobs:
+  pilotage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Faut-il envoyer ? (heure de Paris + anti-doublon)
+        id: go
+        run: |
+          TODAY=$(TZ=Europe/Paris date '+%Y-%m-%d')
+          HOUR=$(TZ=Europe/Paris date '+%H')
+          SENT=$(cat .pilotage-sent 2>/dev/null || echo none)
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "$SENT" = "$TODAY" ]; then echo "deja envoye aujourd'hui ($SENT)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ "$HOUR" -lt 8 ]; then echo "trop tot ($HOUR h Paris)"; echo "send=no" >> "$GITHUB_OUTPUT"; exit 0; fi
+          fi
+          echo "send=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.send == 'yes'
+        with:
+          python-version: "3.12"
+
+      - name: Dependances
+        if: steps.go.outputs.send == 'yes'
+        run: pip install --quiet openpyxl
+
+      - name: Recuperer les donnees (pont Apps Script)
+        if: steps.go.outputs.send == 'yes'
+        env:
+          BRIDGE_URL: ${{ secrets.BRIDGE_URL }}
+          BRIDGE_KEY: ${{ secrets.BRIDGE_KEY }}
+        working-directory: pipeline
+        run: |
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=closing" -o closing.b64
+          if grep -q "acces refuse" closing.b64; then echo "cle du pont refusee"; exit 1; fi
+          base64 -d closing.b64 > investisseurs30.xlsx
+          python -c "import openpyxl; wb=openpyxl.load_workbook('investisseurs30.xlsx', read_only=True); print('onglets:', len(wb.sheetnames))"
+          curl -sfL --retry 4 --retry-delay 6 --retry-all-errors "$BRIDGE_URL?key=$BRIDGE_KEY&what=ads" -o ads_values.json
+
+      - name: Pipeline + prise de recul Telegram
+        if: steps.go.outputs.send == 'yes'
+        env:
+          META_TOKEN: ${{ secrets.META_TOKEN }}
+          META_ACCOUNT: ${{ secrets.META_ACCOUNT }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+          WA_THOMAS: ${{ secrets.WA_THOMAS }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        working-directory: pipeline
+        run: |
+          python parse_xlsx.py investisseurs30.xlsx data.json
+          python sales_ledger.py data.json ../.sales-ledger.json
+          python parse_ads_values.py ads_values.json ads.json
+          python meta_fetch.py
+          if [ "$DRY_RUN" = "true" ]; then
+            python pilotage.py --dry-run
+          else
+            python pilotage.py
+          fi
+
+      - name: Marquer comme envoye
+        if: steps.go.outputs.send == 'yes' && inputs.dry_run != true
+        run: |
+          echo "${{ steps.go.outputs.today }}" > .pilotage-sent
+          git config user.name "console-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add .pilotage-sent
+          git diff --cached --quiet && exit 0
+          git commit -m "Prise de recul envoyee"
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 10; done
