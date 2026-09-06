@@ -5,7 +5,8 @@ jour où elle est cochée, pas le jour du premier call).
 Le Sheet n'enregistre pas quand VENTE passe à OUI : ce script note, pour chaque
 vente (VENTE=OUI/REMBOURSEMENT ou virement Justine), la date du premier run qui
 la voit, et annote data.json en place (champ sale_date sur les calls vendus).
-Consoles et briefs utilisent ensuite sale_date (repli : date du call).
+Consoles et briefs utilisent ensuite sale_date (repli : date du call, ou 1er du
+mois de l'onglet si le call est daté d'avant ce mois, voir fallback_date).
 
 Usage: python3 sales_ledger.py data.json <chemin du registre .sales-ledger.json>
 
@@ -30,6 +31,18 @@ def key(c):
     return hashlib.sha1(raw.encode()).hexdigest()[:16]
 
 
+def fallback_date(c):
+    """Vente présente au seed (date de cochage inconnue) : si le call est daté
+    d'AVANT le mois de son onglet (follow-up conclu le mois suivant, ex. call du
+    09/07 dans « Suivi Closing Aout »), la vente est attribuée au 1er du mois de
+    l'onglet, comme le récap « CA Contracté JUSTINE » du Sheet (57 208 € en août,
+    fix du 06/09/2026). Sinon None = repli sur la date du call."""
+    y, m, d = c.get("year"), c.get("month"), c.get("date") or ""
+    if y and m and d and d < f"{y}-{m:02d}-01":
+        return f"{y}-{m:02d}-01"
+    return None
+
+
 def main(data_path, ledger_path):
     d = json.load(open(data_path))
     seeding = not os.path.exists(ledger_path)
@@ -44,7 +57,7 @@ def main(data_path, ledger_path):
             # seed : vente déjà là avant le registre -> "" (repli date du call)
             ledger[k] = "" if seeding else today
             new += 1
-        c["sale_date"] = ledger[k] or None
+        c["sale_date"] = ledger[k] or fallback_date(c)
     json.dump(ledger, open(ledger_path, "w"), indent=0, sort_keys=True)
     json.dump(d, open(data_path, "w"))
     print(f"sales_ledger: {len(ledger)} ventes au registre, {new} nouvelle(s)"
