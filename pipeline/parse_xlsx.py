@@ -14,6 +14,11 @@ import openpyxl
 
 # onglet -> (année, mois, webi ?)
 CLOSING_TABS = {
+    # onglets à venir pré-enregistrés (06/09/2026) : reconnus dès leur création
+    "Suivi Closing DECEMBRE": (2026, 12, False),
+    "Suivi Closing NOVEMBRE": (2026, 11, False),
+    "Suivi Closing OCTOBRE": (2026, 10, False),
+    "Suivi Closing SEPTEMBRE": (2026, 9, False),
     "Suivi Closing Aout": (2026, 8, False),
     "Suivi Closing JUILLET": (2026, 7, False),
     "Suivi Closing JUIN": (2026, 6, False),
