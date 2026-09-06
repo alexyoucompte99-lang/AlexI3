@@ -117,6 +117,8 @@ COL_MAP = {
     "date de relance a faire": "relance",
     "date r2": "r2",
     "relance faite": "relance_faite",  # colonne ajoutée par la console (coche Relancé)
+    "epargne mensuelle": "epargne",      # réponses du questionnaire iClosed (Zap, depuis le 06/09/2026)
+    "patrimoine dispo": "patrimoine",
 }
 
 
@@ -259,6 +261,8 @@ def main(xlsx_path, out_path):
                     "relance": f"{relance[0]:04d}-{relance[1]:02d}-{relance[2]:02d}" if relance else None,
                     "r2": f"{r2[0]:04d}-{r2[1]:02d}-{r2[2]:02d}" if r2 else None,
                     "relance_faite": cell_str(g("relance_faite"))[:30],
+                    "epargne": cell_str(g("epargne"))[:40],
+                    "patrimoine": cell_str(g("patrimoine"))[:40],
                     "has_show_up_raw": bool(cell_str(g("show_up"))),
                     "has_vente_raw": bool(cell_str(g("vente"))),
                     "has_qualif_raw": bool(cell_str(g("qualif"))),
