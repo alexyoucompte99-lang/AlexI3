@@ -113,6 +113,7 @@ def stats(calls, rows, f_iso=None, t_iso=None):
     s["pitched"] = [c for c in s["shows"] if c["vente"] in ("OUI", "NON", "REMBOURSEMENT")]
     s["fu"] = [c for c in s["shows"] if c["vente"] == "FOLLOW_UP"]
     s["nonpitch"] = [c for c in s["shows"] if c["vente"] == "NON_PITCHE"]
+    s["valar"] = [c for c in s["shows"] if c["vente"] == "VALAR"]
     # ventes comptées le jour du cochage (règle Alex 01/09) quand une plage est
     # donnée ; sinon ancienne règle (ventes parmi les lignes)
     if f_iso:
@@ -143,8 +144,9 @@ def ventes_detail(ventes):
 def pitch_line(s):
     """Décomposition des présents en buckets disjoints."""
     seg = (f"Sur les présents : {len(s['pitched'])} pitché(s)"
-           f" + {len(s['fu'])} follow-up(s) + {len(s['nonpitch'])} non pitché(s)")
-    autres = len(s["shows"]) - len(s["pitched"]) - len(s["fu"]) - len(s["nonpitch"])
+           f" + {len(s['fu'])} follow-up(s) + {len(s['nonpitch'])} non pitché(s)"
+           + (f" + {len(s['valar'])} parti(s) chez Valar" if s["valar"] else ""))
+    autres = len(s["shows"]) - len(s["pitched"]) - len(s["fu"]) - len(s["nonpitch"]) - len(s["valar"])
     if autres:
         seg += f" + {autres} sans statut"
     return seg

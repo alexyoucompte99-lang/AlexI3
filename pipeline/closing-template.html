@@ -559,6 +559,11 @@ __FUNNEL_CSS__
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="vlCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Étape</span><span id="vlStagePills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
       </div>
+      <div class="card" id="vlFluxCard" style="margin-bottom:14px"><h3 style="margin-top:0">Ce qui part chez Valar depuis les calls I3</h3>
+        <p class="lede" style="margin-bottom:8px">Sur les calls I3 présents de la période : pitchés I3, non pitchés, partis chez Valar (résultat « Parti chez Valar » choisi dans À remplir, ou lead retrouvé dans le CRM Valar).
+          Le taux de closing hors Valar déduit ces leads des présents. Les appels Valar comptent les R1 datés dans le CRM Valar pour des leads venus d'I3.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:10px"><span class="eyebrow" style="min-width:62px">Période</span><span id="vlFluxPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div class="kpis" id="vlFluxKpis"></div></div>
       <div class="kpis" id="vlKpis" style="margin-bottom:14px"></div>
       <div class="card" id="vlByCloserCard" style="margin-bottom:14px"><h3 style="margin-top:0">Closer par closer</h3>
         <p class="lede" style="margin-bottom:8px">Ce que chacun a envoyé chez Valar et ce que c'est devenu.</p>
@@ -1141,7 +1146,7 @@ function salesIn(r, pred) {
 }
 function st(rows, r, pred) {
   const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
-              pitched: 0, fuShows: 0, nonPitche: 0, ventes: 0, follow: 0, ca: 0, qSum: 0, qN: 0 };
+              pitched: 0, fuShows: 0, nonPitche: 0, valar: 0, valarCrm: 0, ventes: 0, follow: 0, ca: 0, qSum: 0, qN: 0 };
   for (const c of rows) {
     if (c.s === "OUI") o.shows++;
     else if (c.s === "NON") o.noshow++;
@@ -1149,11 +1154,13 @@ function st(rows, r, pred) {
     else if (c.s === "ANNULE") o.annule++;
     else o.suVide++;
     if (c.s === "OUI") {
-      /* buckets disjoints : présents = pitchés + follow-ups + non pitchés (+ sans statut) */
-      if (c.v === "NON_PITCHE") o.nonPitche++;
+      /* buckets disjoints : présents = pitchés + follow-ups + non pitchés + partis chez Valar (+ sans statut) */
+      if (c.v === "VALAR") o.valar++;
+      else if (c.v === "NON_PITCHE") o.nonPitche++;
       else if (c.v === "FOLLOW_UP") o.fuShows++;
       else if (["OUI", "NON", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
       if (c.q != null) { o.qSum += c.q; o.qN++; }
+      if (c.vl) o.valarCrm++; /* présent retrouvé dans le CRM Valar (quel que soit le résultat) */
     }
     /* vente comptée si validée par le closer (OUI) ou par Justine (virement) ;
        si une plage r est fournie, les ventes sont comptées APRÈS la boucle
@@ -1174,6 +1181,11 @@ function st(rows, r, pred) {
   o.tClosPitche = o.pitchedAll ? 100 * o.ventes / o.pitchedAll : null;
   o.tClosShow = o.shows ? 100 * o.ventes / o.shows : null;
   o.tClosBooke = o.calls ? 100 * o.ventes / o.calls : null;
+  /* leads partis chez Valar déduits : ils n'avaient pas vocation à acheter I3 */
+  o.showsHV = o.shows - o.valar;
+  o.tValar = o.shows ? 100 * o.valar / o.shows : null;
+  o.tClosShowHV = o.showsHV ? 100 * o.ventes / o.showsHV : null;
+  o.tClosBookeHV = o.calls - o.valar ? 100 * o.ventes / (o.calls - o.valar) : null;
   o.qMoy = o.qN ? o.qSum / o.qN : null;
   return o;
 }
@@ -1270,9 +1282,11 @@ function renderClosersTab() {
     kpiTile("Taux de show-up", clPc(o.tShowPasses), `présents ÷ ${fmtN(o.passes)} calls renseignés`),
     kpiTile("Lignes non remplies", fmtN(o.suVide), "show-up vide : à corriger dans le Sheet"),
     kpiTile("Non pitchés", fmtN(o.nonPitche), "soit " + clPc(o.tNonPitche) + " des présents"),
+    kpiTile("Partis chez Valar 🏦", fmtN(o.valar), "soit " + clPc(o.tValar) + " des présents" + (o.valarCrm ? ` · ${fmtN(o.valarCrm)} présent(s) dans le CRM Valar` : "")),
     kpiTile("Ventes", fmtN(o.ventes), "closer OUI ou virement Justine"),
     kpiTile("Closing / pitchés", clPc(o.tClosPitche), `${fmtN(o.pitchedAll)} calls pitchés (dont ${fmtN(o.fuShows)} follow-ups)`),
     kpiTile("Closing / présents", clPc(o.tClosShow), `${fmtN(o.shows)} présents`),
+    kpiTile("Closing / présents hors Valar", clPc(o.tClosShowHV), `${fmtN(o.showsHV)} présents une fois les ${fmtN(o.valar)} Valar déduits`),
     kpiTile("Closing / bookés", clPc(o.tClosBooke), `${fmtN(o.calls)} bookés`),
     kpiTile("CA total", fmtE(o.ca), "sur la période"),
     kpiTile("CA / call booké", clEur(o.caBooke), ""),
@@ -1291,9 +1305,12 @@ function renderClosersTab() {
     ["Lignes non remplies", oo => oo.suVide, fmtN, "min"],
     ["Non pitchés", oo => oo.nonPitche, fmtN, "min"],
     ["Taux de non pitché", oo => oo.tNonPitche, clPc, "min"],
+    ["Partis chez Valar", oo => oo.valar, fmtN, null],
+    ["Taux Valar (sur présents)", oo => oo.tValar, clPc, null],
     ["Ventes", oo => oo.ventes, fmtN, "max"],
     ["Closing / pitchés", oo => oo.tClosPitche, clPc, "max"],
     ["Closing / présents", oo => oo.tClosShow, clPc, "max"],
+    ["Closing / présents hors Valar", oo => oo.tClosShowHV, clPc, "max"],
     ["Closing / bookés", oo => oo.tClosBooke, clPc, "max"],
     ["CA total", oo => oo.ca, v => fmtE(v || 0), "max"],
     ["CA / call booké", oo => oo.caBooke, clEur, "max"],
@@ -1937,8 +1954,9 @@ function renderKpis(r, rows) {
     kpiTile("Calls bookés (résas prises)", fmtN(booked), "réservations créées sur la période", deltaTag(booked, pbooked)) +
     kpiTile("Présents", fmtN(s.shows), `show-up ${fmtP(s.tShowPasses, 0)} des calls renseignés`, deltaTag(s.shows, ps?.shows)) +
     kpiTile("No-show", fmtN(s.noshow), s.suVide ? `${fmtN(s.suVide)} call(s) pas encore renseigné(s)` : "tout est renseigné ✓", deltaTag(s.noshow, ps?.noshow, true)) +
-    kpiTile("Pitchés", fmtN(s.pitched), `+ ${fmtN(s.fuShows)} follow-up(s) + ${fmtN(s.nonPitche)} non pitché(s), sur ${fmtN(s.shows)} présents`, deltaTag(s.pitched, ps?.pitched)) +
-    kpiTile("Ventes", fmtN(s.ventes), `closing ${fmtP(s.tClosPitche, 0)} / pitchés · ${fmtP(s.tClosShow, 0)} / présents · ${fmtP(s.tClosBooke, 0)} / prévus`, deltaTag(s.ventes, ps?.ventes)) +
+    kpiTile("Pitchés", fmtN(s.pitched), `+ ${fmtN(s.fuShows)} follow-up(s) + ${fmtN(s.nonPitche)} non pitché(s) + ${fmtN(s.valar)} Valar, sur ${fmtN(s.shows)} présents`, deltaTag(s.pitched, ps?.pitched)) +
+    kpiTile("Partis chez Valar 🏦", fmtN(s.valar), `${fmtP(s.tValar, 0)} des présents · closing hors Valar ${fmtP(s.tClosShowHV, 0)}`, deltaTag(s.valar, ps?.valar)) +
+    kpiTile("Ventes", fmtN(s.ventes), `closing ${fmtP(s.tClosPitche, 0)} / pitchés · ${fmtP(s.tClosShow, 0)} / présents (${fmtP(s.tClosShowHV, 0)} hors Valar) · ${fmtP(s.tClosBooke, 0)} / prévus`, deltaTag(s.ventes, ps?.ventes)) +
     kpiTile("CA signé", fmtE(s.ca), `${fmtN(s.follow)} follow-up créés sur la période`, deltaTag(s.ca, ps?.ca)) +
     kpiTile("Qualité des leads", s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10", `${fmtN(s.qN)} lead(s) noté(s)`, deltaTag(s.qMoy, ps?.qMoy));
 }
@@ -1960,6 +1978,7 @@ function renderClosers(rows) {
       <div class="row"><span>Calls prévus</span><b>${fmtN(s.calls)}</b></div>
       <div class="row"><span>Présents (show-up)</span><b>${fmtN(s.shows)} (${fmtP(s.tShowPasses, 0)})</b></div>
       <div class="row"><span>Ventes</span><b>${fmtN(s.ventes)}${s.pitchedAll ? " · " + fmtP(s.tClosPitche, 0) + " des pitchés" : ""}</b></div>
+      ${s.valar ? `<div class="row"><span>Partis chez Valar 🏦</span><b>${fmtN(s.valar)} · closing hors Valar ${fmtP(s.tClosShowHV, 0)}</b></div>` : ""}
       <div class="row"><span>CA signé</span><b>${fmtE(s.ca)}</b></div>
       <div class="row"><span>Qualif moyenne</span><b>${s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10"}</b></div>
       ${s.suVide ? `<div class="row"><span class="late">À renseigner</span><b class="late">${fmtN(s.suVide)} call(s)</b></div>` : ""}
@@ -2025,7 +2044,7 @@ function renderDays(r, rows) {
 
 /* ================= récap ================= */
 const CHIP_S = { OUI: ["g", "Présent"], NON: ["r", "No-show"], REPROGRAMMER: ["o", "Reprog."], ANNULE: ["m", "Annulé"], "": ["empty", "à remplir"] };
-const CHIP_V = { OUI: ["g", "VENTE"], NON: ["m", "Non"], NON_PITCHE: ["m", "Non pitché"], FOLLOW_UP: ["o", "Follow-up"], REMBOURSEMENT: ["r", "Remboursé"], AUTRE: ["m", "Autre"], "": ["empty", "·"] };
+const CHIP_V = { OUI: ["g", "VENTE"], NON: ["m", "Non"], NON_PITCHE: ["m", "Non pitché"], VALAR: ["o", "Valar 🏦"], FOLLOW_UP: ["o", "Follow-up"], REMBOURSEMENT: ["r", "Remboursé"], AUTRE: ["m", "Autre"], "": ["empty", "·"] };
 const chip = (map, key) => { const [cls, lb] = map[key] || map[""]; return `<span class="chip ${cls}">${lb}</span>`; };
 const venteChip = (c) => isSale(c) && c.v !== "OUI" ? `<span class="chip g">Vente (Justine)</span>` : chip(CHIP_V, c.v);
 
@@ -2711,7 +2730,7 @@ function renderMod() {
   pillRow("modPeriodPills", [{ k: "7", label: "7 j" }, { k: "30", label: "30 j" }, { k: "mois", label: "Mois en cours" }, { k: "90", label: "3 mois" }, { k: "", label: "Tout" }],
     modSel.period, k => modSel.period = k, renderMod);
   pillRow("modStatutPills", [{ k: "", label: "Tous" }, { k: "VENTE", label: "Vente" }, { k: "FOLLOW_UP", label: "Follow-up" },
-    { k: "NON", label: "Pitché sans vente" }, { k: "NON_PITCHE", label: "Non pitché" }, { k: "NOSHOW", label: "No-show" }, { k: "AUTRE", label: "Autres" }],
+    { k: "NON", label: "Pitché sans vente" }, { k: "NON_PITCHE", label: "Non pitché" }, { k: "VALAR", label: "Valar 🏦" }, { k: "NOSHOW", label: "No-show" }, { k: "AUTRE", label: "Autres" }],
     modSel.statut, k => modSel.statut = k, renderMod);
   let from = null;
   if (modSel.period === "mois") from = TODAY_ISO.slice(0, 8) + "01";
@@ -3073,8 +3092,10 @@ function renderJustine() {
    le Sheet a la valeur, l'overlay est purgé. */
 const FILL_SU = { OUI: "Présent", NON: "No-show", REPROGRAMMER: "Reprogrammé", ANNULE: "Annulé" };
 const FILL_SU_SHEET = { OUI: "OUI", NON: "NON", REPROGRAMMER: "Reprogrammé", ANNULE: "Annulé" };
-const FILL_V = { OUI: "Vente ✅", NON: "Pas de vente", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché" };
-const FILL_V_SHEET = { OUI: "OUI", NON: "NON", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché" };
+const FILL_V = { OUI: "Vente ✅", NON: "Pas de vente", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché", VALAR: "Parti chez Valar 🏦" };
+/* « Valar (non pitché) » dans le Sheet : la console le lit comme VALAR, et les formules de
+   Thomas (Suivi DATA, COUNTIF "*pitch*") continuent de le compter dans les non pitchés */
+const FILL_V_SHEET = { OUI: "OUI", NON: "NON", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché", VALAR: "Valar (non pitché)" };
 const fillKey = (c) => "fill:" + c.st + "|" + c.sr;
 let fillCloser = localStorage.getItem("fill-closer") || "";
 let fillFilter = "todo";
@@ -3097,7 +3118,8 @@ const BUILD_MS = (() => {
     try {
       const o = JSON.parse(raw);
       const f = o.f || o; /* compat ancien format */
-      const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v) && (f.q == null || c.q === f.q)
+      /* un « non pitché » retrouvé dans le CRM Valar est affiché VALAR : c'est bien à jour */
+      const caughtUp = (!f.s || c.s === f.s) && (!f.v || c.v === f.v || (c.v === "VALAR" && f.v === "NON_PITCHE")) && (f.q == null || c.q === f.q)
         && (!f.d || c.d === f.d);
       const pageOlder = o.when && BUILD_MS && BUILD_MS < o.when + 2 * 60e3;
       if (!pageOlder && (caughtUp || Date.now() - (o.when || 0) > 3 * 86400e3)) { localStorage.removeItem(fillKey(c)); continue; }
@@ -3171,7 +3193,7 @@ function fillCard(c, edit) {
   const quand = frDateFull(c.d) + (c.hh ? " à " + c.hh : "");
   const orig = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", mens: c.mens || "",
                  c250: c.c250 || "", vid: c.vid || "", rec: c.rec || "", rel: c.rel || "" };
-  const state = Object.assign({}, orig, { com: "", obj: "", raison: "", replan: "" });
+  const state = Object.assign({}, orig, { com: "", obj: "", raison: "", replan: "", vrdv: "", vnote: "" });
   const nonClose = () => ["NON", "FOLLOW_UP", "NON_PITCHE"].includes(state.v);
   const seg = (label, opts, cur, onPick, cls) => {
     const wrap = document.createElement("div");
@@ -3222,6 +3244,13 @@ function fillCard(c, edit) {
     /* un résultat rempli implique que le lead était présent (règle Alex) */
     card.appendChild(seg("Résultat du call", Object.entries(FILL_V), state.v,
       k => { state.v = k; if (!state.s) state.s = "OUI"; }));
+    if (state.v === "VALAR") {
+      /* lead redirigé chez Valar Gestion Privée : on trace le RDV pour le rattacher au CRM Valar */
+      const w = seg("RDV Valar", [["OUI", "RDV Valar booké"], ["NON", "Pas encore de RDV"]], state.vrdv, k => state.vrdv = k, "two");
+      w.querySelector(".flabel").style.color = "var(--accent)";
+      card.appendChild(w);
+      card.appendChild(labeledInput("Précision Valar (patrimoine, conseiller, contexte…)", "text", state.vnote, "ex : 300k à placer, RDV avec Benjamin jeudi", v => state.vnote = v));
+    }
     card.appendChild(seg("Lead qualifié ? /10",
       Array.from({ length: 10 }, (_, i) => [i + 1, String(i + 1)]), state.q, k => state.q = +k, "qn"));
     card.appendChild(seg("+250k cash à placer ?", [["OUI", "Oui"], ["NON", "Non"]], state.c250, k => state.c250 = k, "two"));
@@ -3362,6 +3391,12 @@ async function fillSend(c, orig, state, btn) {
       (c.d ? ` (initialement le ${frDate(c.d)}${c.hh ? " à " + c.hh : ""})` : "");
   }
   if (state.v && state.v !== orig.v) fields.vente = FILL_V_SHEET[state.v];
+  if (state.v === "VALAR" && (state.v !== orig.v || state.vrdv || state.vnote.trim())) {
+    /* trace dans le recap : lisible dans le Sheet, et le rattachement au CRM Valar s'appuie dessus */
+    const line = "Parti chez Valar" + (state.vrdv === "OUI" ? " · RDV Valar booké" : state.vrdv === "NON" ? " · RDV Valar pas encore pris" : "")
+      + (state.vnote.trim() ? " · " + state.vnote.trim() : "");
+    if ((c.com || "").indexOf(line) === -1) state.com = state.com.trim() ? line + "\n" + state.com : line;
+  }
   if (state.q != null && state.q !== orig.q) fields.qualif = state.q;
   if (state.pp && +state.pp !== +(orig.pp || 0)) fields.prix = +state.pp;
   if (String(state.mens).trim() && String(state.mens).trim() !== orig.mens) fields.mensualites = String(state.mens).trim();
@@ -3579,9 +3614,40 @@ function renderValarClaimsAlex() {
   }));
 }
 
+/* flux I3 -> Valar : répartition des présents I3 (pitchés / non pitchés / Valar) et appels Valar issus d'I3 */
+let vlFluxK = "mtd";
+const VL_FLUX_PERIODS = [
+  { k: "7j", label: "7 jours", range: () => ({ from: iso(new Date(NOW - 7 * DAY)), to: TODAY_ISO }) },
+  { k: "mtd", label: "Mois en cours", range: () => ({ from: TODAY_ISO.slice(0, 8) + "01", to: TODAY_ISO }) },
+  { k: "30j", label: "30 jours", range: () => ({ from: iso(new Date(NOW - 30 * DAY)), to: TODAY_ISO }) },
+  { k: "3m", label: "3 mois", range: () => ({ from: iso(new Date(NOW - 90 * DAY)), to: TODAY_ISO }) },
+  { k: "all", label: "Tout 2026", range: () => ({ from: "2026-01-01", to: TODAY_ISO }) },
+];
+function renderValarFlux(all) {
+  pillRow("vlFluxPills", VL_FLUX_PERIODS.map(p => ({ k: p.k, label: p.label })), vlFluxK, k => vlFluxK = k, renderValar);
+  const r = VL_FLUX_PERIODS.find(p => p.k === vlFluxK).range();
+  const matchC = (c) => vlCloser === "" || vlCloser === "hors" || vlCloser === "sans" ? true
+    : vlCloser === "autres" ? (c.c && !TOP3.includes(c.c)) : c.c === vlCloser;
+  const rows = DATA.calls.filter(c => c.d && c.d >= r.from && c.d <= r.to && c.s === "OUI" && matchC(c));
+  const s = st(rows);
+  const declared = rows.filter(c => c.v === "VALAR" && !c.va).length;
+  const leads = vlCloser === "hors" ? [] : vlOfCloser(all, vlCloser === "sans" ? "sans" : vlCloser);
+  const r1 = leads.filter(l => l.r1 && l.r1 >= r.from && l.r1 <= r.to).length;
+  const r1Fut = leads.filter(l => l.r1 && l.r1 > TODAY_ISO).length;
+  const pc = (n) => s.shows ? Math.round(100 * n / s.shows) + " % des présents" : "";
+  $("vlFluxKpis").innerHTML = [
+    kpiTile("Calls I3 présents", fmtN(s.shows), `${fmtN(rows.filter(c => !c.v).length)} sans résultat renseigné`),
+    kpiTile("Pitchés I3", fmtN(s.pitchedAll), `${pc(s.pitchedAll)} · dont ${fmtN(s.fuShows)} follow-up(s)`),
+    kpiTile("Non pitchés", fmtN(s.nonPitche), pc(s.nonPitche)),
+    kpiTile("Partis chez Valar 🏦", fmtN(s.valar), `${pc(s.valar)} · ${fmtN(declared)} déclaré(s) par le closer, le reste retrouvé dans le CRM Valar · ${fmtN(s.valarCrm)} présent(s) au total dans le CRM Valar (ventes I3 comprises)`),
+    kpiTile("Closing I3 hors Valar", fmtP(s.tClosShowHV, 0), `${fmtN(s.ventes)} vente(s) sur ${fmtN(s.showsHV)} présents hors Valar (${fmtP(s.tClosShow, 0)} sur tous les présents)`),
+    kpiTile("Appels Valar (R1) de leads I3", fmtN(r1), `R1 Valar datés dans la période · ${fmtN(r1Fut)} R1 à venir`),
+  ].join("");
+}
 function renderValar() {
   renderValarClaims();
   const all = vlLeads();
+  renderValarFlux(all);
   const horsI3 = (VL.leads || []).filter(l => !l.i3);
   $("vlBadge").textContent = all.filter(l => VL_EN_COURS.includes(l.stage)).length || "";
   if (!VL.fetched_at) {
@@ -3645,7 +3711,7 @@ function renderValar() {
       const stg = VL_STAGE[l.stage] || { label: l.stage, chip: "m" };
       const closer = l.cl ? `<b>${esc(l.cl.split(" ")[0])}</b>${l.cl2 ? " + " + esc(l.cl2.split(" ")[0]) : ""}` : `<span class="miss">inconnu</span>`;
       const how = (l.how === "claim" ? `<br><span class="miss">attribué par Alex</span>` : "")
-        + (l.cd ? `<br><span class="miss">call I3 le ${frDateFull(l.cd)}${l.cv === "OUI" ? " · vendu" : l.cv === "FOLLOW_UP" ? " · follow-up" : ""}</span>`
+        + (l.cd ? `<br><span class="miss">call I3 le ${frDateFull(l.cd)}${l.cv === "OUI" ? " · vendu I3" : l.cv === "FOLLOW_UP" ? " · follow-up I3" : l.cv === "VALAR" ? " · parti chez Valar" : l.cv === "NON_PITCHE" ? " · non pitché" : ""}</span>`
         : l.how === "src" ? `<br><span class="miss">noté par Valar</span>` : "")
         + (l.pend ? `<br><span class="chip o">⏳ réclamé par ${esc(l.pend.split(" ")[0])}</span>` : "")
         + (!l.pend && (!l.cl || !l.i3) ? `<br><button class="btn ghost" style="padding:3px 9px;font-size:12px;margin-top:4px" data-vlclaim="${esc(l.id)}">🙋 C'est mon lead</button>` : "");
@@ -3692,6 +3758,7 @@ function leadStatut(c) {
   if (c.v === "FOLLOW_UP") return "FOLLOW_UP";
   if (c.v === "NON") return "NON";
   if (c.v === "NON_PITCHE") return "NON_PITCHE";
+  if (c.v === "VALAR") return "VALAR";
   if (c.s === "NON") return "NOSHOW";
   return "AUTRE";
 }
@@ -3734,6 +3801,7 @@ function renderLeads() {
     { k: "FOLLOW_UP", label: "Follow-up" },
     { k: "NON", label: "Pitché sans vente" },
     { k: "NON_PITCHE", label: "Non pitché" },
+    { k: "VALAR", label: "Valar 🏦" },
     { k: "NOSHOW", label: "No-show" },
     { k: "AUTRE", label: "Autres" },
   ], ldSel.statut, k => ldSel.statut = k);
@@ -3833,7 +3901,7 @@ function buildBrief() {
   lines.push(`Calls passés et renseignés : ${s.passes} · non renseignés ou à venir : ${s.calls - s.passes}`);
   lines.push(`Présents : ${s.shows} sur les ${s.passes} calls renseignés, soit *${fmtP(s.tShowPasses, 0)}* de show-up`);
   lines.push(`No-show : ${s.noshow} · reprogrammés/annulés : ${s.reprog + s.annule}`);
-  lines.push(`Sur les présents : ${s.pitched} pitché(s) + ${s.fuShows} follow-up(s) + ${s.nonPitche} non pitché(s)`);
+  lines.push(`Sur les présents : ${s.pitched} pitché(s) + ${s.fuShows} follow-up(s) + ${s.nonPitche} non pitché(s) + ${s.valar} parti(s) chez Valar`);
   lines.push("");
   lines.push(`Ventes : ${s.ventes} · CA signé sur la période : *${fmtE(s.ca)}*`);
   const tmNow = TODAY_ISO.slice(0, 7);
@@ -3841,7 +3909,7 @@ function buildBrief() {
   const caMois = DATA.calls.filter(c => isSale(c) && saleD(c).slice(0, 7) === tmNow).reduce((a, c) => a + (c.p || c.pp || 0), 0);
   const caTotal = DATA.calls.filter(c => isSale(c) && saleD(c) >= "2026").reduce((a, c) => a + (c.p || c.pp || 0), 0);
   lines.push(`CA signé mois en cours : *${fmtE(caMois)}* · total 2026 : *${fmtE(caTotal)}*`);
-  lines.push(`Taux de closing : *${fmtP(s.shows ? 100 * s.ventes / s.shows : null, 0)}* des présents · *${fmtP(s.tClosPitche, 0)}* des pitchés`);
+  lines.push(`Taux de closing : *${fmtP(s.shows ? 100 * s.ventes / s.shows : null, 0)}* des présents · *${fmtP(s.tClosShowHV, 0)}* des présents hors Valar · *${fmtP(s.tClosPitche, 0)}* des pitchés`);
   lines.push(`CA par call présent : ${s.shows ? fmtE(s.ca / s.shows) : "·"} · CA par call booké (présent ou non) : ${s.passes ? fmtE(s.ca / s.passes) : "·"}`);
   if (ads.spend > 0) {
     lines.push("");

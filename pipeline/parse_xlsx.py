@@ -163,6 +163,10 @@ def norm_vente(s):
         return ""
     if "rembours" in n:
         return "REMBOURSEMENT"
+    # lead redirigé chez Valar Gestion Privée (console : « Valar (non pitché) »,
+    # ou « Valar » tapé à la main) : bucket à part, hors non pitché
+    if "valar" in n:
+        return "VALAR"
     if "non pitch" in n or ("pitche" in n and n.startswith("non")):
         return "NON_PITCHE"
     if n.startswith("oui"):
@@ -234,7 +238,7 @@ def main(xlsx_path, out_path):
                 vente = norm_vente(cell_str(g("vente")))
                 # règle Alex 28/08 : un résultat rempli (vente, follow-up, non pitché...)
                 # implique que le lead était présent, même si SHOW UP est resté vide
-                if not show_up and vente in ("OUI", "NON", "FOLLOW_UP", "NON_PITCHE", "REMBOURSEMENT"):
+                if not show_up and vente in ("OUI", "NON", "FOLLOW_UP", "NON_PITCHE", "VALAR", "REMBOURSEMENT"):
                     show_up = "OUI"
                 booking = parse_date(g("booking_date"))
                 relance = parse_date(g("relance"))

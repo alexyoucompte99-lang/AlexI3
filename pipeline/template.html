@@ -513,7 +513,7 @@ function weeksIn(r) { return DATA.weeks.filter(w => w.start >= r.from.slice(0, 1
 const isSale = (c) => c.v === "OUI" || (c.vir && c.v !== "REMBOURSEMENT");
 function st(rows) {
   const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
-              pitched: 0, nonPitche: 0, ventes: 0, remb: 0, follow: 0, ca: 0,
+              pitched: 0, nonPitche: 0, valar: 0, ventes: 0, remb: 0, follow: 0, ca: 0,
               qSum: 0, qN: 0, ventesAvecPrix: 0 };
   for (const c of rows) {
     if (c.s === "OUI") o.shows++;
@@ -522,7 +522,8 @@ function st(rows) {
     else if (c.s === "ANNULE") o.annule++;
     else o.suVide++;
     if (c.s === "OUI") {
-      if (c.v === "NON_PITCHE") o.nonPitche++;
+      if (c.v === "VALAR") o.valar++; /* lead redirigé chez Valar : ni pitché ni non pitché */
+      else if (c.v === "NON_PITCHE") o.nonPitche++;
       else if (["OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
       if (c.q != null) { o.qSum += c.q; o.qN++; }
     }
@@ -536,6 +537,8 @@ function st(rows) {
   o.tClosBooke = o.calls ? 100 * o.ventes / o.calls : null;
   o.tClosShow = o.shows ? 100 * o.ventes / o.shows : null;
   o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
+  o.tValar = o.shows ? 100 * o.valar / o.shows : null;
+  o.tClosShowHV = o.shows - o.valar ? 100 * o.ventes / (o.shows - o.valar) : null;
   o.panier = o.ventesAvecPrix ? o.ca / o.ventesAvecPrix : null;
   o.qMoy = o.qN ? o.qSum / o.qN : null;
   return o;
@@ -804,7 +807,7 @@ function renderKpis(r, rows, wks) {
       `${fmtN(s.calls)} calls bookés sur la période`,
       "Ce que rapporte en moyenne une résa, présents et absents confondus : la vraie valeur d'un booking.",
       deltaTag(s.calls ? s.ca / s.calls : null, ps?.calls ? ps.ca / ps.calls : null)) +
-    kpiTile("Non pitchés / présents", fmtP(s.tNonPitche, 1), `${fmtN(s.nonPitche)} lead(s) présent(s) non pitché(s)`,
+    kpiTile("Non pitchés / présents", fmtP(s.tNonPitche, 1), `${fmtN(s.nonPitche)} lead(s) présent(s) non pitché(s)` + (s.valar ? ` · + ${fmtN(s.valar)} parti(s) chez Valar (${fmtP(s.tValar, 0)}), closing hors Valar ${fmtP(s.tClosShowHV, 0)}` : ""),
       "Hors cible, pas le budget, décisionnaire absent : ces leads consomment un call sans chance de vente. À challenger avec la qualification.",
       deltaTag(s.tNonPitche, ps?.tNonPitche, true)) +
     kpiTile("Qualité des leads", s.qMoy == null ? "·" : s.qMoy.toFixed(1).replace(".", ",") + "/10", `${fmtN(s.qN)} leads notés`,

@@ -85,17 +85,19 @@ def window(calls, ads, first, last):
     pitched = [c for c in shows if c["vente"] in ("OUI", "NON", "REMBOURSEMENT")]
     fu = [c for c in shows if c["vente"] == "FOLLOW_UP"]
     nonp = [c for c in shows if c["vente"] == "NON_PITCHE"]
+    valar = [c for c in shows if c["vente"] == "VALAR"]   # partis chez Valar : hors non pitché
     f, t = first.isoformat(), last.isoformat()
     ventes = [c for c in calls if is_sale(c) and f <= sale_day(c) <= t]
     return {
         "first": first, "last": last, "days": (last - first).days + 1,
         "n": len(rows), "shows": len(shows), "noshow": len(noshow), "pending": len(pending),
-        "reprog": len(reprog), "pitched": len(pitched), "fu": len(fu), "nonp": len(nonp),
+        "reprog": len(reprog), "pitched": len(pitched), "fu": len(fu), "nonp": len(nonp), "valar": len(valar),
         "ventes": len(ventes), "ca": sum(sale_amount(c) for c in ventes),
         "spend": spend_between(ads, first, last), "booked": booked_between(calls, first, last),
         "showup": rate(len(shows), len(shows) + len(noshow) + len(pending)),
         "rendement": rate(len(shows), len(rows)),
         "closing": rate(len(ventes), len(shows)),
+        "closing_hv": rate(len(ventes), len(shows) - len(valar)),
         "part_nonp": rate(len(nonp), len(shows)),
     }
 
@@ -321,7 +323,8 @@ def build_recap_thomas(x):
     if x["sans_vente"] is not None and x["sans_vente"] >= SANS_VENTE_ORANGE:
         pts.append(f"{x['sans_vente']} jours sans vente")
     if w7["shows"] >= 5:
-        pts.append(f"closing {fp(w7['closing'])} des présents sur 7 j ({fp(w28['closing'])} sur 28 j, 24 % en juillet)")
+        pts.append(f"closing {fp(w7['closing'])} des présents sur 7 j ({fp(w28['closing'])} sur 28 j, 24 % en juillet"
+                   + (f", {fp(w28['closing_hv'])} hors Valar" if w28["valar"] else "") + ")")
         if w7["part_nonp"] and w7["part_nonp"] > CIBLE_NON_PITCHE:
             pts.append(f"{w7['nonp']} présents sur {w7['shows']} non pitchés")
     if len(x["fus"]) >= 5:

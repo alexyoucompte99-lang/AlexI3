@@ -293,8 +293,14 @@ def attach_valar(calls, valar, claims=()):
         l["cl2"] = from_src[1] if len(from_src) > 1 else ""
         l["how"] = "src" if from_src else ("call" if c else "")
         if c:
+            # le call I3 est retrouvé dans le CRM Valar : le lead est parti chez Valar.
+            # Un « non pitché » (ou un présent sans résultat) devient « Parti chez Valar »
+            # dans la console (va = "crm" : déduit du CRM, pas saisi par le closer).
+            c["vl"] = l.get("stage") or "r1"
+            if c.get("s") == "OUI" and (c.get("v") or "") in ("NON_PITCHE", "AUTRE", ""):
+                c["v"], c["va"] = "VALAR", "crm"
             l["cd"] = c.get("d")        # date du call I3
-            l["cv"] = c.get("v")        # issue du call I3 (OUI / FOLLOW_UP / NON…)
+            l["cv"] = c.get("v")        # issue du call I3 (OUI / FOLLOW_UP / VALAR / NON…)
             l["cs"] = c.get("s")        # show-up du call I3
             l["cn"] = c.get("n")        # nom tel qu'écrit dans le Sheet closing
         i3_src = bool(VALAR_I3_RE.search(src)) and not VALAR_NON_I3_RE.search(src)

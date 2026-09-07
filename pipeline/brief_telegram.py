@@ -89,6 +89,7 @@ def build_brief(data, ads, days, today):
     pitched = pitched_all  # dénominateur du taux de closing (follow-ups compris)
     n_pitche_seul = len(pitched_all) - fu
     non_pitche = sum(1 for c in rows if c["show_up"] == "OUI" and c["vente"] == "NON_PITCHE")
+    valar = sum(1 for c in rows if c["show_up"] == "OUI" and c["vente"] == "VALAR")
     # ventes comptées le jour du cochage (règle Alex 01/09), pas le jour du call
     ventes = [c for c in data["calls"] if is_sale(c) and f_iso <= sale_day(c) <= t_iso]
     ca = sum((c.get("prix_confirme") or c.get("prix") or 0) for c in ventes)
@@ -110,10 +111,11 @@ def build_brief(data, ads, days, today):
         f"Calls passés et renseignés : {len(filled)} · non renseignés ou à venir : {len(rows) - len(filled)}",
         f"Présents : {len(shows)} sur {len(filled)} calls renseignés, soit *{fmt_p(t_show)}* de show-up",
         f"No-show : {noshow} · reprogrammés/annulés : {reprog}",
-        f"Sur les présents : {n_pitche_seul} pitché(s) + {fu} follow-up(s) + {non_pitche} non pitché(s)", "",
+        f"Sur les présents : {n_pitche_seul} pitché(s) + {fu} follow-up(s) + {non_pitche} non pitché(s) + {valar} parti(s) chez Valar", "",
         f"Ventes : {len(ventes)} · CA signé sur la période : *{fmt_e(ca)}*",
         f"CA signé mois en cours : *{fmt_e(ca_mois(data, today))}*",
         f"Taux de closing : *{fmt_p(100 * len(ventes) / len(shows) if shows else None)}* des présents"
+        f" · *{fmt_p(100 * len(ventes) / (len(shows) - valar) if len(shows) - valar > 0 else None)}* hors Valar"
         f" · *{fmt_p(100 * len(ventes) / len(pitched) if pitched else None)}* des pitchés",
         f"CA par call présent : {fmt_e(ca / len(shows)) if shows else '·'}"
         f" · CA par call booké : {fmt_e(ca / len(filled)) if filled else '·'}",
