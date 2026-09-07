@@ -703,6 +703,12 @@ __FUNNEL_CSS__
           <label for="eowLeads">Ton ressenti sur la qualité des leads</label>
           <div class="range-wrap"><input type="range" id="eowLeads" min="0" max="10" step="1" value="5"><output id="eowLeadsOut">5/10</output></div>
         </div>
+        <div class="field">
+          <label for="eowVolume">Le volume d'appels : on bouge la qualification ?</label>
+          <div class="sub" style="margin-bottom:8px">Moins d'appels = filtre plus strict, que des leads chauds. Plus d'appels = filtre plus souple, plus de calls mais moins qualifiés.</div>
+          <div class="seg three" id="eowVolumeSeg"></div>
+          <input type="hidden" id="eowVolume" value="Comme maintenant">
+        </div>
         <div class="field"><label for="eowGood">Ce qui a bien marché cette semaine</label><textarea id="eowGood" placeholder="Un call, une approche, un moment où tu t'es senti fort..."></textarea></div>
         <div class="field"><label for="eowHard">Ce qui a bloqué ou pesé</label><textarea id="eowHard" placeholder="Une difficulté, une frustration, un doute..."></textarea></div>
         <div class="field"><label for="eowObj">L'objection ou le profil qui t'a le plus challengé</label><textarea id="eowObj"></textarea></div>
@@ -736,6 +742,12 @@ __FUNNEL_CSS__
           <div class="field">
             <label for="eodEnergy">Ton niveau d'énergie aujourd'hui</label>
             <div class="range-wrap"><input type="range" id="eodEnergy" min="0" max="10" step="1" value="5"><output id="eodEnergyOut">5/10</output></div>
+          </div>
+          <div class="field">
+            <label for="eodVolume">Le volume d'appels aujourd'hui : on bouge la qualification ?</label>
+            <div class="sub" style="margin-bottom:8px">Moins d'appels = filtre plus strict. Plus d'appels = filtre plus souple, plus de calls mais moins qualifiés.</div>
+            <div class="seg three" id="eodVolumeSeg"></div>
+            <input type="hidden" id="eodVolume" value="Comme maintenant">
           </div>
           <div class="field"><label for="eodMood">Ta journée en deux mots</label><textarea id="eodMood" placeholder="Grosse journée, calls durs, un beau closing, la forme, un coup de mou..."></textarea></div>
           <div class="field"><label for="eodFlag">Un truc à signaler (optionnel)</label><textarea id="eodFlag" placeholder="Un blocage, une info pour l'équipe, un lead à surveiller..."></textarea></div>
@@ -2389,6 +2401,25 @@ function renderFollowups() {
   $("fuCsv").href = "data:text/csv;charset=utf-8," + encodeURIComponent("﻿" + csv);
 }
 
+/* choix à 3 boutons du volume d'appels souhaité (EOW/EOD) : la valeur vit dans un input caché */
+const VOLUME_OPTS = [["Moins d'appels", "➖ Moins d'appels", "qualif plus stricte"], ["Comme maintenant", "✅ Comme maintenant", "on ne change rien"], ["Plus d'appels", "➕ Plus d'appels", "qualif plus souple"]];
+function volumeSeg(segId, inputId, onPick) {
+  const inp = $(inputId), host = $(segId);
+  if (!VOLUME_OPTS.some(o => o[0] === inp.value)) inp.value = "Comme maintenant";
+  const draw = () => {
+    host.innerHTML = "";
+    for (const [k, lbl, sub] of VOLUME_OPTS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = `${esc(lbl)}<br><span style="font-size:11px;font-weight:400;opacity:.8">${esc(sub)}</span>`;
+      b.setAttribute("aria-pressed", String(inp.value === k));
+      b.addEventListener("click", () => { inp.value = k; draw(); onPick(); });
+      host.appendChild(b);
+    }
+  };
+  draw();
+}
+
 /* choix du closer en boutons (EOW/EOD) : la valeur vit dans un input caché,
    les brouillons et l'envoi ne changent pas */
 function closerSeg(segId, inputId, onPick, extra = [], def = "") {
@@ -2416,7 +2447,7 @@ function closerSeg(segId, inputId, onPick, extra = [], def = "") {
 }
 
 /* ================= EOW ================= */
-const EOW_FIELDS = ["eowCloser", "eowEnergy", "eowLeads", "eowGood", "eowHard", "eowObj", "eowNeed", "eowFree"];
+const EOW_FIELDS = ["eowCloser", "eowEnergy", "eowLeads", "eowVolume", "eowGood", "eowHard", "eowObj", "eowNeed", "eowFree"];
 function initEow() {
   const saved = JSON.parse(localStorage.getItem("eow-draft") || "{}");
   for (const id of EOW_FIELDS) if (saved[id] != null) $(id).value = saved[id];
@@ -2427,11 +2458,13 @@ function initEow() {
   };
   EOW_FIELDS.forEach(id => $(id).addEventListener("input", sync));
   closerSeg("eowCloserSeg", "eowCloser", sync);
+  volumeSeg("eowVolumeSeg", "eowVolume", sync);
   sync();
   const eowText = () => {
     const monday = new Date(NOW - ((NOW.getDay() + 6) % 7) * DAY);
     return `🧭 EOW ${$("eowCloser").value}, semaine du ${frDateFull(iso(monday))}
 Énergie : ${$("eowEnergy").value}/10 · Ressenti qualité des leads : ${$("eowLeads").value}/10
+📞 Volume d'appels souhaité : ${$("eowVolume").value}
 ✅ Ce qui a bien marché : ${$("eowGood").value || "·"}
 🧱 Ce qui a bloqué : ${$("eowHard").value || "·"}
 🗣 Objection / profil le plus challengeant : ${$("eowObj").value || "·"}
@@ -2441,7 +2474,7 @@ function initEow() {
   const eowMsg = (m) => { $("eowOk").textContent = m; $("eowOk").style.display = "inline"; setTimeout(() => $("eowOk").style.display = "none", 5000); };
   const eowToSheet = () => bridgePost({
     what: "eow", closer: $("eowCloser").value,
-    energie: $("eowEnergy").value, leads: $("eowLeads").value,
+    energie: $("eowEnergy").value, leads: $("eowLeads").value, volume: $("eowVolume").value,
     good: $("eowGood").value, hard: $("eowHard").value,
     obj: $("eowObj").value, need: $("eowNeed").value, free: $("eowFree").value,
   });
@@ -2469,12 +2502,13 @@ function initEow() {
   $("eowClear").addEventListener("click", () => {
     localStorage.removeItem("eow-draft");
     EOW_FIELDS.forEach(id => { const el = $(id); if (el.tagName === "TEXTAREA") el.value = ""; });
-    $("eowEnergy").value = 5; $("eowLeads").value = 5; sync();
+    $("eowEnergy").value = 5; $("eowLeads").value = 5; $("eowVolume").value = "Comme maintenant";
+    volumeSeg("eowVolumeSeg", "eowVolume", sync); sync();
   });
 }
 
 /* ================= EOD (ressenti du jour, optionnel) ================= */
-const EOD_FIELDS = ["eodCloser", "eodEnergy", "eodMood", "eodFlag"];
+const EOD_FIELDS = ["eodCloser", "eodEnergy", "eodVolume", "eodMood", "eodFlag"];
 const newSendId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
 const hhmm = (d) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 /* Envoi fiable vers le pont (EOD closers + EOD setter) : id d'envoi réutilisé jusqu'à confirmation
@@ -2509,6 +2543,7 @@ function initEod() {
   EOD_FIELDS.forEach(id => $(id).addEventListener("input", sync));
   // par défaut : dernier closer qui a envoyé depuis ce navigateur, sinon Romain
   closerSeg("eodCloserSeg", "eodCloser", sync, [], [localStorage.getItem("eod-closer"), "Romain"]);
+  volumeSeg("eodVolumeSeg", "eodVolume", sync);
   sync();
   const showBanner = () => { // EOD déjà envoyé aujourd'hui depuis ce navigateur
     const last = JSON.parse(localStorage.getItem("eod-sent") || "null");
@@ -2528,7 +2563,8 @@ function initEod() {
     localStorage.removeItem("eod-draft");
     sendId = newSendId();
     ["eodMood", "eodFlag"].forEach(id => $(id).value = "");
-    $("eodEnergy").value = 5; sync();
+    $("eodEnergy").value = 5; $("eodVolume").value = "Comme maintenant";
+    volumeSeg("eodVolumeSeg", "eodVolume", sync); sync();
     $("eodOk").style.display = "none";
   };
   $("eodSend").addEventListener("click", async () => {
@@ -2539,7 +2575,7 @@ function initEod() {
     $("eodOk").style.display = "none";
     const closer = $("eodCloser").value;
     const ok = await reliablePost({
-      what: "eod", id: sendId, closer, energie: $("eodEnergy").value,
+      what: "eod", id: sendId, closer, energie: $("eodEnergy").value, volume: $("eodVolume").value,
       mood: $("eodMood").value, flag: $("eodFlag").value,
     }, btn, "✅ Envoyer mon EOD");
     btn.disabled = false; $("eodClear").disabled = false;

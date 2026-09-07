@@ -29,9 +29,10 @@ def send(token, chat, text):
 
 
 def fmt_eow(vals):
-    date, closer, energie, leads, good, hard, obj, need, free = (vals + [""] * 9)[:9]
+    date, closer, energie, leads, good, hard, obj, need, free, volume = (vals + [""] * 10)[:10]
     return (f"EOW reçu de {closer or '?'}\n\n"
-            f"Énergie : {energie or '?'}/10 · Ressenti leads : {leads or '?'}/10\n\n"
+            f"Énergie : {energie or '?'}/10 · Ressenti leads : {leads or '?'}/10\n"
+            f"📞 Volume d'appels souhaité : {volume or '·'}\n\n"
             f"Ce qui a marché : {good or '·'}\n"
             f"Ce qui a bloqué : {hard or '·'}\n"
             f"Objection : {obj or '·'}\n"
@@ -40,9 +41,10 @@ def fmt_eow(vals):
 
 
 def fmt_eod(vals):
-    date, closer, energie, mood, flag = (vals + [""] * 5)[:5]
+    date, closer, energie, mood, flag, _id, volume = (vals + [""] * 7)[:7]
     return (f"🌙 EOD reçu de {closer or '?'}\n\n"
             f"Énergie : {energie or '?'}/10\n"
+            f"📞 Volume d'appels souhaité : {volume or '·'}\n"
             f"Journée : {mood or '·'}\n"
             f"À signaler : {flag or '·'}")
 
