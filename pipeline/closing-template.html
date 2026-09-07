@@ -295,6 +295,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabFollowups" aria-selected="false" data-panel="panelFollowups">Follow-ups <span class="badge" id="fuBadge"></span></button>
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabAnnules" aria-selected="false" data-panel="panelAnnules">Annulés 🚫 <span class="badge" id="anBadge"></span></button>
+    <button class="tab" role="tab" id="tabJustine" aria-selected="false" data-panel="panelJustine">Justine 💶 <span class="badge" id="juBadge"></span></button>
     <button class="tab" role="tab" id="tabIdea" aria-selected="false" data-panel="panelIdea">Idées 💡</button>
     <button class="tab" role="tab" id="tabFunnel" aria-selected="false" data-panel="panelFunnel">Funnel 🔒</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
@@ -836,6 +837,29 @@ __FUNNEL_CSS__
       <div class="kpis" id="anKpis" style="margin-bottom:14px"></div>
       <div class="card full"><div class="tscroll"><table id="anTable"></table></div>
         <div class="sub" id="anNote" style="margin-top:8px"></div></div>
+    </section>
+  </div>
+
+  <!-- ================== JUSTINE (ventes à ajouter, facturation) ================== -->
+  <div id="panelJustine" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Facturation · Justine</span>
+      <h2>Nouvelles ventes à ajouter</h2>
+      <p class="lede">Chaque vente validée par un closer (VENTE = OUI dans le Sheet) arrive ici avec toutes les infos du prospect.
+        Une fois la vente ajoutée de ton côté, coche « Ajouté » : la coche est enregistrée dans le Sheet et partagée, la ligne passe dans « Ajoutées ».
+        Les ventes d'avant le 1er septembre sont considérées déjà traitées (visibles avec « Tout 2026 »).</p>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">État</span><span id="juEtatPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="juPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="juCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <input type="text" id="juSearch" placeholder="Chercher un nom..." style="min-width:170px"></div>
+      </div>
+      <div class="kpis" id="juKpis" style="margin-bottom:14px"></div>
+      <div class="card full"><div class="tscroll"><table id="juTable"></table></div>
+        <div class="sub" id="juNote" style="margin-top:8px"></div></div>
+      <p class="sub" style="margin-top:10px">Prix = prix confirmé par Justine s'il est renseigné, sinon prix proposé par le closer. Virement = colonne « Virement reçu validé par Justine » du Sheet ;
+        la case se coche toujours dans le Sheet, la console ne fait que l'afficher. « Voir la fiche » déplie toutes les infos, « Copier » met la fiche dans le presse-papiers.</p>
     </section>
   </div>
 
@@ -2896,6 +2920,152 @@ function renderAnnules() {
   $("anNote").textContent = list.length > 300 ? `${list.length} lignes, les 300 plus récentes affichées.` : (list.length ? "" : "Aucun lead annulé sur cette sélection.");
 }
 
+/* ================= onglet Justine (ventes à ajouter, facturation) ================= */
+/* Ventes (règle isSale) avec toutes les infos du prospect ; Justine coche « Ajouté »
+   quand la vente est passée dans son suivi. Coche partagée via le pont what=iclosed_claim
+   (même onglet Sheet « Relances iClosed » que les relances), lead JUSTINE|<onglet>|<nom>,
+   closer « Justine », statut AJOUTE / ANNULE ; relue par aggregate_closing (champ ja).
+   Overlay localStorage en attendant le refresh du Sheet. */
+const JU_START = "2026-09-01"; /* ventes antérieures = déjà traitées par Justine */
+const juNorm = (n) => (n || "").replace(/\s+/g, " ").trim().toLowerCase();
+const juKey = (c) => "JUSTINE|" + (c.st || "") + "|" + juNorm(c.n);
+const juLs = (c) => "ju:" + juKey(c);
+let juSel = { etat: "todo", period: "sept", closer: "" };
+(function applyJuOverlays() {
+  for (const c of DATA.calls) {
+    if (!isSale(c)) continue;
+    let v = null;
+    try { v = localStorage.getItem(juLs(c)); } catch (e) {}
+    if (v == null) continue;
+    const [flag, d] = v.split("|");
+    /* le Sheet a rattrapé l'état local -> overlay purgé */
+    if ((flag === "1" && c.ja) || (flag === "0" && !c.ja)) { try { localStorage.removeItem(juLs(c)); } catch (e) {} continue; }
+    if (flag === "1") c.ja = d || TODAY_ISO; else delete c.ja;
+  }
+})();
+const juVirChip = (c) => c.vir ? `<span class="chip g">Virement reçu ✓</span>`
+  : c.var ? `<span class="chip o">Virement à recevoir</span>` : `<span class="chip r">Pas encore validé</span>`;
+const juPrix = (c) => c.pc ? `<b>${fmtE(c.pc)}</b><br><span class="miss">confirmé</span>`
+  : c.pp ? `<b>${fmtE(c.pp)}</b><br><span class="miss">proposé · à confirmer</span>` : "·";
+const juMens = (c) => esc(c.mensc || c.mens || "") || "·";
+function juFiche(c) {
+  const L = [];
+  L.push(`Prospect : ${c.n}`);
+  if (c.tel) L.push(`Téléphone : ${c.tel}`);
+  if (c.mail) L.push(`Mail : ${c.mail}`);
+  L.push(`Closer : ${c.c}`);
+  L.push(`Call : ${frDateFull(c.d)}${c.hh ? " " + c.hh : ""}`);
+  L.push(`Vente cochée le : ${frDateFull(saleD(c))}`);
+  L.push(`Prix : ${c.pc ? fmtE(c.pc) + " (confirmé)" : c.pp ? fmtE(c.pp) + " (proposé, à confirmer)" : "·"}`);
+  if (c.mensc || c.mens) L.push(`Mensualités : ${c.mensc || c.mens}`);
+  L.push(`Virement : ${c.vir ? "reçu, validé" : c.var ? "à recevoir" : "pas encore validé"}`);
+  if (c.pay) L.push(`Info paiement : ${c.pay}`);
+  if (c.c250) L.push(`+250k cash à placer : ${c.c250}`);
+  if (c.ep) L.push(`Épargne mensuelle (iClosed) : ${c.ep}`);
+  if (c.pa) L.push(`Patrimoine dispo (iClosed) : ${c.pa}`);
+  if (c.q != null) L.push(`Qualification : ${c.q}/10`);
+  if (c.utm) L.push(`Source : ${c.utm}`);
+  if (c.b) L.push(`Booké le : ${frDateFull(c.b)}`);
+  if (c.com) L.push(`Commentaire closer : ${c.com}`);
+  if (c.obj) L.push(`Objection : ${c.obj}`);
+  if (c.rec) L.push(`Enregistrement : ${c.rec}`);
+  L.push(`Sheet : ${c.st || "?"} · ligne ${c.sr || "?"}`);
+  return L.join("\n");
+}
+function juDetail(c) {
+  const row = (k, v) => v ? `<div><span class="eyebrow" style="display:block;margin-bottom:2px">${k}</span>${v}</div>` : "";
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 18px;padding:4px 0">
+    ${row("Téléphone", c.tel ? `<a class="tel" href="https://wa.me/${esc(anWa(c.tel))}" target="_blank" rel="noopener">${esc(c.tel)}</a>` : "")}
+    ${row("Mail", c.mail ? `<a href="mailto:${esc(c.mail)}">${esc(c.mail)}</a>` : "")}
+    ${row("Call", `${frDateFull(c.d)}${c.hh ? " " + esc(c.hh) : ""}`)}
+    ${row("Booké le", c.b ? frDateFull(c.b) : "")}
+    ${row("Prix proposé (closer)", c.pp ? fmtE(c.pp) : "")}
+    ${row("Prix confirmé (Justine)", c.pc ? fmtE(c.pc) : "")}
+    ${row("Mensualités (closer)", esc(c.mens))}
+    ${row("Mensualités confirmées", esc(c.mensc))}
+    ${row("Info paiement", esc(c.pay))}
+    ${row("Virement à recevoir", c.var ? "coché" : "")}
+    ${row("+250k cash à placer", esc(c.c250))}
+    ${row("Épargne mensuelle (iClosed)", esc(c.ep))}
+    ${row("Patrimoine dispo (iClosed)", esc(c.pa))}
+    ${row("Qualification", c.q != null ? c.q + "/10" : "")}
+    ${row("Vidéo préchauffe", c.vid === "OUI" ? "vue" : c.vid === "NON" ? "pas vue" : c.vid === "PAS" ? "pas regardée" : "")}
+    ${row("Source / UTM", esc(c.utm))}
+    ${row("Enregistrement", c.rec ? `<a href="${esc(c.rec)}" target="_blank" rel="noopener">ouvrir</a>` : "")}
+    ${row("Sheet", `${esc(c.st || "?")} · ligne ${c.sr || "?"}`)}
+  </div>
+  ${c.com ? `<div style="margin-top:8px"><span class="eyebrow">Commentaire closer</span><div style="white-space:pre-wrap">${esc(c.com)}</div></div>` : ""}
+  ${c.obj ? `<div style="margin-top:8px"><span class="eyebrow">Objection</span><div style="white-space:pre-wrap">${esc(c.obj)}</div></div>` : ""}`;
+}
+function renderJustine() {
+  const sales = DATA.calls.filter(c => isSale(c) && c.tm >= "2026");
+  $("juBadge").textContent = sales.filter(c => !c.ja && saleD(c) >= JU_START).length || "";
+  pillRow("juEtatPills", [{ k: "todo", label: "À ajouter" }, { k: "done", label: "Ajoutées" }, { k: "all", label: "Toutes" }],
+    juSel.etat, k => juSel.etat = k, renderJustine);
+  pillRow("juPeriodPills", [{ k: "sept", label: "Depuis le 1er sept." }, { k: "mois", label: "Mois en cours" }, { k: "30", label: "30 j" }, { k: "", label: "Tout 2026" }],
+    juSel.period, k => juSel.period = k, renderJustine);
+  pillRow("juCloserPills", [{ k: "", label: "Tous" }, ...TOP3.map(n => ({ k: n, label: n.split(" ")[0] }))],
+    juSel.closer, k => juSel.closer = k, renderJustine);
+  let from = null;
+  if (juSel.period === "sept") from = JU_START;
+  else if (juSel.period === "mois") from = TODAY_ISO.slice(0, 8) + "01";
+  else if (juSel.period) from = iso(new Date(+new Date(TODAY_ISO) - (Number(juSel.period) - 1) * DAY));
+  const q = $("juSearch").value.trim().toLowerCase();
+  const inSel = sales.filter(c => (!from || saleD(c) >= from) && (!juSel.closer || c.c === juSel.closer)
+      && (!q || (c.n || "").toLowerCase().includes(q)));
+  const list = inSel.filter(c => juSel.etat === "todo" ? !c.ja : juSel.etat === "done" ? !!c.ja : true)
+    .sort((a, b) => (saleD(b) + (b.d || "")).localeCompare(saleD(a) + (a.d || "")));
+  const todo = inSel.filter(c => !c.ja), done = inSel.filter(c => c.ja);
+  const caOf = (arr) => arr.reduce((s, c) => s + (c.p || c.pp || 0), 0);
+  $("juKpis").innerHTML =
+    kpiTile("À ajouter", fmtN(todo.length), `${fmtE(caOf(todo))} sur la sélection`) +
+    kpiTile("Ajoutées", fmtN(done.length), `${fmtE(caOf(done))}`) +
+    kpiTile("Virement pas validé", fmtN(inSel.filter(c => !c.vir).length), "vente cochée par le closer, case Justine vide") +
+    kpiTile("Prix à confirmer", fmtN(inSel.filter(c => !c.pc).length), "pas de prix confirmé dans le Sheet");
+  $("juTable").innerHTML = `<thead><tr><th>Ajouté</th><th>Vente le</th><th>Closer</th><th>Prospect</th><th class="num">Prix</th><th>Mensualités</th><th>Virement</th><th>Fiche</th></tr></thead><tbody>` +
+    list.slice(0, 300).map((c, i) => `<tr>
+      <td><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" data-ju="${i}" ${c.ja ? "checked" : ""} style="width:17px;height:17px;accent-color:var(--accent);cursor:pointer">${c.ja ? `<span class="miss">${frDate(c.ja)}</span>` : ""}</label></td>
+      <td>${frDateFull(saleD(c))}${saleD(c) !== c.d ? `<br><span class="miss">call ${frDate(c.d)}</span>` : ""}</td>
+      <td>${esc(c.c)}</td>
+      <td><b>${esc(c.n)}</b>${c.v !== "OUI" ? ` <span class="chip g">Vente (Justine)</span>` : ""}<br>
+        ${c.tel ? `<a class="tel" href="https://wa.me/${esc(anWa(c.tel))}" target="_blank" rel="noopener">${esc(c.tel)}</a>` : "<span class=\"miss\">pas de tél</span>"}
+        ${c.mail ? `<br><a href="mailto:${esc(c.mail)}">${esc(c.mail)}</a>` : ""}</td>
+      <td class="num">${juPrix(c)}</td>
+      <td>${juMens(c)}</td>
+      <td>${juVirChip(c)}</td>
+      <td style="white-space:nowrap"><button class="btn ghost" type="button" style="padding:4px 10px;font-size:12px" data-jusee="${i}">Voir la fiche</button>
+        <button class="btn ghost" type="button" style="padding:4px 10px;font-size:12px" data-jucopy="${i}">Copier</button></td>
+    </tr>
+    <tr hidden data-judetail="${i}"><td colspan="8" style="font-size:12.5px;color:var(--ink-2);background:var(--plane)">${juDetail(c)}</td></tr>`).join("") + "</tbody>";
+  $("juNote").textContent = list.length > 300 ? `${list.length} ventes, les 300 plus récentes affichées.`
+    : (list.length ? "" : (juSel.etat === "todo" ? "Rien à ajouter sur cette sélection ✓" : "Rien ici pour l'instant."));
+  $("juTable").querySelectorAll("input[data-ju]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const c = list[+cb.dataset.ju];
+      if (cb.checked) {
+        c.ja = TODAY_ISO;
+        try { localStorage.setItem(juLs(c), "1|" + TODAY_ISO); } catch (e) {}
+        bridgePost({ what: "iclosed_claim", lead: juKey(c), closer: "Justine", value: "AJOUTE" })
+          .then(ok => toast(ok ? `${c.n} : noté comme ajouté ✓` : "Noté sur ce navigateur (Sheet injoignable, réessaie plus tard)"));
+      } else {
+        delete c.ja;
+        try { localStorage.setItem(juLs(c), "0|" + TODAY_ISO); } catch (e) {}
+        bridgePost({ what: "iclosed_claim", lead: juKey(c), closer: "Justine", value: "ANNULE" })
+          .then(ok => toast(ok ? "Coche retirée ✓" : "Retirée sur ce navigateur (Sheet injoignable)"));
+      }
+      renderJustine();
+    });
+  });
+  $("juTable").querySelectorAll("[data-jusee]").forEach(b => b.addEventListener("click", () => {
+    const row = $("juTable").querySelector(`[data-judetail="${b.dataset.jusee}"]`);
+    if (row) { row.hidden = !row.hidden; b.textContent = row.hidden ? "Voir la fiche" : "Replier"; }
+  }));
+  $("juTable").querySelectorAll("[data-jucopy]").forEach(b => b.addEventListener("click", () => {
+    copyText(juFiche(list[+b.dataset.jucopy])).then(() => toast("Fiche copiée ✓"));
+  }));
+}
+
 /* ================= onglet À remplir (saisie closers -> Sheet) ================= */
 /* Le Sheet reste la source de vérité : la carte envoie what=call_update au pont
    (écriture par nom de colonne dans l'onglet du mois), la console relit le Sheet
@@ -4068,6 +4238,9 @@ csmSettingsInit();
 renderCsm();
 $("anSearch").addEventListener("input", renderAnnules);
 renderAnnules();
+$("tabJustine").addEventListener("click", renderJustine);
+$("juSearch").addEventListener("input", renderJustine);
+renderJustine();
 initEow();
 initEod();
 initEodSetter();

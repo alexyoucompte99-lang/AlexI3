@@ -142,6 +142,13 @@ def _call_day(iso_or_txt):
     return m.group(1) if m else ""
 
 
+def justine_key(c):
+    """Clé partagée de la coche « Ajouté » de Justine (même normalisation côté page :
+    minuscules, espaces réduits)."""
+    n = re.sub(r"\s+", " ", c.get("n") or "").strip().lower()
+    return f"JUSTINE|{c.get('st') or ''}|{n}"
+
+
 def attach_wa_confirms(calls, confirms):
     """Pose sur chaque call : wac (1er clic WhatsApp, 'YYYY-MM-DD HH:MM'),
     wan (nb de clics), war (date où le closer a coché « reçu », '' sinon).
@@ -347,6 +354,12 @@ def main(data_path, out_path, updated_at):
             # vente comptée si validée par le closer (OUI) OU par Justine (virement)
             "p": round(prix_eff) if (c.get("vente") in ("OUI", "REMBOURSEMENT") or c.get("virement")) else 0,
             "vir": bool(c.get("virement")),
+            # colonnes de Justine (onglet « Justine » de la console) : prix / mensualités
+            # confirmés, info paiement, case « Virement à recevoir »
+            "pc": round(c.get("prix_confirme") or 0),
+            "mensc": (c.get("mensualites_confirme") or "").strip(),
+            "pay": (c.get("paiement") or "").strip(),
+            "var": (c.get("virement_a_recevoir") or "").strip().upper() in ("TRUE", "VRAI", "OUI"),
             "com": (c.get("commentaire") or "").strip(),
             "obj": (c.get("objection") or "").strip(),
             # réponses du questionnaire iClosed (colonnes remplies par le Zap depuis le 06/09/2026)
@@ -412,6 +425,18 @@ def main(data_path, out_path, updated_at):
         if cl and cl.get("statut") != "ANNULE":
             l["cl"] = cl.get("closer") or ""
             l["cld"] = cl.get("d") or ""
+
+    # onglet « Justine » : ventes ajoutées par Justine (facturation). Même registre partagé
+    # « Relances iClosed » que les relances, lead préfixé JUSTINE|<onglet>|<nom normalisé>,
+    # closer « Justine », statut AJOUTE (dernière ligne par lead = état, ANNULE = décoché).
+    ju_claim = {}
+    for cl in d.get("iclosed_claims", []):
+        if (cl.get("lead") or "").startswith("JUSTINE|"):
+            ju_claim[cl["lead"]] = cl
+    for c in calls:
+        cl = ju_claim.get(justine_key(c))
+        if cl and cl.get("statut") == "AJOUTE":
+            c["ja"] = (cl.get("d") or "")[:10]
 
     # confirmations WhatsApp (page merci : clic ; console : reçu / non reçu),
     # rattachées aux calls par e-mail, sinon par nom ; le reste = orphelines

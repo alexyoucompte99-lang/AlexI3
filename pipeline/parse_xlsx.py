@@ -119,6 +119,10 @@ COL_MAP = {
     "relance faite": "relance_faite",  # colonne ajoutée par la console (coche Relancé)
     "epargne mensuelle": "epargne",      # réponses du questionnaire iClosed (Zap, depuis le 06/09/2026)
     "patrimoine dispo": "patrimoine",
+    # colonnes de Justine (facturation) : lues pour l'onglet « Justine » de la console closing
+    "mensualite confirme par justine": "mensualites_confirme",
+    "info paiment": "paiement", "info paiement": "paiement",
+    "virement a recevoir": "virement_a_recevoir",
 }
 
 
@@ -255,6 +259,9 @@ def main(xlsx_path, out_path):
                     "commentaire": cell_str(g("commentaire"))[:600],
                     "objection": cell_str(g("objection"))[:300],
                     "mensualites": cell_str(g("mensualites"))[:40],
+                    "mensualites_confirme": cell_str(g("mensualites_confirme"))[:40],
+                    "paiement": cell_str(g("paiement"))[:200],
+                    "virement_a_recevoir": cell_str(g("virement_a_recevoir"))[:80],
                     "cash250": cell_str(g("cash250"))[:20],
                     "video": cell_str(g("video"))[:20],
                     "recording": cell_str(g("recording"))[:200],
