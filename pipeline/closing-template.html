@@ -2205,6 +2205,7 @@ async function bridgePost(payload, opts = {}) {
     const txt = await r.text();
     const ok = txt.indexOf('"ok":true') !== -1;
     bridgePost.lastReason = ok ? "" : ((txt.match(/"raison":"([^"]*)"/) || [])[1] || "");
+    bridgePost.lastText = txt;
     if (ok && payload.what === "call_update" && payload.fields && typeof renderHistory === "function") {
       HIST_LOCAL.unshift({ local: true, ts: "", tab: payload.tab, row: payload.row, lead: payload.lead || "",
                            by: payload.by || "", action: payload.action || "", fields: JSON.stringify(payload.fields) });
@@ -3486,6 +3487,24 @@ async function fillSend(c, orig, state, btn) {
          d: replan ? c.d : null, hh: replan ? c.hh : null } }));
   toast("✅ C'est dans le Sheet, tié un tigre 🐯");
   renderFill();
+  if (state.v === "VALAR" && orig.v !== "VALAR") valarPush(c, state);
+}
+async function valarPush(c, state) {
+  /* le lead part chez Valar : créé dans l'onglet R1 du CRM Valar par le pont (what=valar_push,
+     anti-doublon sur mail / numéro / nom). Rien à faire pour le closer, juste un toast. */
+  const ok = await bridgePost({ what: "valar_push", lead: c.n, mail: c.mail, tel: c.tel, closer: c.c, by: modBy(),
+    date: c.d ? frDateFull(c.d) : "", rdv: state.vrdv || "", note: (state.vnote || "").trim(), com: (state.com || "").trim().slice(0, 600) });
+  const txt = bridgePost.lastText || "";
+  if (ok && txt.indexOf('"dup":true') !== -1) {
+    const st = (txt.match(/"statut":"([^"]*)"/) || [])[1] || "";
+    c.vl = c.vl || "r1";
+    toast(`🏦 ${c.n} est déjà dans le CRM Valar${st ? " (" + st + ")" : ""}`);
+  } else if (ok) {
+    c.vl = "r1";
+    toast(`🏦 ${c.n} créé dans le CRM Valar (onglet R1, à contacter)`);
+  } else {
+    toast("⚠️ Pas pu créer " + c.n + " dans le CRM Valar" + (bridgePost.lastReason ? " : " + bridgePost.lastReason : "") + ". Dis-le à Alex.");
+  }
 }
 
 /* ================= LEADS VALAR ================= */
