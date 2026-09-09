@@ -383,7 +383,7 @@ __FUNNEL_CSS__
     <section style="margin-top:16px">
       <span class="eyebrow">Par closer</span>
       <h2>Performances closers</h2>
-      <p class="lede">Les stats du closer choisi sur la période, puis le comparatif des trois. Une vente est comptée si elle est validée par le closer ou par le virement Justine ; le taux de show-up se calcule sur les calls renseignés.</p>
+      <p class="lede">Les stats du closer choisi sur la période, puis le comparatif des trois. Une vente est comptée si elle est validée par le closer ou par le virement Justine ; le taux de show-up se calcule sur les calls renseignés, hors calls annulés par le lead.</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="clCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="clPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -1185,7 +1185,9 @@ function st(rows, r, pred) {
   /* même règle que l'onglet Suivi DATA du Sheet : on ne compte que les calls
      dont le show-up est renseigné ; les non renseignés et les calls à venir
      sont exclus du calcul (et signalés à part) */
-  o.passes = rows.filter(c => c.s !== "").length;
+  /* règle Alex 09/09/2026 : un call annulé PAR LE LEAD n'a pas eu lieu, il sort du dénominateur
+     du show-up (no-show, reprogrammés et autres annulés y restent) */
+  o.passes = rows.filter(c => c.s !== "" && !(c.s === "ANNULE" && c.al)).length;
   o.showsPasses = o.shows;
   o.tShowPasses = o.passes ? 100 * o.shows / o.passes : null;
   const dsh = o.shows + o.noshow;
@@ -1292,7 +1294,7 @@ function renderClosersTab() {
   $("clKpis").innerHTML = [
     kpiTile("Calls bookés", fmtN(o.calls), "lignes du Sheet sur la période"),
     kpiTile("Calls présents", fmtN(o.shows), `${fmtN(o.noshow)} no-show · ${fmtN(o.reprog + o.annule)} reprogrammés/annulés`),
-    kpiTile("Taux de show-up", clPc(o.tShowPasses), `présents ÷ ${fmtN(o.passes)} calls renseignés`),
+    kpiTile("Taux de show-up", clPc(o.tShowPasses), `présents ÷ ${fmtN(o.passes)} calls renseignés (hors annulés par le lead)`),
     kpiTile("Lignes non remplies", fmtN(o.suVide), "show-up vide : à corriger dans le Sheet"),
     kpiTile("Non pitchés", fmtN(o.nonPitche), "soit " + clPc(o.tNonPitche) + " des présents"),
     kpiTile("Partis chez Valar 🏦", fmtN(o.valar), "soit " + clPc(o.tValar) + " des présents" + (o.valarCrm ? ` · ${fmtN(o.valarCrm)} présent(s) dans le CRM Valar` : "")),
