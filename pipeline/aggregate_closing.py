@@ -391,6 +391,8 @@ def main(data_path, out_path, updated_at):
             "hasV": bool(c.get("has_vente_raw")),
             "st": c.get("tab"),          # onglet + ligne Sheet : écriture retour
             "sr": c.get("row"),
+            # v19 : ligne retirée du Sheet par le bouton Supprimer (archive « Supprimés Console »)
+            **({"del": True, "delAt": c.get("deleted_at") or "", "delBy": c.get("deleted_by") or ""} if c.get("deleted") else {}),
             "rf": (c.get("relance_faite") or "").strip(),
             "utm": (c.get("utm") or "").strip()[:40],
             # canal du call : webi (onglets webinaire), new (calendrier iClosed « Appel Diagnostic - Club »,

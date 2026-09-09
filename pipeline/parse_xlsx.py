@@ -192,6 +192,41 @@ def find_header(rows_iter, must_have, scan=12):
     return None, None
 
 
+def common_fields(g):
+    """Champs d'un call communs aux onglets du mois et à l'archive « Supprimés Console »."""
+    booking = parse_date(g("booking_date"))
+    relance = parse_date(g("relance"))
+    r2 = parse_date(g("r2"))
+    return {
+        "qualif": parse_num(g("qualif")),
+        "prix": parse_num(g("prix")),
+        "prix_confirme": parse_num(g("prix_confirme")),
+        "virement": cell_str(g("virement")) == "TRUE",
+        "source": cell_str(g("source")), "source2": cell_str(g("source2")),
+        "utm": cell_str(g("utm")), "lead_source": cell_str(g("lead_source")),
+        "booking_date": f"{booking[0]:04d}-{booking[1]:02d}-{booking[2]:02d}" if booking else None,
+        "phone": cell_str(g("phone"))[:20],
+        "mail": cell_str(g("mail"))[:80],
+        "commentaire": cell_str(g("commentaire"))[:600],
+        "objection": cell_str(g("objection"))[:300],
+        "mensualites": cell_str(g("mensualites"))[:40],
+        "mensualites_confirme": cell_str(g("mensualites_confirme"))[:40],
+        "paiement": cell_str(g("paiement"))[:200],
+        "virement_a_recevoir": cell_str(g("virement_a_recevoir"))[:80],
+        "cash250": cell_str(g("cash250"))[:20],
+        "video": cell_str(g("video"))[:20],
+        "recording": cell_str(g("recording"))[:200],
+        "relance": f"{relance[0]:04d}-{relance[1]:02d}-{relance[2]:02d}" if relance else None,
+        "r2": f"{r2[0]:04d}-{r2[1]:02d}-{r2[2]:02d}" if r2 else None,
+        "relance_faite": cell_str(g("relance_faite"))[:30],
+        "epargne": cell_str(g("epargne"))[:40],
+        "patrimoine": cell_str(g("patrimoine"))[:40],
+        "has_show_up_raw": bool(cell_str(g("show_up"))),
+        "has_vente_raw": bool(cell_str(g("vente"))),
+        "has_qualif_raw": bool(cell_str(g("qualif"))),
+    }
+
+
 def main(xlsx_path, out_path):
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     calls, stripe, settings_rows, setter_reports, dm_reports = [], [], [], [], []
@@ -240,9 +275,6 @@ def main(xlsx_path, out_path):
                 # implique que le lead était présent, même si SHOW UP est resté vide
                 if not show_up and vente in ("OUI", "NON", "FOLLOW_UP", "NON_PITCHE", "VALAR", "REMBOURSEMENT"):
                     show_up = "OUI"
-                booking = parse_date(g("booking_date"))
-                relance = parse_date(g("relance"))
-                r2 = parse_date(g("r2"))
                 calls.append({
                     "tab": title, "webi": webi, "row": ridx, "hrow": hidx + 1,
                     "closer": re.sub(r"\s+", " ", closer),
@@ -251,32 +283,52 @@ def main(xlsx_path, out_path):
                     "hour": parse_time(g("date")),
                     "year": year, "month": month,
                     "show_up": show_up, "vente": vente, "annule_lead": annule_lead,
-                    "qualif": parse_num(g("qualif")),
-                    "prix": parse_num(g("prix")),
-                    "prix_confirme": parse_num(g("prix_confirme")),
-                    "virement": cell_str(g("virement")) == "TRUE",
-                    "source": cell_str(g("source")), "source2": cell_str(g("source2")),
-                    "utm": cell_str(g("utm")), "lead_source": cell_str(g("lead_source")),
-                    "booking_date": f"{booking[0]:04d}-{booking[1]:02d}-{booking[2]:02d}" if booking else None,
-                    "phone": cell_str(g("phone"))[:20],
-                    "mail": cell_str(g("mail"))[:80],
-                    "commentaire": cell_str(g("commentaire"))[:600],
-                    "objection": cell_str(g("objection"))[:300],
-                    "mensualites": cell_str(g("mensualites"))[:40],
-                    "mensualites_confirme": cell_str(g("mensualites_confirme"))[:40],
-                    "paiement": cell_str(g("paiement"))[:200],
-                    "virement_a_recevoir": cell_str(g("virement_a_recevoir"))[:80],
-                    "cash250": cell_str(g("cash250"))[:20],
-                    "video": cell_str(g("video"))[:20],
-                    "recording": cell_str(g("recording"))[:200],
-                    "relance": f"{relance[0]:04d}-{relance[1]:02d}-{relance[2]:02d}" if relance else None,
-                    "r2": f"{r2[0]:04d}-{r2[1]:02d}-{r2[2]:02d}" if r2 else None,
-                    "relance_faite": cell_str(g("relance_faite"))[:30],
-                    "epargne": cell_str(g("epargne"))[:40],
-                    "patrimoine": cell_str(g("patrimoine"))[:40],
-                    "has_show_up_raw": bool(cell_str(g("show_up"))),
-                    "has_vente_raw": bool(cell_str(g("vente"))),
-                    "has_qualif_raw": bool(cell_str(g("qualif"))),
+                    **common_fields(g),
+                })
+            continue
+
+        if norm(title) == "supprimes console":
+            # v19 (09/09/2026) : lignes retirées des onglets du mois par le bouton « Supprimer »
+            # de la console (pont what=call_delete). Colonnes : Supprime le, Par, Motif, Onglet
+            # source, Ligne source, puis les colonnes de l'onglet d'origine (par nom d'en-tête).
+            # Motif « Annulé par le lead » -> call ANNULE + annule_lead (base Annulés, stats
+            # inchangées : un annulé n'est pas un no-show). Doublons / tests : ignorés partout.
+            # Pas de ligne Sheet (row None) : la fiche n'est plus modifiable depuis la console.
+            if not all_rows:
+                continue
+            mapping = map_header(all_rows[0])
+            for r in all_rows[1:]:
+                def g(f):
+                    i = mapping.get(f)
+                    return r[i] if i is not None and i < len(r) else None
+                motif = norm(cell_str(r[2] if len(r) > 2 else None))
+                src_tab = cell_str(r[3] if len(r) > 3 else None)
+                closer = cell_str(g("closer"))
+                prospect = cell_str(g("prospect"))
+                if not closer and not prospect:
+                    continue
+                if not motif.startswith("annul"):
+                    continue
+                if re.search(r"\btests?\b", prospect, re.I):
+                    continue
+                d = parse_date(g("date"))
+                ym = CLOSING_TABS.get(src_tab)
+                if ym:
+                    year, month, webi = ym
+                elif d:
+                    year, month, webi = d[0], d[1], False
+                else:
+                    continue
+                calls.append({
+                    "tab": src_tab, "webi": webi, "row": None, "hrow": None,
+                    "deleted": True, "deleted_at": cell_str(r[0])[:16], "deleted_by": cell_str(r[1])[:40],
+                    "closer": re.sub(r"\s+", " ", closer),
+                    "prospect": prospect,
+                    "date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None,
+                    "hour": parse_time(g("date")),
+                    "year": year, "month": month,
+                    "show_up": "ANNULE", "vente": norm_vente(cell_str(g("vente"))), "annule_lead": True,
+                    **common_fields(g),
                 })
             continue
 
