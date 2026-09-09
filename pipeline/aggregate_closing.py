@@ -485,7 +485,30 @@ def main(data_path, out_path, updated_at):
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
-    out = {"updated_at": updated_at, "calls": calls, "hrows": hrows,
+    # Event Paris 2026 (10/10/2026) : lignes de l'onglet Sheet « Event Paris 2026 » (table de Justine,
+    # alimentée par le script mail contact@ à chaque inscription Tally) + soumissions Tally brutes
+    # (event-tally.json) pour repérer celles qui manquent encore dans le Sheet (« pending »).
+    event = {"rows": d.get("event") or [], "pending": [], "tally_n": 0, "fetched_at": ""}
+    try:
+        import os
+        ev_path = os.path.join(os.path.dirname(os.path.abspath(out_path)) or ".", "event-tally.json")
+        evt = json.load(open(ev_path))
+        event["fetched_at"] = evt.get("fetched_at", "")
+        subs = evt.get("subs", [])
+        event["tally_n"] = len(subs)
+        mails = {(r.get("email") or "").lower() for r in event["rows"] if r.get("email")}
+        ids = {r.get("tally_id") for r in event["rows"] if r.get("tally_id")}
+        seen = set()
+        for s in sorted(subs, key=lambda x: x.get("at", "")):
+            em = s.get("email") or ""
+            if not em or em in mails or s.get("id") in ids or em in seen:
+                continue
+            seen.add(em)
+            event["pending"].append(s)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    out = {"updated_at": updated_at, "calls": calls, "hrows": hrows, "event": event,
            "iclosed": iclosed, "wa_orphans": wa_orphans, "tally": tally, "valar": valar,
            "eod_appel": eod_appel, "eod_ecrit": eod_ecrit, "eod_setter": eod_setter, "history": history, "csm": csm, "weeks": weeks}
     with open(out_path, "w") as f:

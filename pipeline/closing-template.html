@@ -296,6 +296,7 @@ __FUNNEL_CSS__
     <button class="tab" role="tab" id="tabLeads" aria-selected="false" data-panel="panelLeads">Leads</button>
     <button class="tab" role="tab" id="tabAnnules" aria-selected="false" data-panel="panelAnnules">Annulés 🚫 <span class="badge" id="anBadge"></span></button>
     <button class="tab" role="tab" id="tabJustine" aria-selected="false" data-panel="panelJustine">Justine 👸 <span class="badge" id="juBadge"></span></button>
+    <button class="tab" role="tab" id="tabEvent" aria-selected="false" data-panel="panelEvent">EVENT PARIS 2026 🎟️ <span class="badge" id="evBadge"></span></button>
     <button class="tab" role="tab" id="tabIdea" aria-selected="false" data-panel="panelIdea">Idées 💡</button>
     <button class="tab" role="tab" id="tabFunnel" aria-selected="false" data-panel="panelFunnel">Funnel 🔒</button>
     <button class="tab" role="tab" id="tabAlex" aria-selected="false" data-panel="panelAlex">Alex 🔒</button>
@@ -881,6 +882,33 @@ __FUNNEL_CSS__
     </section>
   </div>
 
+  <!-- ================== EVENT PARIS 2026 ================== -->
+  <div id="panelEvent" role="tabpanel" hidden>
+    <section style="margin-top:16px">
+      <span class="eyebrow">Évènement annuel · samedi 10 octobre 2026 · Pan Piper, Paris 11e</span>
+      <h2>EVENT PARIS 2026</h2>
+      <p class="lede">Le tableau de Justine, en direct. Chaque inscription au formulaire Tally arrive ici toute seule (nom, prénom, mail, date, déjeuner, question),
+        et la colonne « Mail auto » dit si le mail de confirmation (programme, lieu, +1) est bien parti. Coche Membre / Invité et écris le nom de l'invité directement dans le tableau :
+        c'est enregistré dans le Sheet pour toute l'équipe.</p>
+
+      <div class="kpis" id="evKpis" style="margin-bottom:14px"></div>
+      <div id="evPending"></div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Filtres</span><span id="evFilterPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span>
+          <span style="width:1px;height:20px;background:var(--border);margin:0 3px"></span>
+          <input type="text" id="evSearch" placeholder="Chercher un nom, un mail…" style="min-width:200px"></div>
+      </div>
+
+      <div class="card full"><div class="tscroll"><table id="evTable"></table></div>
+        <div class="sub" id="evNote" style="margin-top:8px"></div></div>
+      <p class="sub" style="margin-top:10px">Sources : <a href="https://tally.so/r/BzXDDY" target="_blank" rel="noopener">formulaire Tally</a> ·
+        onglet « Event Paris 2026 » du <a href="https://docs.google.com/spreadsheets/d/1F3f-0c9VA-RjtcPNEFd_VH4x2fap9eMDc4VgeZTwAvY/edit" target="_blank" rel="noopener">Sheet closing</a> (rempli automatiquement) ·
+        <a href="https://docs.google.com/spreadsheets/d/16KNX9C6OKWF-qHZV4345CevC2K4OGX-2EMLffffuBf8/edit" target="_blank" rel="noopener">tableau d'origine de Justine</a> (repris le 09/09/2026, il ne bouge plus).
+        Les lignes orange ont un invité, comme dans le tableau de Justine. Mail auto « Justine (manuel) » = inscrit d'avant l'automatisation, mail envoyé à la main.</p>
+    </section>
+  </div>
+
   <!-- ================== ALEX ================== -->
   <!-- ================== IDÉES ================== -->
   <div id="panelIdea" role="tabpanel" hidden>
@@ -1418,6 +1446,105 @@ function renderRelances() {
       }
       renderRelances();
     });
+  });
+}
+
+/* ================= EVENT PARIS 2026 (onglet Sheet « Event Paris 2026 », pont v20) ================= */
+const EV = DATA.event || { rows: [], pending: [] };
+const EV_TEAM = 10;  /* membres de la team attendus (chiffre du tableau de Justine) */
+let evFilter = "all";
+const evKey = (r) => "ev:" + (r.email || r.tally_id || r.row);
+/* overlay local (optimiste, le temps de la prochaine MAJ) : {membre, invite, invite_nom} */
+function evRow(r) {
+  const loc = localStorage.getItem(evKey(r));
+  if (!loc) return r;
+  try { const o = JSON.parse(loc); if (o.at && o.at < (DATA.updated_at || "")) { localStorage.removeItem(evKey(r)); return r; } return Object.assign({}, r, o); } catch (e) { return r; }
+}
+const evIsoOf = (s) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(s || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : ""; };
+const evDej = (s) => { const x = (s || "").toLowerCase().trim(); return !x ? "" : /^(oui|yes|1|pr[ée]sent|ok)/.test(x) ? "oui" : /^(non|no|2|absent|pas)/.test(x) ? "non" : "?"; };
+function evMail(r) {
+  const m = r.mail_auto || "";
+  if (/^auto/i.test(m)) return { k: "auto", html: `<span style="color:var(--good-text);white-space:nowrap">✅ Auto</span><div class="sub" style="font-size:11px">${esc(m.replace(/^auto\s*/i, ""))}</div>` };
+  if (/justine|manuel/i.test(m)) return { k: "manuel", html: `<span style="color:var(--ink-2);white-space:nowrap">✉️ Justine (manuel)</span>` };
+  if (/\?/.test(m)) return { k: "verif", html: `<span style="color:var(--critical);white-space:nowrap">⚠️ À vérifier</span>` };
+  return m ? { k: "autre", html: esc(m) } : { k: "aucun", html: `<span class="miss">non</span>` };
+}
+const evName = (r) => `${r.prenom || ""} ${r.nom || ""}`.trim();
+function renderEvent() {
+  const rows = (EV.rows || []).map(evRow);
+  const pending = (EV.pending || []).map(s => ({ nom: s.nom, prenom: s.prenom, email: s.email, membre: true, invite: false, invite_nom: "",
+    inscrit_le: s.at ? `${s.at.slice(8, 10)}/${s.at.slice(5, 7)}/${s.at.slice(0, 4)} ${s.at.slice(11, 16)}` : "", dej: s.dej, question: s.q,
+    mail_auto: "? à vérifier", source: "Tally (pas encore dans le Sheet)", tally_id: s.id, pending: true }));
+  const all = rows.concat(pending);
+  const d7 = iso(new Date(NOW.getTime() - 7 * 864e5));
+  const isNew = (r) => evIsoOf(r.inscrit_le) >= d7;
+  const membres = all.filter(r => r.membre).length, invites = all.filter(r => r.invite).length;
+  const sansNom = all.filter(r => r.invite && !(r.invite_nom || "").trim()).length;
+  const news = all.filter(isNew);
+  const autos = all.filter(r => evMail(r).k === "auto").length, verifs = all.filter(r => evMail(r).k === "verif").length;
+  const dejNon = all.filter(r => evDej(r.dej) === "non").length, dejInc = all.filter(r => evDej(r.dej) === "?" || !evDej(r.dej)).length;
+  $("evBadge").textContent = news.length || "";
+  $("evKpis").innerHTML = [
+    kpiTile("Inscrits", fmtN(all.length), `${fmtN(news.length)} sur les 7 derniers jours`),
+    kpiTile("Membres", fmtN(membres), "case « Membre » cochée"),
+    kpiTile("Invités (+1)", fmtN(invites), sansNom ? `<span style="color:var(--critical)">${sansNom} sans nom d'invité</span>` : "tous avec le nom du +1"),
+    kpiTile("Attendus le 10/10", fmtN(membres + invites + EV_TEAM), `${fmtN(membres)} membres + ${fmtN(invites)} invités + ${EV_TEAM} team`),
+    kpiTile("Mail de confirmation", fmtN(autos) + " auto", verifs ? `<span style="color:var(--critical)">${verifs} à vérifier</span>` : `${fmtN(all.length - autos)} envoyés à la main avant l'automatisation`),
+    kpiTile("Déjeuner", fmtN(all.length - dejNon - dejInc) + " oui", `${fmtN(dejNon)} non · ${fmtN(dejInc)} sans réponse claire`),
+  ].join("");
+  $("evPending").innerHTML = pending.length ? `<div class="card" style="margin-bottom:14px;border-color:var(--accent)"><b>${pending.length} inscription${pending.length > 1 ? "s" : ""} Tally pas encore dans le Sheet</b>
+    <div class="sub">${esc(pending.map(evName).join(", "))} : la ligne est ajoutée automatiquement à la prochaine mise à jour (15 min max). Si « Mail auto » reste à vérifier, le mail de confirmation n'est probablement pas parti.</div></div>` : "";
+
+  pillRow("evFilterPills", [
+    { k: "all", label: `Tous (${all.length})` }, { k: "new", label: `Nouveaux 7 j (${news.length})` },
+    { k: "invite", label: `Avec invité (${invites})` }, { k: "noname", label: `Invité sans nom (${sansNom})` },
+    { k: "verif", label: `Mail à vérifier (${verifs})` }, { k: "dej", label: `Déjeuner non / ? (${dejNon + dejInc})` },
+  ], evFilter, k => evFilter = k, renderEvent);
+
+  const q = ($("evSearch").value || "").trim().toLowerCase();
+  let list = all.filter(r => evFilter === "all" ? true : evFilter === "new" ? isNew(r) : evFilter === "invite" ? r.invite
+    : evFilter === "noname" ? (r.invite && !(r.invite_nom || "").trim()) : evFilter === "verif" ? evMail(r).k === "verif"
+    : (evDej(r.dej) !== "oui"));
+  if (q) list = list.filter(r => `${evName(r)} ${r.email} ${r.invite_nom || ""}`.toLowerCase().includes(q));
+  list.sort((a, b) => (evIsoOf(b.inscrit_le) + (b.inscrit_le || "")).localeCompare(evIsoOf(a.inscrit_le) + (a.inscrit_le || "")));
+
+  $("evTable").innerHTML = "<thead><tr><th>Nom</th><th>Prénom</th><th>Mail</th><th>Membre</th><th>Invité</th><th>Nom et prénom invité</th><th>Inscrit le</th><th>Déjeuner</th><th>Question / info</th><th>Mail auto</th></tr></thead><tbody>" +
+    list.map((r, i) => {
+      const bg = r.invite ? ' style="background:rgba(245,166,35,.16)"' : (r.pending ? ' style="opacity:.7"' : "");
+      const dj = evDej(r.dej);
+      const dis = r.pending ? " disabled" : "";
+      return `<tr${bg}>
+        <td><b>${esc(r.nom) || "·"}</b>${r.pending ? `<div class="sub" style="font-size:11px">⏳ pas encore dans le Sheet</div>` : ""}</td>
+        <td>${esc(r.prenom) || "·"}</td>
+        <td style="max-width:22ch;overflow-wrap:anywhere"><a class="tel" href="mailto:${esc(r.email)}">${esc(r.email) || "·"}</a></td>
+        <td style="text-align:center"><input type="checkbox" data-evk="membre" data-ev="${i}" ${r.membre ? "checked" : ""}${dis} style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer"></td>
+        <td style="text-align:center"><input type="checkbox" data-evk="invite" data-ev="${i}" ${r.invite ? "checked" : ""}${dis} style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer"></td>
+        <td><input type="text" data-evk="invite_nom" data-ev="${i}" value="${esc(r.invite_nom || "")}" placeholder="${r.invite ? "Nom Prénom du +1" : ""}"${dis} style="min-width:150px;font-size:12.5px;padding:4px 7px${r.invite && !(r.invite_nom || "").trim() ? ";border-color:var(--critical)" : ""}"></td>
+        <td style="white-space:nowrap;font-size:12.5px">${esc(r.inscrit_le) || "·"}${isNew(r) ? ' <span class="badge" style="background:var(--accent);color:#fff">new</span>' : ""}</td>
+        <td style="font-size:12.5px">${dj === "oui" ? "Oui" : dj === "non" ? `<span style="color:var(--critical)">Non</span>` : `<span class="miss">${esc(r.dej) || "·"}</span>`}</td>
+        <td style="font-size:12px;max-width:34ch;color:var(--ink-2)">${esc(r.question) || "·"}</td>
+        <td style="font-size:12.5px">${evMail(r).html}</td>
+      </tr>`;
+    }).join("") + `</tbody><tfoot><tr style="font-weight:600"><td colspan="3">Total (${list.length} affiché${list.length > 1 ? "s" : ""} sur ${all.length})</td>
+      <td style="text-align:center">${membres}</td><td style="text-align:center">${invites}</td><td colspan="5" class="sub">+ ${EV_TEAM} membres de la team = ${membres + invites + EV_TEAM} attendus</td></tr></tfoot>`;
+  $("evNote").textContent = list.length ? "" : "Personne ne correspond à ce filtre.";
+
+  const save = (r, fields, msgOk) => {
+    const cur = (() => { try { return JSON.parse(localStorage.getItem(evKey(r)) || "{}"); } catch (e) { return {}; } })();
+    localStorage.setItem(evKey(r), JSON.stringify(Object.assign(cur, fields, { at: DATA.updated_at || "" })));
+    Object.assign(r, fields);
+    bridgePost({ what: "event_update", email: r.email, tally_id: r.tally_id, fields, by: "console closing" })
+      .then(ok => toast(ok ? msgOk : "Enregistré sur ce navigateur seulement (Sheet injoignable : " + (bridgePost.lastReason || "?") + ")"));
+  };
+  $("evTable").querySelectorAll("input[type=checkbox][data-ev]").forEach(cb => cb.addEventListener("change", () => {
+    const r = list[+cb.dataset.ev], k = cb.dataset.evk;
+    save(r, { [k]: cb.checked ? 1 : "" }, (k === "invite" ? "Invité" : "Membre") + (cb.checked ? " coché ✓" : " décoché ✓") + " (partagé)");
+    renderEvent();
+  }));
+  $("evTable").querySelectorAll("input[type=text][data-ev]").forEach(inp => {
+    const commit = () => { const r = list[+inp.dataset.ev]; const v = inp.value.trim(); if (v === (r.invite_nom || "")) return; save(r, { invite_nom: v || "__VIDE__" }, "Nom de l'invité enregistré ✓ (partagé)"); r.invite_nom = v; };
+    inp.addEventListener("change", commit);
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
   });
 }
 
@@ -4364,6 +4491,9 @@ $("tabPilotage").addEventListener("click", () => {
 $("tabRelances").addEventListener("click", renderRelances);
 renderRelances();
 $("tabScan").addEventListener("click", renderScan);
+$("tabEvent").addEventListener("click", renderEvent);
+$("evSearch").addEventListener("input", renderEvent);
+renderEvent();
 $("tabValar").addEventListener("click", renderValar);
 initValarClaims();
 tyInit();

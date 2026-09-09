@@ -234,6 +234,7 @@ def main(xlsx_path, out_path):
     history = []  # onglet « Historique Console » (modifs faites depuis la console, pont v14)
     csm = []  # onglet « CSM » : suivi post-vente (3 calls d'accompagnement, mails V1, témoignages)
     iclosed_leads, iclosed_claims, wa_confirms, valar_claims = [], [], [], []
+    event = []  # onglet « Event Paris 2026 » (inscrits event 10/10/2026, pont v20, table de Justine)
 
     for ws in wb.worksheets:
         title = ws.title.strip()
@@ -342,6 +343,28 @@ def main(xlsx_path, out_path):
                     return cell_str(r[i]) if i < len(r) else ""
                 iclosed_leads.append({"e": g(0), "pn": g(1), "n": g(2), "tel": g(3),
                                       "d": g(4)[:16], "src": g(5), "camp": g(6), "ad": g(7)})
+            continue
+
+        if title == "Event Paris 2026":
+            # Nom, Prenom, Mail, Membre, Invite, Nom et prenom invite, Inscrit le, Dejeuner, Question,
+            # Mail auto, Source, Id Tally, Ajoute le, Commentaire (écrit par le pont v20 / script mail)
+            for ridx, r in enumerate(all_rows[1:], start=2):
+                r = list(r) + [None] * 14
+                email = cell_str(r[2]).strip().lower()
+                nom, prenom = cell_str(r[0]).strip(), cell_str(r[1]).strip()
+                if not (email or nom or prenom):
+                    continue
+                if re.search(r"\btests?\b", f"{nom} {prenom}", re.I):
+                    continue  # lignes de test (« TEST V2 », …) ignorées
+                def one(v):
+                    s = cell_str(v).strip().upper()
+                    return s in ("1", "TRUE", "OUI", "VRAI", "X", "1.0")
+                event.append({"row": ridx, "nom": nom[:60], "prenom": prenom[:40], "email": email[:80],
+                              "membre": one(r[3]), "invite": one(r[4]), "invite_nom": cell_str(r[5]).strip()[:80],
+                              "inscrit_le": cell_str(r[6]).strip()[:16], "dej": cell_str(r[7]).strip()[:40],
+                              "question": cell_str(r[8]).strip()[:600], "mail_auto": cell_str(r[9]).strip()[:40],
+                              "source": cell_str(r[10]).strip()[:40], "tally_id": cell_str(r[11]).strip()[:20],
+                              "ajoute_le": cell_str(r[12]).strip()[:16], "commentaire": cell_str(r[13]).strip()[:600]})
             continue
 
         if title == "Relances iClosed":
@@ -623,7 +646,7 @@ def main(xlsx_path, out_path):
            "setter_reports": setter_reports, "dm_reports": dm_reports,
            "setter_console": setter_console, "history": history, "csm": csm,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
-           "wa_confirms": wa_confirms, "valar_claims": valar_claims}
+           "wa_confirms": wa_confirms, "valar_claims": valar_claims, "event": event}
     with open(out_path, "w") as f:
         json.dump(out, f, ensure_ascii=False)
 

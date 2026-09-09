@@ -66,6 +66,9 @@ jobs:
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           python tally_fetch.py || true
+          # Event Paris 2026 (inscrits Tally BzXDDY) : filet de securite de l'onglet Sheet « Event Paris 2026 »
+          python event_fetch.py || true
+          python event_sync.py data.json || true
           # Leads Valar (CRM business Valar, onglet Leads Valar de la console closing)
           python valar_fetch.py || true
           python eow_notify.py investisseurs30.xlsx ../.eow-count ../.eod-count ../.idea-count ../.eodsetter-count ../.valarclaim-count || true
@@ -95,7 +98,7 @@ jobs:
           ) || echo "PIPELINE FUNNEL KO : onglet Funnel indisponible sur cette MAJ"
           NOW=$(TZ=Europe/Paris date '+%d/%m/%Y %H:%M')
           # SOURCES_AT change a chaque run : exclu du hash, sinon plus aucun court-circuit
-          HASH=$( { cat data.json ads.json tally.json valar.json 2>/dev/null; \
+          HASH=$( { cat data.json ads.json tally.json valar.json event-tally.json 2>/dev/null; \
                     grep -v "^var SOURCES_AT" funnel/data-block.js 2>/dev/null; } | sha256sum | cut -d" " -f1)
           OLD=$(cat ../.data-hash 2>/dev/null || echo none)
           if [ "$HASH" = "$OLD" ] && [ "${{ github.event_name }}" = "schedule" ]; then
