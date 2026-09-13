@@ -2,7 +2,8 @@ name: Prise de recul du matin
 
 # Chaque matin (~8h Paris) : 2 messages Telegram à Alex = prise de recul cap 100 k
 # (objectif du mois, alertes dont les jours sans vente, chaîne 7 j / 28 j, goulot)
-# + récap prêt à envoyer à Thomas (bloc à copier + lien WhatsApp pré-rempli).
+# + récap prêt à envoyer à Thomas (bloc à copier + lien WhatsApp pré-rempli)
+# + liste des calls non remplis des 3 derniers jours (non_remplis.py).
 # Données rafraîchies juste avant (pont Apps Script + Meta), comme brief.yml.
 # Indépendant du Mac d'Alex ; le bot local (telegram_bot.py) sert de filet à 8h45.
 # Marqueur .pilotage-sent (date Paris) = anti-doublon.
@@ -82,8 +83,10 @@ jobs:
           python meta_fetch.py
           if [ "$DRY_RUN" = "true" ]; then
             python pilotage.py --dry-run
+            python non_remplis.py --dry-run
           else
             python pilotage.py
+            python non_remplis.py || echo "non_remplis KO"
           fi
 
       - name: Marquer comme envoye
