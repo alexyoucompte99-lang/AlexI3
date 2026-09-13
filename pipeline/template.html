@@ -301,8 +301,8 @@
     <h2>Volume, conversion et chiffre d'affaires par mois</h2>
     <p class="lede">Chaque call est rattaché à l'onglet mensuel où l'équipe l'a loggé, comme dans les récaps du Sheet. Janvier et avril incluent les webinaires.</p>
     <div class="cards">
-      <div class="card"><h3>Calls bookés et ventes</h3><div class="sub">Lignes closing / ventes signées</div><div id="chMonthlyCalls"></div></div>
-      <div class="card"><h3>CA signé</h3><div class="sub">Prix confirmé (sinon proposé) des ventes OUI, en euros</div><div id="chMonthlyCA"></div></div>
+      <div class="card"><h3>Calls bookés et ventes</h3><div class="sub">Lignes closing par onglet / ventes signées au mois du cochage</div><div id="chMonthlyCalls"></div></div>
+      <div class="card"><h3>CA signé</h3><div class="sub">Prix confirmé (sinon proposé) des ventes OUI, en euros, au mois du cochage</div><div id="chMonthlyCA"></div></div>
       <div class="card"><h3>Taux de show-up et de closing</h3><div class="sub">Show-up : présents / (présents + no-show) · closing : ventes / pitchés</div><div id="chMonthlyRates"></div></div>
       <div class="card"><h3>ROAS mensuel</h3><div class="sub">CA signé du mois divisé par le budget ads du mois · pointillé : seuil de rentabilité ×1 · dispo depuis mai</div><div id="chRoas"></div></div>
     </div>
@@ -364,11 +364,12 @@
         <dt>Show-up</dt><dd>Présents divisés par (présents + no-show). Les « reprogrammer » et « annulé » sont exclus du calcul.</dd>
         <dt>Pitché</dt><dd>Lead présent dont la colonne VENTE est remplie (OUI, NON, FOLLOW UP), hors « non pitché ».</dd>
         <dt>Taux de closing</dt><dd>Ventes OUI divisées par les pitchés.</dd>
-        <dt>CA signé</dt><dd>Somme des prix (confirmé par Justine si dispo, sinon prix proposé) des lignes VENTE = OUI, TTC.</dd>
+        <dt>CA signé</dt><dd>Somme des prix (confirmé par Justine si dispo, sinon prix proposé) des lignes VENTE = OUI (ou virement validé par Justine), TTC.</dd>
+        <dt>Date de vente</dt><dd>Date de vente = jour du cochage : une vente est comptée (ventes, CA, ROAS, mensuel, closers, canaux, projection) le jour où elle a été cochée dans la console closing, pas le jour du call ni le mois de son onglet. Les ventes antérieures au registre (1ᵉʳ septembre 2026) gardent la date du call, ou le 1ᵉʳ du mois de leur onglet si le call est antérieur à ce mois. Même règle que la console closing.</dd>
         <dt>ROAS</dt><dd>CA signé divisé par le budget ads de la même période. Il compare le CA tous canaux au budget Facebook : un ordre de grandeur tant que l'attribution par canal n'est pas fiabilisée.</dd>
         <dt>Coût par call</dt><dd>Budget ads divisé par les calls bookés attribués aux ads (tableau ads hebdo).</dd>
         <dt>Qualité lead</dt><dd>Note « Qualifié /10 » donnée par le closer sur les leads présents.</dd>
-        <dt>Filtres de dates</dt><dd>Les calls sont filtrés sur leur date réelle (à défaut, le 1ᵉʳ du mois de leur onglet). Les semaines ads sont prises quand leur début tombe dans la période. « Comparatif » compare à la période précédente de même durée.</dd>
+        <dt>Filtres de dates</dt><dd>Les calls sont filtrés sur leur date réelle (à défaut, le 1ᵉʳ du mois de leur onglet) ; les ventes sur leur date de vente (jour du cochage). Les semaines ads sont prises quand leur début tombe dans la période. « Comparatif » compare à la période précédente de même durée.</dd>
       </dl>
     </div>
   </section>
@@ -511,7 +512,17 @@ function weeksIn(r) { return DATA.weeks.filter(w => w.start >= r.from.slice(0, 1
 /* ================= stats ================= */
 /* vente comptée si validée par le closer (OUI) ou par Justine (virement coché) */
 const isSale = (c) => c.v === "OUI" || (c.vir && c.v !== "REMBOURSEMENT");
-function st(rows) {
+/* date de la vente = jour où elle a été cochée (registre .sales-ledger, champ sd),
+   repli sur la date du call pour les ventes antérieures au registre (règle Alex 01/09) ;
+   même règle et mêmes fonctions que la console closing (saleD / salesIn / st) */
+const saleD = (c) => c.sd || c.d || "";
+function salesIn(r, pred) {
+  return DATA.calls.filter(c => isSale(c) && (!pred || pred(c)) &&
+    (r.tm ? saleD(c).slice(0, 7) === r.tm
+          : isMtdRange(r) ? saleD(c).slice(0, 7) === TODAY_ISO.slice(0, 7) && saleD(c) <= TODAY_ISO
+          : saleD(c) >= r.from && saleD(c) <= r.to));
+}
+function st(rows, r, pred) {
   const o = { calls: rows.length, shows: 0, noshow: 0, reprog: 0, annule: 0, suVide: 0,
               pitched: 0, nonPitche: 0, valar: 0, ventes: 0, remb: 0, follow: 0, ca: 0,
               qSum: 0, qN: 0, ventesAvecPrix: 0 };
@@ -527,10 +538,13 @@ function st(rows) {
       else if (["OUI", "NON", "FOLLOW_UP", "REMBOURSEMENT"].includes(c.v)) o.pitched++;
       if (c.q != null) { o.qSum += c.q; o.qN++; }
     }
-    if (isSale(c)) { o.ventes++; o.ca += c.p; if (c.p > 0) o.ventesAvecPrix++; }
+    /* si une plage r est fournie, les ventes sont comptées APRÈS la boucle sur leur
+       date de cochage (salesIn), pas sur la date du call ni sur le mois de l'onglet */
+    if (!r && isSale(c)) { o.ventes++; o.ca += c.p; if (c.p > 0) o.ventesAvecPrix++; }
     if (c.v === "REMBOURSEMENT") o.remb++;
     if (c.v === "FOLLOW_UP" && !c.vir) o.follow++;
   }
+  if (r) for (const c of salesIn(r, pred)) { o.ventes++; o.ca += c.p; if (c.p > 0) o.ventesAvecPrix++; }
   const dsh = o.shows + o.noshow;
   o.tShow = dsh ? 100 * o.shows / dsh : null;
   o.tClosPitche = o.pitched ? 100 * o.ventes / o.pitched : null;
@@ -764,13 +778,13 @@ function deltaTag(cur, prev, lowerIsBetter = false) {
 }
 
 function renderKpis(r, rows, wks) {
-  const s = st(rows);
+  const s = st(rows, r, closerOk);
   const spend = wks.reduce((a, w) => a + w.spend, 0);
   const booked = wks.reduce((a, w) => a + w.calls_booked, 0);
   let ps = null, pspend = 0, pbooked = 0;
   if (state.compare) {
     const pr = prevRange(r);
-    ps = st(callsIn(pr));
+    ps = st(callsIn(pr), pr, closerOk);
     const pw = weeksIn(pr);
     pspend = pw.reduce((a, w) => a + w.spend, 0);
     pbooked = pw.reduce((a, w) => a + w.calls_booked, 0);
@@ -779,7 +793,7 @@ function renderKpis(r, rows, wks) {
      sur le CA de la partie de période couverte par le tableau ads */
   const ADS_START = "2026-05-04";
   const adsCovered = r.from >= ADS_START;
-  const caForRoas = adsCovered ? s.ca : st(rows.filter(c => c.ed >= ADS_START)).ca;
+  const caForRoas = adsCovered ? s.ca : st(rows.filter(c => c.ed >= ADS_START), { from: ADS_START, to: r.to }, closerOk).ca;
   const roas = spend > 0 ? caForRoas / spend : null;
   const proas = ps && pspend > 0 ? ps.ca / pspend : null;
   const cpc = booked > 0 ? spend / booked : null;
@@ -788,7 +802,7 @@ function renderKpis(r, rows, wks) {
   $("kpiTitle").textContent = "Vue globale · " + rangeLabel(r) + " · " + closerLabel();
   $("kpiGrid").innerHTML =
     kpiTile("CA signé", fmtE(s.ca), `${s.ventes} vente(s) · panier ${fmtE(s.panier)}`,
-      "Prix des ventes OUI, TTC. Le CA encaissé n'est pas encore branché (voir Données à brancher).",
+      "Prix des ventes OUI, TTC, comptées le jour où la vente a été cochée dans la console closing. Le CA encaissé n'est pas encore branché (voir Données à brancher).",
       deltaTag(s.ca, ps?.ca)) +
     kpiTile("Calls bookés", fmtN(s.calls), `${fmtN(s.shows)} présents · ${fmtN(s.noshow)} no-show`,
       "Une ligne dans un onglet closing. Il y en a toujours plus que dans le tableau ads : webinaires et organique s'ajoutent.",
@@ -826,9 +840,9 @@ function renderKpis(r, rows, wks) {
       deltaTag(roas, proas));
 }
 
-function renderBottleneck(rows, wks) {
+function renderBottleneck(r, rows, wks) {
   const t = (k) => wks.reduce((a, w) => a + w[k], 0);
-  const s = st(rows);
+  const s = st(rows, r, closerOk);
   const checks = [];
   if (t("impressions") > 0) {
     checks.push({ name: "CTR des ads (vues vers clics)", val: 100 * t("clicks") / t("impressions"), bench: 1.5, fix: "créatives et audiences" });
@@ -852,7 +866,7 @@ function renderBottleneck(rows, wks) {
 
 function renderFunnel(r, rows, wks) {
   const t = (k) => wks.reduce((a, w) => a + w[k], 0);
-  const s = st(rows);
+  const s = st(rows, r, closerOk);
   $("funnelPeriod").textContent = "Période : " + rangeLabel(r) +
     (t("spend") ? " · budget dépensé : " + fmtE(t("spend")) : " · aucune semaine ads trackée sur la période") +
     ". Les deux blocs se rejoignent sur les calls bookés : côté ads on en compte " + fmtN(t("calls_booked")) +
@@ -901,18 +915,26 @@ function renderFunnel(r, rows, wks) {
       <td class="num">${spend > 0 && n > 0 ? fmtE2(spend / n) : "·"}</td></tr>`).join("") + "</tbody>";
 }
 
-function monthsOf(rows) {
+/* mois = onglet du call pour les calls ; quand la plage r est fournie, les ventes et le CA
+   d'un mois sont comptés sur la date de cochage (salesIn), bornés à la période affichée */
+function monthsOf(rows, r) {
   const map = new Map();
   for (const c of rows) {
     if (!map.has(c.tm)) map.set(c.tm, []);
     map.get(c.tm).push(c);
   }
+  const inPeriod = r ? (c) => closerOk(c) && saleD(c) >= r.from && saleD(c) <= r.to : null;
+  if (r) for (const c of salesIn(r, closerOk)) {
+    const tm = saleD(c).slice(0, 7);
+    if (!map.has(tm)) map.set(tm, []);
+  }
   return [...map.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1)
-    .map(([tm, list]) => ({ tm, label: MONTH_SHORT[+tm.slice(5)] + (tm.slice(0, 4) !== "2026" ? " " + tm.slice(2, 4) : ""), s: st(list) }));
+    .map(([tm, list]) => ({ tm, label: MONTH_SHORT[+tm.slice(5)] + (tm.slice(0, 4) !== "2026" ? " " + tm.slice(2, 4) : ""),
+                            s: r ? st(list, { tm }, inPeriod) : st(list) }));
 }
 
 function renderMonthly(rows, allWeeksInRange) {
-  const M = monthsOf(rows);
+  const M = monthsOf(rows, currentRange());
   const labels = M.map(m => m.label);
   const spendByTm = {};
   for (const w of DATA.weeks) {
@@ -960,14 +982,21 @@ function renderWeekly(wks) {
 
 let closerSort = { k: "ca", dir: -1 };
 function renderClosers(rows) {
+  const r = currentRange();
   const byCloser = new Map();
   for (const c of rows) {
     const name = c.c || "(sans closer)";
     if (!byCloser.has(name)) byCloser.set(name, []);
     byCloser.get(name).push(c);
   }
+  /* un closer sans call sur la période mais avec une vente cochée dedans apparaît quand même */
+  for (const c of salesIn(r, closerOk)) {
+    const name = c.c || "(sans closer)";
+    if (!byCloser.has(name)) byCloser.set(name, []);
+  }
   const list = [...byCloser.entries()].map(([name, rs]) => {
-    const s = st(rs);
+    /* ventes et CA du closer comptés sur la date de cochage (même règle que la console closing) */
+    const s = st(rs, r, c => (c.c || "(sans closer)") === name);
     return { name, ...s, caBooke: s.calls ? s.ca / s.calls : null };
   });
   const totalV = list.reduce((a, x) => a + x.ventes, 0);
@@ -1032,11 +1061,10 @@ function renderClosers(rows) {
 let srcSort = { k: "calls", dir: -1 };
 function renderSources(rows) {
   const by = new Map();
-  for (const c of rows) {
-    if (!by.has(c.g)) by.set(c.g, { calls: 0, ventes: 0, ca: 0 });
-    const o = by.get(c.g);
-    o.calls++; if (isSale(c)) { o.ventes++; o.ca += c.p; }
-  }
+  const bucket = (g) => { if (!by.has(g)) by.set(g, { calls: 0, ventes: 0, ca: 0 }); return by.get(g); };
+  for (const c of rows) bucket(c.g).calls++;
+  /* ventes et CA par canal comptés sur la date de cochage (même règle que la console closing) */
+  for (const c of salesIn(currentRange(), closerOk)) { const o = bucket(c.g); o.ventes++; o.ca += c.p; }
   const S = [...by.entries()].map(([name, o]) =>
     ({ name, ...o, tx: o.calls ? 100 * o.ventes / o.calls : null }));
   const tot = S.reduce((a, s) => a + s.calls, 0);
@@ -1198,7 +1226,8 @@ function renderProjection() {
   const y = NOW.getFullYear(), mo = NOW.getMonth() + 1;
   const tm = y + "-" + String(mo).padStart(2, "0");
   const rows = DATA.calls.filter(c => c.tm === tm);
-  const s = st(rows);
+  /* CA et ventes du mois = ventes cochées dans le mois calendaire (date de vente = jour du cochage) */
+  const s = st(rows, { tm });
   const elapsed = Math.max(1, NOW.getDate() - 1);
   const daysTotal = new Date(y, mo, 0).getDate();
   const projCA = s.ca / elapsed * daysTotal;
@@ -1251,7 +1280,7 @@ function renderAll() {
   const rows = callsIn(r);
   const wks = weeksIn(r);
   renderKpis(r, rows, wks);
-  renderBottleneck(rows, wks);
+  renderBottleneck(r, rows, wks);
   renderFunnel(r, rows, wks);
   renderMonthly(rows, wks);
   renderWeekly(wks);

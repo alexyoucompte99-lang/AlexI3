@@ -4,6 +4,12 @@
 Tout le calcul (KPI, funnel, closers, sources, hygiène) se fait côté page,
 ce qui permet les filtres de dates et de closers.
 
+Date de vente = jour du cochage (règle Alex 01/09/2026, même règle que la
+console closing) : le champ sd (sale_date posé par sales_ledger.py, lancé avant
+ce script sur data.json) donne la date où la vente a été cochée ; la page compte
+ventes et CA sur cette date, avec repli sur la date du call pour les ventes
+antérieures au registre.
+
 Usage: python3 aggregate.py data.json ads.json dashboard-data.json "08/08/2026 09:00"
 """
 import json
@@ -60,6 +66,9 @@ def main(data_path, ads_path, out_path, updated_at):
             "q": c.get("qualif"),
             "p": round(prix) if sale else 0,
             "vir": bool(c.get("virement")),
+            # date où la vente a été cochée (registre .sales-ledger), sinon absent :
+            # la page compte les ventes dessus (repli date du call), comme la console closing
+            "sd": c.get("sale_date"),
             "g": source_category(c),
             "f": flags,
         })
@@ -85,9 +94,12 @@ def main(data_path, ads_path, out_path, updated_at):
         json.dump(out, f, ensure_ascii=False)
 
     n26 = sum(1 for c in calls if c["tm"].startswith("2026"))
-    v26 = sum(1 for c in calls if c["tm"].startswith("2026") and c["v"] == "OUI")
-    ca26 = sum(c["p"] for c in calls if c["tm"].startswith("2026"))
-    print(f"calls={len(calls)} (2026: {n26}) ventes 2026={v26} ca 2026={ca26}", file=sys.stderr)
+    # même règle que la page : vente = OUI closer ou virement Justine, datée du cochage
+    sold = [c for c in calls if c["v"] == "OUI" or (c["vir"] and c["v"] != "REMBOURSEMENT")]
+    sale_month = lambda c: (c["sd"] or c["d"] or "")[:7]
+    v26 = sum(1 for c in sold if sale_month(c).startswith("2026"))
+    ca26 = sum(c["p"] for c in sold if sale_month(c).startswith("2026"))
+    print(f"calls={len(calls)} (2026: {n26}) ventes 2026={v26} ca 2026={ca26} (date de vente = jour du cochage)", file=sys.stderr)
     print(f"weeks={len(weeks)} spend={sum(w['spend'] for w in weeks):.0f}", file=sys.stderr)
 
 
