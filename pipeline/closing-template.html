@@ -1466,6 +1466,7 @@ function evMail(r) {
   const m = r.mail_auto || "";
   if (/^auto/i.test(m)) return { k: "auto", html: `<span style="color:var(--good-text);white-space:nowrap">✅ Auto</span><div class="sub" style="font-size:11px">${esc(m.replace(/^auto\s*/i, ""))}</div>` };
   if (/justine|manuel/i.test(m)) return { k: "manuel", html: `<span style="color:var(--ink-2);white-space:nowrap">✉️ Justine (manuel)</span>` };
+  if (/erreur/i.test(m)) return { k: "verif", html: `<span style="color:var(--critical);white-space:nowrap">❌ Mail non parti</span><div class="sub" style="font-size:11px">à renvoyer à la main</div>` };
   if (/\?/.test(m)) return { k: "verif", html: `<span style="color:var(--critical);white-space:nowrap">⚠️ À vérifier</span>` };
   return m ? { k: "autre", html: esc(m) } : { k: "aucun", html: `<span class="miss">non</span>` };
 }
