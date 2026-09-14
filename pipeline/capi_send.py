@@ -158,12 +158,15 @@ def main():
     queue_emails = set()
     for q in queue:
         eid = str(q.get("event id") or "").strip()
-        if not re.match(r"^sch_[a-z0-9]{1,20}$", eid):
+        if not re.match(r"^sch_[a-z0-9]{1,20}$", eid) or eid.startswith("sch_test"):
             continue
         email = norm_email(q.get("email"))
         if email:
             queue_emails.add(email)
         if eid in ledger["sent"]:
+            continue
+        # sans e-mail ni cookie, Meta n'aurait rien a faire correspondre : on ignore la ligne
+        if not email and not str(q.get("fbp") or "").strip() and not str(q.get("fbc") or "").strip():
             continue
         try:
             ts = int(float(q.get("event time") or 0))
