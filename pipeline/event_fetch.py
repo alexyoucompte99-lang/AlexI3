@@ -8,6 +8,7 @@ import json, os, sys, time, urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 API = "https://api.tally.so"
 FORM = "BzXDDY"
+WEBHOOK = "woAL7O"  # webhook Tally -> script mail (compte contact@)
 OUT = os.path.join(HERE, "event-tally.json")
 
 
@@ -64,9 +65,27 @@ def main():
         row["email"] = row["email"].lower()
         out.append(row)
     out.sort(key=lambda r: r["at"], reverse=True)
+    # Livraisons du webhook : prouve que le script mail a bien recu l'inscription (donc mail parti)
+    hooks, page = {}, 1
+    try:
+        while True:
+            d = get(f"/webhooks/{WEBHOOK}/events?page={page}")
+            for e in d.get("events", []):
+                pl = e.get("payload") or {}
+                if isinstance(pl, str):
+                    pl = json.loads(pl)
+                sid = (pl.get("data") or {}).get("submissionId")
+                if sid and (sid not in hooks or e.get("deliveryStatus") == "SUCCEEDED"):
+                    hooks[sid] = {"status": e.get("deliveryStatus") or "", "at": (e.get("updatedAt") or "")[:19]}
+            if not d.get("hasMore"):
+                break
+            page += 1
+    except Exception as e:  # noqa
+        print(f"event_fetch : livraisons webhook indisponibles ({e})", file=sys.stderr)
+        hooks = None
     tmp = OUT + ".tmp"
     with open(tmp, "w") as f:
-        json.dump({"fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "subs": out}, f, ensure_ascii=False)
+        json.dump({"fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "subs": out, "hooks": hooks}, f, ensure_ascii=False)
     os.replace(tmp, OUT)
     print(f"event-tally.json : {len(out)} soumissions", file=sys.stderr)
 

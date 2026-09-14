@@ -23,10 +23,36 @@ def fr(iso):
     return f"{iso[8:10]}/{iso[5:7]}/{iso[0:4]} {iso[11:16]}" if len(iso) >= 16 else iso
 
 
+def paris(iso):
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    return datetime.fromisoformat(iso[:19]).replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Europe/Paris")).strftime("%d/%m/%Y %H:%M")
+
+
+def mail_label(s, hooks):
+    """Libellé « Mail auto » : inscriptions d'avant la mise en service = Justine ; après, preuve par le webhook Tally."""
+    if s["at"] < AUTO_SINCE:
+        return "Justine (manuel)"
+    h = (hooks or {}).get(s["id"])
+    if h and h["status"] == "SUCCEEDED":
+        return "Auto " + paris(h["at"] or s["at"])
+    if h:
+        return "ERREUR mail non parti (webhook " + h["status"] + ")"
+    return "? à vérifier"
+
+
+def post(body):
+    url, key = bridge()
+    body["key"] = key
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "text/plain"})
+    return urllib.request.urlopen(req, timeout=120).read().decode()[:300]
+
+
 def main(data_path, dry=False):
     d = json.load(open(data_path))
     rows = d.get("event") or []
-    tal = json.load(open(os.path.join(HERE, "event-tally.json"))).get("subs", [])
+    et = json.load(open(os.path.join(HERE, "event-tally.json")))
+    tal, hooks = et.get("subs", []), et.get("hooks")
     mails = {(r.get("email") or "").lower() for r in rows if r.get("email")}
     ids = {r.get("tally_id") for r in rows if r.get("tally_id")}
     missing, seen = [], set()
@@ -37,17 +63,25 @@ def main(data_path, dry=False):
         seen.add(em)
         missing.append({"nom": s["nom"], "prenom": s["prenom"], "email": em, "membre": 1, "invite": "", "invite_nom": "",
                         "inscrit_le": fr(s["at"]), "dej": s["dej"], "question": s["q"],
-                        "mail_auto": "? à vérifier" if s["at"] >= AUTO_SINCE else "Justine (manuel)",
+                        "mail_auto": mail_label(s, hooks),
                         "source": "Tally (sync)", "tally_id": s["id"], "commentaire": ""})
-    print(f"event_sync : {len(rows)} lignes Sheet, {len(tal)} soumissions Tally, {len(missing)} à ajouter", file=sys.stderr)
-    if not missing or dry:
-        if dry:
-            print(json.dumps(missing, ensure_ascii=False, indent=1))
+    # Lignes déjà dans le Sheet encore « ? à vérifier » : on tranche dès que le webhook a une trace
+    by_id = {x["id"]: x for x in tal}
+    fixes = []
+    for r in rows:
+        s = by_id.get(r.get("tally_id"))
+        if s and (r.get("mail_auto") or "").startswith("?"):
+            lab = mail_label(s, hooks)
+            if not lab.startswith("?"):
+                fixes.append((s["id"], lab))
+    print(f"event_sync : {len(rows)} lignes Sheet, {len(tal)} soumissions Tally, {len(missing)} à ajouter, {len(fixes)} mail auto à corriger", file=sys.stderr)
+    if dry:
+        print(json.dumps({"missing": missing, "fixes": fixes}, ensure_ascii=False, indent=1))
         return
-    url, key = bridge()
-    body = json.dumps({"key": key, "what": "event_add", "rows": missing}).encode()
-    req = urllib.request.Request(url, data=body, headers={"Content-Type": "text/plain"})
-    print(urllib.request.urlopen(req, timeout=120).read().decode()[:300], file=sys.stderr)
+    if missing:
+        print(post({"what": "event_add", "rows": missing}), file=sys.stderr)
+    for tid, lab in fixes:
+        print(post({"what": "event_update", "tally_id": tid, "fields": {"mail_auto": lab}, "by": "event_sync"}), file=sys.stderr)
 
 
 if __name__ == "__main__":
