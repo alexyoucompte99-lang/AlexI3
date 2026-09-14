@@ -58,11 +58,16 @@ jobs:
           VALAR_URL: ${{ secrets.VALAR_URL }}
           VALAR_TOKEN: ${{ secrets.VALAR_TOKEN }}
           DATA_KEY: ${{ secrets.DATA_KEY }}
+          META_CAPI_TOKEN: ${{ secrets.META_CAPI_TOKEN }}
           PARSE_XLSX: ${{ github.workspace }}/pipeline/parse_xlsx.py
         working-directory: pipeline
         run: |
           python parse_xlsx.py investisseurs30.xlsx data.json
           python sales_ledger.py data.json ../.sales-ledger.json
+          # API Conversions Meta : Schedule cote serveur pour chaque reservation du nouveau funnel
+          # (onglet « CAPI Schedule » rempli par la page merci + reservations du Sheet) ; sans le
+          # secret META_CAPI_TOKEN, ne fait rien. Registre .capi-sent.json (ids haches seulement).
+          python capi_send.py investisseurs30.xlsx data.json ../.capi-sent.json || true
           python parse_ads_values.py ads_values.json ads.json
           python meta_fetch.py
           python tally_fetch.py || true
@@ -106,7 +111,7 @@ jobs:
             cd ..
             git config user.name "console-bot"
             git config user.email "actions@users.noreply.github.com"
-            git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count 2>/dev/null || true
+            git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json 2>/dev/null || true
             git diff --cached --quiet || (git commit -m "EOW/EOD/idees/EOD setter/reclamations notifies" && git push)
             exit 0
           fi
@@ -126,5 +131,5 @@ jobs:
           git add closing/v.txt 2>/dev/null || true
           git add v.txt 2>/dev/null || true
           git add .sales-ledger.json funnel-data.enc 2>/dev/null || true
-          git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count 2>/dev/null || true
+          git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json 2>/dev/null || true
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)
