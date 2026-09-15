@@ -111,7 +111,11 @@ jobs:
             cd ..
             git config user.name "console-bot"
             git config user.email "actions@users.noreply.github.com"
-            git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json 2>/dev/null || true
+            # un fichier absent (.capi-sent.json sans secret) fait echouer TOUT le git add :
+            # les compteurs n'etaient plus commites et les memes notifs repartaient a chaque run
+            for f in .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json; do
+              if [ -e "$f" ]; then git add "$f"; fi
+            done
             git diff --cached --quiet || (git commit -m "EOW/EOD/idees/EOD setter/reclamations notifies" && git push)
             exit 0
           fi
@@ -130,6 +134,8 @@ jobs:
           git add index.html closing/index.html .data-hash
           git add closing/v.txt 2>/dev/null || true
           git add v.txt 2>/dev/null || true
-          git add .sales-ledger.json funnel-data.enc 2>/dev/null || true
-          git add .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json 2>/dev/null || true
+          # fichier par fichier : un seul absent fait echouer tout le git add (bug des notifs en boucle du 14/09)
+          for f in .sales-ledger.json funnel-data.enc .eow-count .eod-count .idea-count .eodsetter-count .valarclaim-count .capi-sent.json; do
+            if [ -e "$f" ]; then git add "$f"; fi
+          done
           git diff --cached --quiet && echo "rien a publier" || (git commit -m "MAJ auto consoles" && git push)
