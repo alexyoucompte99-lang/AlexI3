@@ -35,6 +35,7 @@ QUESTIONS = [
     ("XMY4EY", "Q10 · Priorité /10"),
     ("8P8ZGP", "Prénom"),
     ("0JveLj", "Email"),
+    ("vOQjMv", "Téléphone"),
     ("yEvbLg", "WhatsApp"),
     ("zrJ7Z0", "Pseudo Instagram"),
 ]
@@ -129,7 +130,7 @@ def main():
             "done": bool(s.get("isCompleted")),
             "prenom": a.get("8P8ZGP", ""),
             "email": a.get("0JveLj", "").lower(),
-            "tel": a.get("yEvbLg", ""),
+            "tel": a.get("vOQjMv", "") or a.get("yEvbLg", ""),
             "insta": a.get("zrJ7Z0", ""),
             "source": source,
             "pseudo": str(hidden.get("pseudo") or "").strip(),
