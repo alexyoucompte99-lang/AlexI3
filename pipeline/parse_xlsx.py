@@ -47,6 +47,10 @@ def cell_str(v):
         return "TRUE" if v else "FALSE"
     if isinstance(v, (dt.datetime, dt.date)):
         return v.strftime("%d/%m/%Y")
+    # l'export xlsx Google écrit les entiers « 33612345678.0 » (constaté le 16/09/2026) :
+    # sans ça les téléphones prennent un 0 en trop et les mensualités s'affichent « 3.0 »
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
     return str(v).strip()
 
 

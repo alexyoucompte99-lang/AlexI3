@@ -54,6 +54,8 @@ def norm_email(e):
 
 
 def norm_phone(p):
+    if isinstance(p, float) and p.is_integer():  # export xlsx Google « 33612345678.0 »
+        p = int(p)
     d = re.sub(r"\D", "", str(p or ""))
     if re.match(r"^0\d{9}$", d):
         d = "33" + d[1:]
