@@ -238,6 +238,7 @@ def main(xlsx_path, out_path):
     history = []  # onglet « Historique Console » (modifs faites depuis la console, pont v14)
     csm = []  # onglet « CSM » : suivi post-vente (3 calls d'accompagnement, mails V1, témoignages)
     iclosed_leads, iclosed_claims, wa_confirms, valar_claims = [], [], [], []
+    deleted_misc = []  # v22 : doublons supprimés (onglet « Supprimés Console »), restaurables
     event = []  # onglet « Event Paris 2026 » (inscrits event 10/10/2026, pont v20, table de Justine)
 
     for ws in wb.worksheets:
@@ -302,7 +303,7 @@ def main(xlsx_path, out_path):
             if not all_rows:
                 continue
             mapping = map_header(all_rows[0])
-            for r in all_rows[1:]:
+            for arow, r in enumerate(all_rows[1:], start=2):
                 def g(f):
                     i = mapping.get(f)
                     return r[i] if i is not None and i < len(r) else None
@@ -313,6 +314,15 @@ def main(xlsx_path, out_path):
                 if not closer and not prospect:
                     continue
                 if not motif.startswith("annul"):
+                    # v22 : doublons supprimés depuis la console, listés (30 j) avec un bouton
+                    # « Restaurer » (pont call_restore) ; toujours ignorés des stats
+                    if not re.search(r"\btests?\b", prospect + " " + motif, re.I):
+                        d = parse_date(g("date"))
+                        deleted_misc.append({
+                            "ar": arow, "tab": src_tab, "n": prospect, "c": re.sub(r"\s+", " ", closer),
+                            "d": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None, "hh": parse_time(g("date")),
+                            "motif": cell_str(r[2])[:40], "at": cell_str(r[0])[:16], "by": cell_str(r[1])[:40],
+                        })
                     continue
                 if re.search(r"\btests?\b", prospect, re.I):
                     continue
@@ -327,6 +337,7 @@ def main(xlsx_path, out_path):
                 calls.append({
                     "tab": src_tab, "webi": webi, "row": None, "hrow": None,
                     "deleted": True, "deleted_at": cell_str(r[0])[:16], "deleted_by": cell_str(r[1])[:40],
+                    "archive_row": arow,
                     "closer": re.sub(r"\s+", " ", closer),
                     "prospect": prospect,
                     "date": f"{d[0]:04d}-{d[1]:02d}-{d[2]:02d}" if d else None,
@@ -648,7 +659,7 @@ def main(xlsx_path, out_path):
 
     out = {"calls": calls, "stripe": stripe, "settings": settings_rows,
            "setter_reports": setter_reports, "dm_reports": dm_reports,
-           "setter_console": setter_console, "history": history, "csm": csm,
+           "setter_console": setter_console, "history": history, "deleted_misc": deleted_misc, "csm": csm,
            "iclosed": iclosed_leads, "iclosed_claims": iclosed_claims,
            "wa_confirms": wa_confirms, "valar_claims": valar_claims, "event": event}
     with open(out_path, "w") as f:

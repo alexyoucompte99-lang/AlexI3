@@ -2493,11 +2493,12 @@ function renderFollowups() {
       /* lead perdu : la vente passe en NON dans le Sheet, le follow-up sort du pipe */
       if (!window.confirm(`Marquer ${c.n || "ce lead"} comme lead perdu ? La vente passera en « NON » dans le Sheet et le follow-up sortira de la liste.`)) { cb.checked = false; return; }
       cb.disabled = true;
-      const ok = c.st && c.sr && await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+      const ok = c.st && c.sr && await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr, date0: frOfIso(c.d),
         headerRow: (DATA.hrows || {})[c.st] || 1,
         fields: { vente: "NON", commentaire: `Lead perdu le ${frDate(TODAY_ISO)} (follow-up abandonné, coché depuis la console)` }, action: "Lead perdu" });
       if (!ok) { cb.checked = false; cb.disabled = false; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
       c.v = "NON";
+      setOverlay(c, { v: "NON" });
       toast(`Lead perdu noté dans le Sheet pour ${c.n || "le lead"} ✓`);
       renderFollowups();
     });
@@ -3266,7 +3267,14 @@ const FILL_V = { OUI: "Vente ✅", NON: "Pas de vente", FOLLOW_UP: "Follow-up", 
 /* « Valar (non pitché) » dans le Sheet : la console le lit comme VALAR, et les formules de
    Thomas (Suivi DATA, COUNTIF "*pitch*") continuent de le compter dans les non pitchés */
 const FILL_V_SHEET = { OUI: "OUI", NON: "NON", FOLLOW_UP: "Follow-up", NON_PITCHE: "Non pitché", VALAR: "Valar (non pitché)" };
-const fillKey = (c) => "fill:" + c.st + "|" + c.sr;
+/* v22 : clés par lead (onglet + nom + date du call), plus par numéro de ligne : les lignes du Sheet
+   bougent (tri, imports iClosed, suppressions) et une clé par ligne pouvait appliquer la saisie d'un
+   lead à un autre, ou la perdre, d'où des fiches « revenues vides » à remplir une 2e fois */
+function leadKey(c) { return c.st + "|" + normName(c.n) + "|" + (c.d || ""); }
+function normName(n) { return String(n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim(); }
+const fillKey = (c) => "fill2:" + leadKey(c);
+const draftKey = (c) => "fdraft:" + leadKey(c);
+const frOfIso = (d) => d ? d.split("-").reverse().join("/") : "";
 let fillCloser = localStorage.getItem("fill-closer") || "";
 let fillFilter = "todo";
 let fillQ = "";
@@ -3275,6 +3283,19 @@ const BUILD_MS = (() => {
   const m = (DATA.updated_at || "").match(/(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})/);
   return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime() : 0;
 })();
+(function gcFillKeys() {
+  try {
+    const drop = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || "";
+      if (k.startsWith("fill:")) drop.push(k);
+      if (k.startsWith("fdraft:") || k.startsWith("ov2:") || k.startsWith("restored:")) {
+        try { if (Date.now() - (JSON.parse(localStorage.getItem(k)).at || 0) > 7 * 86400e3) drop.push(k); } catch (e) { drop.push(k); }
+      }
+    }
+    drop.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+})();
 (function applyFillOverlays() {
   /* overlay optimiste en attendant que le Sheet redescende (MAJ ~15 min).
      Purgé dès que le Sheet reflète l'état envoyé (show-up + résultat), ou après 3 jours.
@@ -3282,7 +3303,7 @@ const BUILD_MS = (() => {
      navigateur/CDN) : le Sheet ne peut pas encore la refléter, c'est ce qui faisait
      « revenir vides » les calls remplis la veille. */
   for (const c of DATA.calls) {
-    if (!c.st || !c.sr) continue;
+    if (!c.st || !c.sr || !c.n) continue;
     const raw = localStorage.getItem(fillKey(c));
     if (!raw) continue;
     try {
@@ -3307,6 +3328,28 @@ const BUILD_MS = (() => {
       if (f.obj) c.obj = c.obj || f.obj;
       c._fillSent = o.when || 1;
     } catch (e) { localStorage.removeItem(fillKey(c)); }
+  }
+})();
+/* v22 : overlay optimiste des autres écritures (changement de closer, lead perdu) : sans lui, un
+   rechargement avant la MAJ du Sheet les faisait réapparaître et les closers les refaisaient */
+function setOverlay(c, f) {
+  try {
+    const k = "ov2:" + leadKey(c);
+    const cur = JSON.parse(localStorage.getItem(k) || "{}");
+    localStorage.setItem(k, JSON.stringify({ at: Date.now(), f: Object.assign(cur.f || {}, f) }));
+  } catch (e) {}
+}
+(function applyOverlays() {
+  for (const c of DATA.calls) {
+    if (!c.st || !c.n) continue;
+    const k = "ov2:" + leadKey(c);
+    let o; try { o = JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { o = null; }
+    if (!o || !o.f) continue;
+    const caughtUp = (!o.f.c || c.c === o.f.c) && (!o.f.v || c.v === o.f.v);
+    const pageOlder = BUILD_MS && BUILD_MS < o.at + 2 * 60e3;
+    if (!pageOlder && (caughtUp || Date.now() - o.at > 3 * 86400e3)) { localStorage.removeItem(k); continue; }
+    if (o.f.c) c.c = o.f.c;
+    if (o.f.v) c.v = o.f.v;
   }
 })();
 /* « derniers calls non remplis » : 30 derniers jours, calls déjà passés
@@ -3334,7 +3377,8 @@ function renderFill() {
   pillRow("fillFilterPills",
     [{ k: "todo", label: `À remplir (${todo.length})` },
      { k: "fix", label: "Corriger un call rempli" },
-     { k: "sent", label: `Remplis via la console (${sent.length})` }],
+     { k: "sent", label: `Remplis via la console (${sent.length})` },
+     { k: "del", label: `Supprimés (${fillDeleted().filter(mine).length})` }],
     fillFilter, k => fillFilter = k, renderFill);
   $("fillBadge").textContent = DATA.calls.filter(fillTodo7).length || "";
   const searchBox = $("fillSearch");
@@ -3343,6 +3387,7 @@ function renderFill() {
     searchBox.dataset.bound = "1";
     searchBox.addEventListener("input", () => { fillQ = searchBox.value.trim().toLowerCase(); renderFill(); });
   }
+  if (fillFilter === "del") { renderFillDeleted(mine); return; }
   const list = fillFilter === "todo" ? todo : (fillFilter === "fix" ? fix : sent);
   const CAP = 20;
   $("fillMore").textContent = list.length > CAP
@@ -3355,6 +3400,51 @@ function renderFill() {
   mount.innerHTML = "";
   for (const c of list.slice(0, CAP)) mount.appendChild(fillCard(c, fillFilter === "fix"));
 }
+/* v22 : lignes supprimées depuis la console (doublons + annulés par le lead) sur 30 jours,
+   restaurables en 1 clic (pont call_restore : la ligne revient dans son onglet du mois) */
+function fillDeleted() {
+  const since = Date.now() - 30 * 86400e3;
+  const when = (s) => { const m = String(s || "").match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0; };
+  const restoredKey = (x) => "restored:" + x.tab + "|" + normName(x.n) + "|" + (x.d || "");
+  const out = [];
+  for (const x of (DATA.deleted || [])) out.push(Object.assign({}, x, { _src: x }));
+  for (const c of DATA.calls) if (c.del && c.ar) out.push({ ar: c.ar, tab: c.st, n: c.n, c: c.c, d: c.d, hh: c.hh, motif: "Annulé par le lead", at: c.delAt, by: c.delBy, _src: c });
+  return out.filter(x => when(x.at) >= since && x.ar && !x._src._restored && !localStorage.getItem(restoredKey(x)))
+    .map(x => Object.assign(x, { rk: restoredKey(x) }))
+    .sort((a, b) => when(b.at) - when(a.at));
+}
+function renderFillDeleted(mine) {
+  const list = fillDeleted().filter(mine);
+  $("fillMore").textContent = list.length ? "Supprimé par erreur ? « Restaurer » remet la ligne dans le Sheet (visible dans la console à la prochaine MAJ, ~15 min)." : "Aucune ligne supprimée ces 30 derniers jours.";
+  const mount = $("fillList");
+  mount.innerHTML = "";
+  for (const x of list) {
+    const card = document.createElement("div");
+    card.className = "fill-card";
+    card.innerHTML = `<div class="who"><b>${esc(x.n || "(sans nom)")}</b><span>${esc(frDateFull(x.d))}${x.hh ? " à " + esc(x.hh) : ""}${x.c ? " · " + esc(x.c.split(" ")[0]) : ""}</span></div>
+      <div class="lede" style="font-size:13px;margin:4px 0 10px">${esc(x.motif || "Supprimé")} · supprimé le ${esc((x.at || "").slice(0, 10))} par ${esc(x.by || "?")}</div>`;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn send"; b.textContent = "↩︎ Restaurer dans le Sheet";
+    b.addEventListener("click", async () => {
+      if (!window.confirm(`Remettre ${x.n || "ce lead"} (call du ${frDateFull(x.d)}) dans « ${x.tab} » ?`)) return;
+      if (b.dataset.busy) return;
+      b.dataset.busy = "1"; b.textContent = "Restauration...";
+      const ok = await bridgePost({ what: "call_restore", archiveRow: x.ar, lead: x.n, by: modBy(), headerRow: (DATA.hrows || {})[x.tab] || 1 });
+      delete b.dataset.busy;
+      if (!ok) { b.textContent = "Réessayer"; toast("❌ Pas pu restaurer" + (bridgePost.lastReason ? " : " + bridgePost.lastReason : "") + ". Dis-le à Alex."); return; }
+      /* l'archive perd une ligne : les suivantes remontent d'un cran */
+      for (const o of (DATA.deleted || [])) if (o.ar > x.ar) o.ar -= 1;
+      for (const o of DATA.calls) if (o.del && o.ar > x.ar) o.ar -= 1;
+      x._src._restored = true;
+      try { localStorage.setItem(x.rk, JSON.stringify({ at: Date.now() })); } catch (e) {}
+      toast(`↩︎ ${x.n} est de retour dans le Sheet : la fiche réapparaît à la prochaine MAJ`);
+      try { if (bridgeReady()) fetch(BRIDGE.url + "?key=" + encodeURIComponent(BRIDGE.key) + "&what=refresh", { cache: "no-store" }).catch(() => {}); } catch (e) {}
+      renderFill();
+    });
+    card.appendChild(b);
+    mount.appendChild(card);
+  }
+}
 function fillCard(c, edit) {
   /* tous les champs du tracking Sheet, PRÉ-REMPLIS avec ce qui est déjà dedans ;
      à l'envoi, seuls les champs modifiés/ajoutés partent (le reste ne bouge pas) */
@@ -3364,6 +3454,25 @@ function fillCard(c, edit) {
   const orig = { s: c.s || "", v: c.v || "", q: c.q ?? null, pp: c.pp || "", mens: c.mens || "",
                  c250: c.c250 || "", vid: c.vid || "", rec: c.rec || "", rel: c.rel || "" };
   const state = Object.assign({}, orig, { com: "", obj: "", raison: "", replan: "", vrdv: "", vnote: "" });
+  /* v22 : brouillon sauvegardé à chaque frappe/clic (par lead) : un rechargement, un re-rendu de la
+     liste ou un onglet fermé ne font plus perdre une fiche à moitié remplie */
+  const blank = Object.assign({}, state);
+  let restored = false;
+  if (!c._fillSent || edit) {
+    try {
+      const dr = JSON.parse(localStorage.getItem(draftKey(c)) || "null");
+      if (dr && dr.s) { Object.assign(state, dr.s); restored = true; }
+    } catch (e) {}
+  }
+  const saveDraft = () => {
+    try {
+      const diff = {};
+      for (const k in state) if (String(state[k] ?? "") !== String(blank[k] ?? "")) diff[k] = state[k];
+      if (Object.keys(diff).length) localStorage.setItem(draftKey(c), JSON.stringify({ at: Date.now(), s: diff }));
+      else localStorage.removeItem(draftKey(c));
+    } catch (e) {}
+  };
+  card.addEventListener("input", saveDraft);
   const nonClose = () => ["NON", "FOLLOW_UP", "NON_PITCHE"].includes(state.v);
   const seg = (label, opts, cur, onPick, cls) => {
     const wrap = document.createElement("div");
@@ -3390,11 +3499,24 @@ function fillCard(c, edit) {
     return w;
   };
   const redraw = () => {
+    saveDraft();
     card.innerHTML = "";
     const who = document.createElement("div");
     who.className = "who";
     who.innerHTML = `<b>${esc(c.n || "(sans nom)")}</b><span>${esc(quand)}${c.c ? " · " + esc(c.c.split(" ")[0]) : ""}</span>`;
     card.appendChild(who);
+    if (restored && (!c._fillSent || edit)) {
+      const note = document.createElement("div");
+      note.className = "lede";
+      note.style.cssText = "font-size:12px;margin:-2px 0 8px;color:var(--accent)";
+      note.textContent = "📝 Brouillon récupéré : ta saisie non envoyée est revenue.";
+      const clr = document.createElement("button");
+      clr.type = "button"; clr.className = "btn"; clr.style.cssText = "font-size:11px;padding:2px 8px;margin-left:8px";
+      clr.textContent = "Effacer le brouillon";
+      clr.addEventListener("click", () => { Object.assign(state, blank); restored = false; localStorage.removeItem(draftKey(c)); redraw(); });
+      note.appendChild(clr);
+      card.appendChild(note);
+    }
     if (c._fillSent && !edit) {
       const ok = document.createElement("div");
       ok.className = "okline";
@@ -3509,23 +3631,42 @@ async function fillReassign(c, newCloser, sel) {
   if (!newCloser) return;
   if (!window.confirm(`Passer le call de ${c.n || "ce lead"} chez ${newCloser.split(" ")[0]} ? Le Sheet sera mis à jour.`)) { sel.value = ""; return; }
   sel.disabled = true;
-  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr, date0: frOfIso(c.d),
     headerRow: (DATA.hrows || {})[c.st] || 1, fields: { closer: newCloser }, action: "Changement de closer" });
   sel.disabled = false;
   if (!ok) { sel.value = ""; toast("❌ Pas pu écrire dans le Sheet. Réessaie."); return; }
   c.c = newCloser;
+  setOverlay(c, { c: newCloser });
   toast(`✅ Call réattribué à ${newCloser.split(" ")[0]} (Sheet à jour)`);
   renderFill();
+}
+function findTwinCall(c) {
+  const nm = normName(c.n), mail = String(c.mail || "").trim().toLowerCase();
+  const tel = String(c.tel || "").replace(/\.0$/, "").replace(/\D/g, "").slice(-9);
+  return DATA.calls.find(o => o !== c && !o.del && o.s !== "DOUBLON" && (
+    (mail && String(o.mail || "").trim().toLowerCase() === mail) ||
+    (tel.length === 9 && String(o.tel || "").replace(/\.0$/, "").replace(/\D/g, "").slice(-9) === tel) ||
+    (nm && normName(o.n) === nm)));
 }
 async function fillDoublon(c, btn) {
   /* v19 : la ligne est retirée de l'onglet du mois et archivée dans « Supprimés Console »
      (motif Doublon) par le pont what=call_delete ; parse_xlsx ignore les doublons partout */
-  if (!window.confirm(`Supprimer le call de ${c.n || "ce lead"} (DOUBLON) ? La ligne est retirée du Sheet (archivée dans l'onglet « Supprimés Console ») et disparaît de la console et des stats.`)) return;
+  /* v22 : un doublon suppose une AUTRE ligne du même lead (mail, téléphone ou nom). Incident du 13/09 :
+     Sandrine Perrin (seule ligne, vendue ensuite) supprimée en « Doublon » -> introuvable. Le pont
+     refuse aussi de son côté. */
+  const twin = findTwinCall(c);
+  if (!twin) {
+    window.alert(`Pas un doublon : ${c.n || "ce lead"} n'a aucune autre ligne dans le Sheet.\n\nSi le lead a annulé → bouton « Annulé par le lead ».\nSinon remplis la fiche (no-show, reprogrammé…).`);
+    return;
+  }
+  const twinTxt = `${frDateFull(twin.d)}${twin.hh ? " à " + twin.hh : ""}${twin.c ? " avec " + twin.c.split(" ")[0] : ""}${twin.st && twin.st !== c.st ? " (" + twin.st + ")" : ""}`;
+  if (!window.confirm(`Supprimer CE call de ${c.n || "ce lead"} : ${frDateFull(c.d)}${c.hh ? " à " + c.hh : ""} (DOUBLON) ?\n\nL'autre ligne gardée : ${twinTxt}.\n\nLa ligne est archivée dans « Supprimés Console » et reste restaurable 30 jours (filtre « Supprimés »).`)) return;
   btn.disabled = true;
   const ok = await callDelete(c, "Doublon", "Doublon (supprimé)");
   btn.disabled = false;
   if (!ok) { toast("❌ Pas pu supprimer dans le Sheet" + (bridgePost.lastReason ? " · " + bridgePost.lastReason : "") + ". Réessaie."); return; }
   c.s = "DOUBLON"; /* sort de fillTodo tout de suite ; au prochain refresh la ligne n'existe plus */
+  try { localStorage.removeItem(draftKey(c)); } catch (e) {}
   toast("🗑 Doublon supprimé du Sheet (archivé dans Supprimés Console)");
   renderFill();
 }
@@ -3612,7 +3753,7 @@ async function fillSend(c, orig, state, btn) {
   if (!Object.keys(fields).length) { toast("Rien de nouveau à envoyer : tout est déjà dans le Sheet ✓"); return; }
   if (btn.dataset.busy) return;
   btn.dataset.busy = "1"; btn.textContent = "Envoi...";
-  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr,
+  const ok = await bridgePost({ what: "call_update", lead: c.n, by: modBy(), tab: c.st, row: c.sr, date0: frOfIso(c.d),
     headerRow: (DATA.hrows || {})[c.st] || 1, fields, action: c.hasS || c.hasV ? "Correction de la fiche" : "Saisie post-call" });
   delete btn.dataset.busy;
   if (!ok) {
@@ -3620,6 +3761,11 @@ async function fillSend(c, orig, state, btn) {
     toast("❌ Pas pu écrire dans le Sheet" + (bridgePost.lastReason ? " : " + bridgePost.lastReason : "") + ". Réessaie ; si ça persiste, dis-le à Alex.");
     return;
   }
+  /* v22 : le pont a retrouvé le lead sur une autre ligne (Sheet trié entre-temps) -> on suit */
+  const newRow = +((bridgePost.lastText || "").match(/"row":(\d+)/) || [])[1] || 0;
+  if (newRow && newRow !== c.sr) c.sr = newRow;
+  const k0 = fillKey(c), d0 = draftKey(c);
+  try { localStorage.removeItem(d0); } catch (e) {}
   /* MAJ optimiste locale, purgée dès que le Sheet renvoie la vraie valeur */
   if (state.s) c.s = state.s;
   if (replan) { c.s = ""; c.d = replan.split("T")[0]; c.hh = replan.split("T")[1]; }
@@ -3634,7 +3780,7 @@ async function fillSend(c, orig, state, btn) {
   if (fields.commentaire) c.com = c.com ? c.com + "\n" + state.com.trim() : state.com.trim();
   if (fields.objection) c.obj = c.obj ? c.obj + "\n" + fields.objection : fields.objection;
   c._fillSent = Date.now();
-  localStorage.setItem(fillKey(c), JSON.stringify({ when: c._fillSent,
+  localStorage.setItem(k0, JSON.stringify({ when: c._fillSent,
     f: { s: c.s, v: c.v, q: c.q, pp: c.pp, mens: c.mens, c250: c.c250, vid: c.vid, rec: c.rec,
          rel: c.rel, com: state.com.trim(), obj: fields.objection || state.obj.trim(),
          d: replan ? c.d : null, hh: replan ? c.hh : null } }));
@@ -4392,6 +4538,20 @@ $("updatedAt").textContent = DATA.updated_at;
    pont Apps Script ; ailleurs (artifact claude.ai) il garde l'ouverture de Claude */
 const BRIDGE = { url: "__BRIDGE_URL__", key: "__BRIDGE_KEY__" };
 const BUILD_ID = "__BUILD_ID__"; // injecté par build.py, comparé à v.txt (voir setupRefresh)
+function saveView() {
+  try {
+    const t = document.querySelector('.tab[aria-selected="true"]');
+    sessionStorage.setItem("view", JSON.stringify({ at: Date.now(), tab: t ? t.id : "", y: scrollY, ff: fillFilter }));
+  } catch (e) {}
+}
+function restoreView() {
+  let v; try { v = JSON.parse(sessionStorage.getItem("view") || "null"); sessionStorage.removeItem("view"); } catch (e) { v = null; }
+  if (!v || Date.now() - v.at > 10 * 60e3) return;
+  if (v.ff && v.ff !== fillFilter) { fillFilter = v.ff; renderFill(); }
+  const t = v.tab && document.getElementById(v.tab);
+  if (t && t.getAttribute("aria-selected") !== "true" && !/🔒/.test(t.textContent)) t.click();
+  requestAnimationFrame(() => setTimeout(() => scrollTo({ top: v.y || 0 }), 60));
+}
 function setupRefresh(btn, note) {
   if (location.hostname.endsWith("github.io") && BRIDGE.url.indexOf("http") === 0) {
     if (note) note.innerHTML = "Dernière mise à jour : <b>" + DATA.updated_at + "</b><br>À l'ouverture, si la page date de plus de 10 min, la MAJ se lance toute seule (environ 2 min).<br>Le bouton force une MAJ complète immédiate.";
@@ -4410,17 +4570,40 @@ function setupRefresh(btn, note) {
         return /^[0-9a-f]{6,40}$/.test(t) ? t : "";
       } catch (err) { return null; }
     };
-    const goFresh = () => {
+    /* v22 : la page se rechargeait toute seule (vérif chaque minute + retour sur l'onglet) dès qu'une
+       nouvelle version sortait, soit toutes les ~15 min, MÊME en pleine saisie : fiche à moitié remplie
+       perdue, onglet et défilement remis à zéro. Désormais : jamais pendant qu'on s'en sert (champ actif
+       ou action dans les 3 dernières min) -> bandeau « Recharger » ; sinon rechargement en gardant
+       l'onglet, le filtre et la position. */
+    let lastUse = 0; /* à l'ouverture rien n'est en cours : une copie périmée se recharge tout de suite */
+    ["input", "keydown", "pointerdown", "change", "scroll"].forEach(ev =>
+      addEventListener(ev, () => { lastUse = Date.now(); }, { capture: true, passive: true }));
+    const inUse = () => {
+      const a = document.activeElement;
+      return (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) || Date.now() - lastUse < 3 * 60e3;
+    };
+    const goFresh = (force) => {
       /* garde-fou : au plus un rechargement forcé toutes les 2 min (pas de boucle si le CDN traîne) */
       const last = +(sessionStorage.getItem("fresh-at") || 0);
       if (Date.now() - last < 120000) return;
+      if (!force && inUse()) { showNewVersion(); return; }
       sessionStorage.setItem("fresh-at", String(Date.now()));
+      saveView();
       location.replace(location.pathname + "?v=" + Date.now());
+    };
+    let banner = null;
+    const showNewVersion = () => {
+      if (banner) return;
+      banner = document.createElement("div");
+      banner.style.cssText = "position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#241d15;color:#f7efe4;padding:8px 10px 8px 16px;border-radius:999px;font-size:13px;z-index:100;display:flex;gap:10px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.2)";
+      banner.innerHTML = `Données mises à jour <button type="button" style="background:#f7efe4;color:#241d15;border:0;border-radius:999px;padding:4px 12px;font-size:12.5px;cursor:pointer">Recharger</button>`;
+      banner.querySelector("button").addEventListener("click", () => { sessionStorage.removeItem("fresh-at"); goFresh(true); });
+      document.body.appendChild(banner);
     };
     const maybeReload = async () => {
       if (btn.dataset.busy || document.hidden) return;
       const t = await pageTag();
-      if (t && t !== etag0) goFresh();
+      if (t && t !== etag0) goFresh(false);
     };
     /* MAJ complète : dispatch GitHub via le pont, puis attente de la nouvelle version (v.txt) */
     const runRefresh = async (auto) => {
@@ -4447,10 +4630,12 @@ function setupRefresh(btn, note) {
         const tag = await pageTag();
         if (tag && etag0 && tag !== etag0) {
           clearInterval(t);
-          btn.textContent = "Nouvelle version en ligne · rechargement...";
-          goFresh();
+          btn.textContent = auto ? "↻ Mettre à jour maintenant" : "Nouvelle version en ligne · rechargement...";
+          if (!auto) delete btn.dataset.busy;
+          goFresh(!auto);
+          if (auto) delete btn.dataset.busy;
         } else if ((!tag || !etag0) && sec >= 170) {
-          clearInterval(t); goFresh();
+          clearInterval(t); delete btn.dataset.busy; goFresh(!auto);
         } else if (sec >= 300) {
           clearInterval(t);
           btn.textContent = auto ? "↻ Mettre à jour maintenant" : "Toujours rien après 5 min · reclique";
@@ -4468,13 +4653,15 @@ function setupRefresh(btn, note) {
       if (Date.now() - last < 10 * 60e3) return;
       const t = await pageTag();
       if (t === null) return;           // hors ligne / pas de v.txt
-      if (t && t !== etag0) { goFresh(); return; } // une version plus récente existe déjà
+      if (t && t !== etag0) { goFresh(false); return; } // une version plus récente existe déjà
       localStorage.setItem("auto-refresh-at", String(Date.now()));
       runRefresh(true);
     };
     maybeReload().then(autoRefresh);
     setInterval(maybeReload, 60000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) maybeReload(); });
+    /* retour sur l'onglet (après WhatsApp / iClosed) : c'est souvent pour coller quelque chose dans une
+       fiche -> on compte ça comme une utilisation, le rechargement attendra */
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { lastUse = Date.now(); maybeReload(); } });
   } else {
     btn.href = "https://claude.ai/new?q=" + encodeURIComponent(
       "Mets à jour les consoles Thomas (business + closing) : suis le runbook /Users/alex/Alex/thomas-dashboard/README.md (re-télécharge les Google Sheets, relance le pipeline complet, republie les deux artifacts aux mêmes URLs).");
@@ -4528,4 +4715,5 @@ initAlex();
 const backtop = $("backtop");
 addEventListener("scroll", () => backtop.classList.toggle("show", scrollY > 600), { passive: true });
 backtop.addEventListener("click", () => scrollTo({ top: 0 }));
+restoreView();
 </script>
