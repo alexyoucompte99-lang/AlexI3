@@ -1295,7 +1295,7 @@ for (const m of [...new Set(DATA.calls.map(c => c.tm))].filter(m => m && m < TOD
   });
 }
 const CL_LES3 = "__les3__";
-let clSel = TOP3[0], clPeriodK = "7j";
+let clSel = TOP3[0], clPeriodK = "7j", clCustom = null;
 const clPc = (v) => v == null ? "·" : String(Math.round(v)) + " %";
 const clEur = (v) => v == null ? "·" : fmtE(Math.round(v));
 function clStats(name, r) {
@@ -1312,8 +1312,22 @@ function clStats(name, r) {
 function renderClosersTab() {
   pillRow("clCloserPills", [...TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), { k: CL_LES3, label: "Les 3" }], clSel, k => clSel = k, renderClosersTab);
   pillRow("clPeriodPills", CL_PERIODS.map(pp => ({ k: pp.k, label: pp.label })), clPeriodK, k => clPeriodK = k, renderClosersTab);
+  /* dates choisies à la main : du … au … */
+  const clCust = document.createElement("span");
+  clCust.className = "fcustom";
+  clCust.innerHTML = `<input type="date" id="clFrom" aria-label="Du"> → <input type="date" id="clTo" aria-label="Au">`;
+  const clGo = document.createElement("button");
+  clGo.className = "fpill"; clGo.textContent = "Voir";
+  clGo.setAttribute("aria-pressed", String(clPeriodK === "custom"));
+  clGo.addEventListener("click", () => {
+    const f = $("clFrom").value, t = $("clTo").value;
+    if (f && t && f <= t) { clCustom = { from: f, to: t }; clPeriodK = "custom"; renderClosersTab(); }
+  });
+  clCust.appendChild(clGo);
+  $("clPeriodPills").appendChild(clCust);
+  if (clCustom) { $("clFrom").value = clCustom.from; $("clTo").value = clCustom.to; }
   pillRow("clSrcPills", FUN_OPTS, state.src, k => state.src = k, renderClosersTab);
-  const per = CL_PERIODS.find(pp => pp.k === clPeriodK);
+  const per = clPeriodK === "custom" ? { k: "custom", label: "", range: () => ({ ...clCustom }) } : CL_PERIODS.find(pp => pp.k === clPeriodK);
   const r = per.range();
   $("clLede").textContent = (clSel === CL_LES3 ? "Les 3 closers réunis" : clSel) + " · " +
     (r.tm ? "mois " + (/^[aeiouéà]/i.test(per.label) ? "d'" : "de ") + per.label + " (onglet complet, relances comprises)"
