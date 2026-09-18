@@ -384,7 +384,7 @@ __FUNNEL_CSS__
     <section style="margin-top:16px">
       <span class="eyebrow">Par closer</span>
       <h2>Performances closers</h2>
-      <p class="lede">Les stats du closer choisi sur la période, puis le comparatif des trois. Une vente est comptée si elle est validée par le closer ou par le virement Justine ; le taux de show-up se calcule sur les calls renseignés, hors calls annulés par le lead.</p>
+      <p class="lede">Les stats du ou des closers choisis sur la période (choisis-en 1, 2 ou 3 : leurs chiffres sont additionnés), puis le comparatif des trois. Une vente est comptée si elle est validée par le closer ou par le virement Justine ; le taux de show-up se calcule sur les calls renseignés, hors calls annulés par le lead.</p>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Closer</span><span id="clCloserPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
         <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center"><span class="eyebrow" style="min-width:62px">Période</span><span id="clPeriodPills" style="display:inline-flex;flex-wrap:wrap;gap:7px"></span></div>
@@ -1295,12 +1295,15 @@ for (const m of [...new Set(DATA.calls.map(c => c.tm))].filter(m => m && m < TOD
   });
 }
 const CL_LES3 = "__les3__";
-let clSel = TOP3[0], clPeriodK = "7j", clCustom = null;
+/* closers choisis : 1, 2 ou 3 (clic sur une pill = ajoute / retire) */
+let clSel = [TOP3[0]], clPeriodK = "7j", clCustom = null;
+const clSelLabel = (sel) => sel.length === TOP3.length ? "Les 3" : sel.map(n => n.split(" ")[0]).join(" + ");
 const clPc = (v) => v == null ? "·" : String(Math.round(v)) + " %";
 const clEur = (v) => v == null ? "·" : fmtE(Math.round(v));
 function clStats(name, r) {
-  /* name = un closer, ou CL_LES3 = les 3 principaux réunis */
-  const match = (c) => name === CL_LES3 ? TOP3.includes(c.c || "") : (c.c || "") === name;
+  /* name = un closer, une liste de closers réunis, ou CL_LES3 = les 3 principaux réunis */
+  const names = name === CL_LES3 ? TOP3 : [].concat(name);
+  const match = (c) => names.includes(c.c || "");
   const o = st(plannedIn(r).filter(match), r, match);
   o.fu = DATA.calls.filter(c => match(c) && c.v === "FOLLOW_UP" && !c.vir && c.tm >= "2026").length;
   o.tNonPitche = o.shows ? 100 * o.nonPitche / o.shows : null;
@@ -1310,7 +1313,27 @@ function clStats(name, r) {
   return o;
 }
 function renderClosersTab() {
-  pillRow("clCloserPills", [...TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), { k: CL_LES3, label: "Les 3" }], clSel, k => clSel = k, renderClosersTab);
+  /* multi-sélection : chaque closer s'ajoute ou se retire, « Les 3 » sélectionne tout (au moins 1 closer gardé) */
+  const clMount = $("clCloserPills");
+  clMount.innerHTML = "";
+  for (const o of [...TOP3.map(n => ({ k: n, label: n.split(" ")[0] })), { k: CL_LES3, label: "Les 3" }]) {
+    const b = document.createElement("button");
+    b.className = "fpill"; b.textContent = o.label;
+    const on = o.k === CL_LES3 ? clSel.length === TOP3.length : clSel.includes(o.k);
+    b.setAttribute("aria-pressed", String(on));
+    b.title = o.k === CL_LES3 ? "Les 3 closers réunis" : on ? "Retirer " + o.label : "Ajouter " + o.label;
+    b.addEventListener("click", () => {
+      if (o.k === CL_LES3) clSel = [...TOP3];
+      else if (on) { if (clSel.length > 1) clSel = clSel.filter(n => n !== o.k); }
+      else clSel = TOP3.filter(n => n === o.k || clSel.includes(n));
+      renderClosersTab();
+    });
+    clMount.appendChild(b);
+  }
+  const clHint = document.createElement("span");
+  clHint.style.cssText = "font-size:12px;color:var(--muted)";
+  clHint.textContent = "clique pour ajouter ou retirer un closer";
+  clMount.appendChild(clHint);
   pillRow("clPeriodPills", CL_PERIODS.map(pp => ({ k: pp.k, label: pp.label })), clPeriodK, k => clPeriodK = k, renderClosersTab);
   /* dates choisies à la main : du … au … */
   const clCust = document.createElement("span");
@@ -1329,7 +1352,7 @@ function renderClosersTab() {
   pillRow("clSrcPills", FUN_OPTS, state.src, k => state.src = k, renderClosersTab);
   const per = clPeriodK === "custom" ? { k: "custom", label: "", range: () => ({ ...clCustom }) } : CL_PERIODS.find(pp => pp.k === clPeriodK);
   const r = per.range();
-  $("clLede").textContent = (clSel === CL_LES3 ? "Les 3 closers réunis" : clSel) + " · " +
+  $("clLede").textContent = (clSel.length === TOP3.length ? "Les 3 closers réunis" : clSel.length > 1 ? clSelLabel(clSel) + " réunis" : clSel[0]) + " · " +
     (r.tm ? "mois " + (/^[aeiouéà]/i.test(per.label) ? "d'" : "de ") + per.label + " (onglet complet, relances comprises)"
           : rangeLabel(r) + (clPeriodK === "mtd" ? " (onglet du mois complet, relances comprises)" : ""));
   const o = clStats(clSel, r);
@@ -1353,8 +1376,9 @@ function renderClosersTab() {
     kpiTile("Follow-ups en cours", fmtN(o.fu), "toutes périodes, encore à relancer"),
   ].join("");
 
-  /* comparatif : les 3 closers + colonne « Les 3 » (agrégat, hors surlignage) */
-  const stats = [...TOP3, CL_LES3].map(n => clStats(n, r));
+  /* comparatif : les 3 closers + colonne de la sélection si 2 closers choisis + colonne « Les 3 » (agrégats, hors surlignage) */
+  const clDuo = clSel.length > 1 && clSel.length < TOP3.length;
+  const stats = [...TOP3, ...(clDuo ? [clSel] : []), CL_LES3].map(n => clStats(n, r));
   const METRICS = [
     ["Calls bookés", oo => oo.calls, fmtN, "max"],
     ["Calls présents", oo => oo.shows, fmtN, "max"],
@@ -1377,7 +1401,7 @@ function renderClosersTab() {
     ["Follow-ups en cours", oo => oo.fu, fmtN, null],
   ];
   $("clCompare").innerHTML = "<thead><tr><th></th>" +
-    TOP3.map(n => `<th class="num">${esc(n.split(" ")[0])}</th>`).join("") + `<th class="num">Les 3</th>` + "</tr></thead><tbody>" +
+    TOP3.map(n => `<th class="num">${esc(n.split(" ")[0])}</th>`).join("") + (clDuo ? `<th class="num">${esc(clSelLabel(clSel))}</th>` : "") + `<th class="num">Les 3</th>` + "</tr></thead><tbody>" +
     METRICS.map(([lbl, get, fm, dir]) => {
       const vals = stats.map(get);
       let best = null;
@@ -1389,7 +1413,7 @@ function renderClosersTab() {
         `<td class="num${vi < 3 && dir != null && v != null && v === best ? " best" : ""}">${fm(v)}</td>`).join("") + "</tr>";
     }).join("") + "</tbody>";
 
-  const labels = [...TOP3.map(n => n.split(" ")[0]), "Les 3"];
+  const labels = [...TOP3.map(n => n.split(" ")[0]), ...(clDuo ? [clSelLabel(clSel)] : []), "Les 3"];
   const one = (id, values, opts) => { const m = $(id); m.innerHTML = ""; barChart(m, labels, [{ name: "", color: "var(--s1)", values }], opts); };
   one("clChartCa", stats.map(x => x.ca), { fmtAxis: v => fmtN(Math.round(v / 100) * 100), height: 205 });
   one("clChartVentes", stats.map(x => x.ventes), { ticks: 3, height: 205 });
